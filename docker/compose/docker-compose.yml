@@ -1,0 +1,6 @@
+﻿services:
+  sampleckwebapp.webapi:
+    image: sampleckwebapp:build
+    restart: always
+
+

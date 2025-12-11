@@ -1,0 +1,16 @@
+<Project>
+    <Import Project="user.props" Condition="Exists('user.props')"/>
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <Authors>Codecta</Authors>
+        <Company>Codecta</Company>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <NoWarn>1701;1702;1591;8618</NoWarn>
+    </PropertyGroup>
+</Project>

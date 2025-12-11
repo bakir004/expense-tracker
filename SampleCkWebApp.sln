@@ -1,0 +1,90 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleCkWebApp.Contracts", "SampleCkWebApp\src\SampleCkWebApp.Contracts\SampleCkWebApp.Contracts.csproj", "{CB1F805F-C5EF-4B94-AF0E-7F393298F632}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleCkWebApp.Domain", "SampleCkWebApp\src\SampleCkWebApp.Domain\SampleCkWebApp.Domain.csproj", "{9119C794-C8C2-41A7-AC9B-B53599E21B74}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleCkWebApp.Infrastructure", "SampleCkWebApp\src\SampleCkWebApp.Infrastructure\SampleCkWebApp.Infrastructure.csproj", "{F430D79A-1BE4-448A-9E76-22795596BD07}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleCkWebApp.Application", "SampleCkWebApp\src\SampleCkWebApp.Application\SampleCkWebApp.Application.csproj", "{8DB6F467-8B26-41AA-9081-454C8CF5048C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleCkWebApp.WebApi", "SampleCkWebApp\src\SampleCkWebApp.WebApi\SampleCkWebApp.WebApi.csproj", "{36B07AB4-4609-4DBF-86A8-355F9BE0AEAC}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docker", "docker", "{BD0BFA58-DC59-441F-B791-95F8CF2BE864}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "build", "build", "{4F0AFB15-B567-4F74-9361-8FCC5BFE8F59}"
+	ProjectSection(SolutionItems) = preProject
+		docker\build\SampleCkWebApp.Dockerfile = docker\build\SampleCkWebApp.Dockerfile
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "compose", "compose", "{ACBF7216-46C0-4E8A-AD8D-C580A5C2B52A}"
+	ProjectSection(SolutionItems) = preProject
+		docker\compose\docker-compose.yml = docker\compose\docker-compose.yml
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{8F0C5728-E43C-41C6-B3E5-5738113C55D5}"
+	ProjectSection(SolutionItems) = preProject
+		scripts\build.sh = scripts\build.sh
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionFiles", "SolutionFiles", "{DAB849DB-9D46-4F24-96EC-A664CFC1E006}"
+	ProjectSection(SolutionItems) = preProject
+		Directory.Build.props = Directory.Build.props
+		nuget.config = nuget.config
+		.dockerignore = .dockerignore
+		.gitignore = .gitignore
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{5CEE20D2-A217-4F54-A9E5-5F9A99977801}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Applications", "Applications", "{6952E039-A5DA-44C0-B4FC-4E1B5EFF192C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SampleCkWebApp", "SampleCkWebApp", "{9EEC8B81-24D2-40F9-9036-ED3E9D4AF71F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{C75CCC75-4E1C-4B74-9B76-C00ED54D212E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Applications", "Applications", "{C48027FF-5AAA-49A8-B786-D27066D1B983}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SampleCkWebApp", "SampleCkWebApp", "{6B543EF5-1BB4-4488-83AA-D2E62216A8EC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CB1F805F-C5EF-4B94-AF0E-7F393298F632}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CB1F805F-C5EF-4B94-AF0E-7F393298F632}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CB1F805F-C5EF-4B94-AF0E-7F393298F632}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CB1F805F-C5EF-4B94-AF0E-7F393298F632}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9119C794-C8C2-41A7-AC9B-B53599E21B74}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9119C794-C8C2-41A7-AC9B-B53599E21B74}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9119C794-C8C2-41A7-AC9B-B53599E21B74}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9119C794-C8C2-41A7-AC9B-B53599E21B74}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F430D79A-1BE4-448A-9E76-22795596BD07}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F430D79A-1BE4-448A-9E76-22795596BD07}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F430D79A-1BE4-448A-9E76-22795596BD07}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F430D79A-1BE4-448A-9E76-22795596BD07}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8DB6F467-8B26-41AA-9081-454C8CF5048C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8DB6F467-8B26-41AA-9081-454C8CF5048C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8DB6F467-8B26-41AA-9081-454C8CF5048C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8DB6F467-8B26-41AA-9081-454C8CF5048C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{36B07AB4-4609-4DBF-86A8-355F9BE0AEAC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{36B07AB4-4609-4DBF-86A8-355F9BE0AEAC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{36B07AB4-4609-4DBF-86A8-355F9BE0AEAC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{36B07AB4-4609-4DBF-86A8-355F9BE0AEAC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{4F0AFB15-B567-4F74-9361-8FCC5BFE8F59} = {BD0BFA58-DC59-441F-B791-95F8CF2BE864}
+		{ACBF7216-46C0-4E8A-AD8D-C580A5C2B52A} = {BD0BFA58-DC59-441F-B791-95F8CF2BE864}
+		{6952E039-A5DA-44C0-B4FC-4E1B5EFF192C} = {5CEE20D2-A217-4F54-A9E5-5F9A99977801}
+		{9EEC8B81-24D2-40F9-9036-ED3E9D4AF71F} = {6952E039-A5DA-44C0-B4FC-4E1B5EFF192C}
+		{8DB6F467-8B26-41AA-9081-454C8CF5048C} = {9EEC8B81-24D2-40F9-9036-ED3E9D4AF71F}
+		{CB1F805F-C5EF-4B94-AF0E-7F393298F632} = {9EEC8B81-24D2-40F9-9036-ED3E9D4AF71F}
+		{9119C794-C8C2-41A7-AC9B-B53599E21B74} = {9EEC8B81-24D2-40F9-9036-ED3E9D4AF71F}
+		{F430D79A-1BE4-448A-9E76-22795596BD07} = {9EEC8B81-24D2-40F9-9036-ED3E9D4AF71F}
+		{36B07AB4-4609-4DBF-86A8-355F9BE0AEAC} = {9EEC8B81-24D2-40F9-9036-ED3E9D4AF71F}
+		{C48027FF-5AAA-49A8-B786-D27066D1B983} = {C75CCC75-4E1C-4B74-9B76-C00ED54D212E}
+		{6B543EF5-1BB4-4488-83AA-D2E62216A8EC} = {C48027FF-5AAA-49A8-B786-D27066D1B983}
+	EndGlobalSection
+EndGlobal
