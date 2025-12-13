@@ -28,7 +28,35 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
-        c.SwaggerDoc("v1", new() { Title = "API", Version = "v1" });
+        c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+        {
+            Title = "Expense Tracker API",
+            Version = "v1",
+            Description = "A RESTful API for managing expenses, users, and categories in an expense tracking application.",
+            Contact = new Microsoft.OpenApi.Models.OpenApiContact
+            {
+                Name = "API Support",
+                Email = "support@expensetracker.com"
+            }
+        });
+        
+        // Include XML comments
+        var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+        if (File.Exists(xmlPath))
+        {
+            c.IncludeXmlComments(xmlPath);
+        }
+        
+        // Include XML comments from referenced projects
+        var contractsXml = Path.Combine(AppContext.BaseDirectory, "SampleCkWebApp.Contracts.xml");
+        if (File.Exists(contractsXml))
+        {
+            c.IncludeXmlComments(contractsXml);
+        }
+        
+        // Use full names for better organization
+        c.CustomSchemaIds(type => type.FullName);
     });    
     builder.Services
         .AddApplication(builder.Configuration)
@@ -56,7 +84,17 @@ var app = builder.Build();
     });
     
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Expense Tracker API v1");
+        c.RoutePrefix = "swagger"; // Swagger UI available at /swagger
+        c.DocumentTitle = "Expense Tracker API Documentation";
+        c.DefaultModelsExpandDepth(-1); // Hide schemas by default
+        c.DisplayRequestDuration();
+        c.EnableDeepLinking();
+        c.EnableFilter();
+        c.ShowExtensions();
+    });
     
     app.MapControllers();
 }

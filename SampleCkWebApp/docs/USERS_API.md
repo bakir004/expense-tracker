@@ -13,11 +13,13 @@ The Users API provides endpoints to manage users in the expense tracker system. 
 Retrieves all users from the database.
 
 **Request:**
+
 ```
 GET /users
 ```
 
 **Response:**
+
 ```json
 {
   "users": [
@@ -34,6 +36,7 @@ GET /users
 ```
 
 **Status Codes:**
+
 - `200 OK` - Successfully retrieved users
 - `500 Internal Server Error` - Database error
 
@@ -44,11 +47,13 @@ GET /users
 Retrieves a specific user by ID.
 
 **Request:**
+
 ```
 GET /users/1
 ```
 
 **Response:**
+
 ```json
 {
   "id": 1,
@@ -60,6 +65,7 @@ GET /users/1
 ```
 
 **Status Codes:**
+
 - `200 OK` - User found
 - `404 Not Found` - User not found
 - `500 Internal Server Error` - Database error
@@ -71,6 +77,7 @@ GET /users/1
 Creates a new user.
 
 **Request:**
+
 ```json
 {
   "name": "John Doe",
@@ -80,6 +87,7 @@ Creates a new user.
 ```
 
 **Response:**
+
 ```json
 {
   "id": 1,
@@ -91,12 +99,14 @@ Creates a new user.
 ```
 
 **Status Codes:**
+
 - `201 Created` - User successfully created
 - `400 Bad Request` - Validation error (invalid name, email, or password)
 - `409 Conflict` - User with this email already exists
 - `500 Internal Server Error` - Database error
 
 **Validation Rules:**
+
 - `name`: Required, 1-100 characters
 - `email`: Required, must be a valid email format
 - `password`: Required, minimum 6 characters
@@ -138,7 +148,7 @@ The Users feature follows Clean Architecture:
 
 - **Domain Layer**: `UserErrors.cs` - Domain-specific error definitions
 - **Contracts Layer**: Request/Response DTOs (`CreateUserRequest`, `UserResponse`, `GetUsersResponse`)
-- **Application Layer**: 
+- **Application Layer**:
   - `IUserService` - Application service interface
   - `UserService` - Business logic and orchestration
   - `UserValidator` - Validation logic
@@ -204,4 +214,3 @@ All endpoints use the `ErrorOr` pattern for error handling. Errors are automatic
 - Database errors → `500 Internal Server Error`
 
 Error responses follow the standard ASP.NET Core Problem Details format.
-

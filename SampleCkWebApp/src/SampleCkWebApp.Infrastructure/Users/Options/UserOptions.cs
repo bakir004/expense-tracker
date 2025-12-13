@@ -1,3 +1,24 @@
+// ============================================================================
+// FILE: UserOptions.cs
+// ============================================================================
+// WHAT: Configuration options class for user repository database settings.
+//
+// WHY: This options class exists in the Infrastructure layer to provide
+//      strongly-typed configuration for database connections. It follows
+//      the Options pattern from Microsoft.Extensions.Options, which is
+//      the standard way to handle configuration in .NET. By validating
+//      configuration at startup, we fail fast if the connection string
+//      is missing or invalid, rather than discovering it at runtime.
+//
+// WHAT IT DOES:
+//      - Defines UserOptions class with ConnectionString property
+//      - Validates that ConnectionString is not null or empty
+//      - Provides extension methods to bind from IConfiguration
+//      - Registers options in DI container with validation
+//      - Used by UserRepository to get database connection string
+//      - Configuration is read from appsettings.json "Database" section
+// ============================================================================
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

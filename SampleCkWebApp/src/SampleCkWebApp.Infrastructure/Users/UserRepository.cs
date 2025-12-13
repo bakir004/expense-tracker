@@ -1,12 +1,38 @@
+// ============================================================================
+// FILE: UserRepository.cs
+// ============================================================================
+// WHAT: PostgreSQL implementation of the user repository interface.
+//
+// WHY: This repository exists in the Infrastructure layer to handle all
+//      database operations for users. It implements IUserRepository (defined
+//      in Application layer) following the Dependency Inversion Principle.
+//      By keeping database-specific code (Npgsql, SQL queries) here, the
+//      Application layer remains database-agnostic. If we need to switch
+//      databases, only this file changes, not the business logic.
+//
+// WHAT IT DOES:
+//      - Implements IUserRepository interface with PostgreSQL/Npgsql
+//      - Executes SQL queries to: get all users, get user by ID, get user by
+//        email, and create new users
+//      - Maps database records to User domain entities
+//      - Handles database exceptions (unique violations, connection errors)
+//      - Returns ErrorOr results for consistent error handling
+//      - Uses UserOptions for database connection string configuration
+// ============================================================================
+
 using ErrorOr;
 using Npgsql;
-using SampleCkWebApp.Application.Users.Data;
-using SampleCkWebApp.Application.Users.Interfaces.Infrastructure;
+using SampleCkWebApp.Domain.Entities;
 using SampleCkWebApp.Domain.Errors;
+using SampleCkWebApp.Application.Users.Interfaces.Infrastructure;
 using SampleCkWebApp.Infrastructure.Users.Options;
 
 namespace SampleCkWebApp.Infrastructure.Users;
 
+/// <summary>
+/// PostgreSQL implementation of the user repository.
+/// Maps database records to domain entities.
+/// </summary>
 public class UserRepository : IUserRepository
 {
     private readonly UserOptions _options;
@@ -16,7 +42,7 @@ public class UserRepository : IUserRepository
         _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
-    public async Task<ErrorOr<List<UserRecord>>> GetUsersAsync(CancellationToken cancellationToken)
+    public async Task<ErrorOr<List<User>>> GetUsersAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -28,19 +54,11 @@ public class UserRepository : IUserRepository
                 connection);
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var users = new List<UserRecord>();
+            var users = new List<User>();
 
             while (await reader.ReadAsync(cancellationToken))
             {
-                users.Add(new UserRecord
-                {
-                    Id = reader.GetInt32(0),
-                    Name = reader.GetString(1),
-                    Email = reader.GetString(2),
-                    PasswordHash = reader.GetString(3),
-                    CreatedAt = reader.GetDateTime(4),
-                    UpdatedAt = reader.GetDateTime(5)
-                });
+                users.Add(MapToDomainEntity(reader));
             }
 
             return users;
@@ -51,7 +69,7 @@ public class UserRepository : IUserRepository
         }
     }
 
-    public async Task<ErrorOr<UserRecord>> GetUserByIdAsync(int id, CancellationToken cancellationToken)
+    public async Task<ErrorOr<User>> GetUserByIdAsync(int id, CancellationToken cancellationToken)
     {
         try
         {
@@ -70,15 +88,7 @@ public class UserRepository : IUserRepository
                 return UserErrors.NotFound;
             }
 
-            return new UserRecord
-            {
-                Id = reader.GetInt32(0),
-                Name = reader.GetString(1),
-                Email = reader.GetString(2),
-                PasswordHash = reader.GetString(3),
-                CreatedAt = reader.GetDateTime(4),
-                UpdatedAt = reader.GetDateTime(5)
-            };
+            return MapToDomainEntity(reader);
         }
         catch (Exception ex)
         {
@@ -86,7 +96,7 @@ public class UserRepository : IUserRepository
         }
     }
 
-    public async Task<ErrorOr<UserRecord>> GetUserByEmailAsync(string email, CancellationToken cancellationToken)
+    public async Task<ErrorOr<User>> GetUserByEmailAsync(string email, CancellationToken cancellationToken)
     {
         try
         {
@@ -105,15 +115,7 @@ public class UserRepository : IUserRepository
                 return UserErrors.NotFound;
             }
 
-            return new UserRecord
-            {
-                Id = reader.GetInt32(0),
-                Name = reader.GetString(1),
-                Email = reader.GetString(2),
-                PasswordHash = reader.GetString(3),
-                CreatedAt = reader.GetDateTime(4),
-                UpdatedAt = reader.GetDateTime(5)
-            };
+            return MapToDomainEntity(reader);
         }
         catch (Exception ex)
         {
@@ -121,7 +123,7 @@ public class UserRepository : IUserRepository
         }
     }
 
-    public async Task<ErrorOr<UserRecord>> CreateUserAsync(string name, string email, string passwordHash, CancellationToken cancellationToken)
+    public async Task<ErrorOr<User>> CreateUserAsync(User user, CancellationToken cancellationToken)
     {
         try
         {
@@ -134,9 +136,9 @@ public class UserRepository : IUserRepository
                   RETURNING id, name, email, password_hash, created_at, updated_at",
                 connection);
             
-            command.Parameters.AddWithValue("name", name);
-            command.Parameters.AddWithValue("email", email);
-            command.Parameters.AddWithValue("password_hash", passwordHash);
+            command.Parameters.AddWithValue("name", user.Name);
+            command.Parameters.AddWithValue("email", user.Email);
+            command.Parameters.AddWithValue("password_hash", user.PasswordHash);
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
@@ -145,15 +147,7 @@ public class UserRepository : IUserRepository
                 return Error.Failure("Database.Error", "Failed to create user");
             }
 
-            return new UserRecord
-            {
-                Id = reader.GetInt32(0),
-                Name = reader.GetString(1),
-                Email = reader.GetString(2),
-                PasswordHash = reader.GetString(3),
-                CreatedAt = reader.GetDateTime(4),
-                UpdatedAt = reader.GetDateTime(5)
-            };
+            return MapToDomainEntity(reader);
         }
         catch (PostgresException ex) when (ex.SqlState == "23505") // Unique violation
         {
@@ -163,6 +157,22 @@ public class UserRepository : IUserRepository
         {
             return Error.Failure("Database.Error", $"Failed to create user: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Maps a database reader row to a domain entity.
+    /// </summary>
+    private static User MapToDomainEntity(NpgsqlDataReader reader)
+    {
+        return new User
+        {
+            Id = reader.GetInt32(0),
+            Name = reader.GetString(1),
+            Email = reader.GetString(2),
+            PasswordHash = reader.GetString(3),
+            CreatedAt = reader.GetDateTime(4),
+            UpdatedAt = reader.GetDateTime(5)
+        };
     }
 }
 

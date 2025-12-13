@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
@@ -18,6 +18,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\SampleCkWebApp.Domain\SampleCkWebApp.Domain.csproj" />
+      <ProjectReference Include="..\SampleCkWebApp.Contracts\SampleCkWebApp.Contracts.csproj" />
     </ItemGroup>
 
 </Project>
