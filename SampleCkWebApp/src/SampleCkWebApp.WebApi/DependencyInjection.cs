@@ -1,10 +1,17 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using SampleCkWebApp.Application.MessageHistory;
 using SampleCkWebApp.Application.Users;
-using SampleCkWebApp.Infrastructure.MessageHistory;
-using SampleCkWebApp.Infrastructure.MessageHistory.Options;
+using SampleCkWebApp.Application.UserBalances;
+using SampleCkWebApp.Application.Categories;
+using SampleCkWebApp.Application.ExpenseGroups;
+using SampleCkWebApp.Application.Expenses;
+using SampleCkWebApp.Application.Incomes;
 using SampleCkWebApp.Infrastructure.Users;
+using SampleCkWebApp.Infrastructure.UserBalances;
+using SampleCkWebApp.Infrastructure.Categories;
+using SampleCkWebApp.Infrastructure.ExpenseGroups;
+using SampleCkWebApp.Infrastructure.Expenses;
+using SampleCkWebApp.Infrastructure.Incomes;
 using SampleCkWebApp.Infrastructure.Users.Options;
 using SampleCkWebApp.WebApi.Options;
 
@@ -14,18 +21,25 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services, IConfiguration configuration)
     {
-        services.TryAddMessageHistoryOptions(configuration.GetMessageHistoryOptions());
         services.TryAddUserOptions(configuration.GetUserOptions());
 
         return services
-            .AddMessageHistoryApplication()
-            .AddUsersApplication();
+            .AddUsersApplication()
+            .AddUserBalancesApplication()
+            .AddCategoriesApplication()
+            .AddExpenseGroupsApplication()
+            .AddExpensesApplication()
+            .AddIncomesApplication();
     }
     
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
         return services
-            .AddMessageHistoryInfrastructure(configuration)
-            .AddUsersInfrastructure(configuration);
+            .AddUsersInfrastructure(configuration)
+            .AddUserBalancesInfrastructure()
+            .AddCategoriesInfrastructure()
+            .AddExpenseGroupsInfrastructure()
+            .AddExpensesInfrastructure()
+            .AddIncomesInfrastructure();
     }
 }

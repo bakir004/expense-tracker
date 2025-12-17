@@ -50,7 +50,7 @@ public class UserRepository : IUserRepository
             await connection.OpenAsync(cancellationToken);
 
             var command = new NpgsqlCommand(
-                "SELECT id, name, email, password_hash, created_at, updated_at FROM users ORDER BY id",
+                "SELECT id, name, email, password_hash, created_at, updated_at FROM \"Users\" ORDER BY id",
                 connection);
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -77,7 +77,7 @@ public class UserRepository : IUserRepository
             await connection.OpenAsync(cancellationToken);
 
             var command = new NpgsqlCommand(
-                "SELECT id, name, email, password_hash, created_at, updated_at FROM users WHERE id = @id",
+                "SELECT id, name, email, password_hash, created_at, updated_at FROM \"Users\" WHERE id = @id",
                 connection);
             command.Parameters.AddWithValue("id", id);
 
@@ -104,7 +104,7 @@ public class UserRepository : IUserRepository
             await connection.OpenAsync(cancellationToken);
 
             var command = new NpgsqlCommand(
-                "SELECT id, name, email, password_hash, created_at, updated_at FROM users WHERE email = @email",
+                "SELECT id, name, email, password_hash, created_at, updated_at FROM \"Users\" WHERE email = @email",
                 connection);
             command.Parameters.AddWithValue("email", email);
 
@@ -131,7 +131,7 @@ public class UserRepository : IUserRepository
             await connection.OpenAsync(cancellationToken);
 
             var command = new NpgsqlCommand(
-                @"INSERT INTO users (name, email, password_hash, created_at, updated_at) 
+                @"INSERT INTO ""Users"" (name, email, password_hash, created_at, updated_at) 
                   VALUES (@name, @email, @password_hash, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
                   RETURNING id, name, email, password_hash, created_at, updated_at",
                 connection);

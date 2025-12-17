@@ -23,6 +23,16 @@ var builder = WebApplication.CreateBuilder(args);
     
     builder.Host.UseSerilog();
     
+    // CORS: allow the Vite frontend to call this API during development
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+            policy
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowAnyOrigin());
+    });
+
     builder.Services.AddControllers();
 
     builder.Services.AddEndpointsApiExplorer();
@@ -67,8 +77,6 @@ Log.Logger.Information("Application starting");
 
 var app = builder.Build();
 {
-    app.UseRouting();
-    
     // Save service provider to static class
     ServicePool.Create(app.Services);
 
@@ -83,6 +91,10 @@ var app = builder.Build();
         };
     });
     
+    // CORS must be early in the pipeline to handle preflight OPTIONS requests
+    app.UseCors();
+    
+    // Swagger should be before UseRouting to avoid authorization issues
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -95,6 +107,8 @@ var app = builder.Build();
         c.EnableFilter();
         c.ShowExtensions();
     });
+    
+    app.UseRouting();
     
     app.MapControllers();
 }

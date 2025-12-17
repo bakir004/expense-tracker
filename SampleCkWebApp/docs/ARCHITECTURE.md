@@ -19,21 +19,24 @@ This directory contains all the main application projects organized by layer.
 **Purpose**: Contains the core business logic and domain entities. This is the innermost layer with no dependencies on other application layers.
 
 **What should be here:**
+
 - **Domain Entities**: Core business objects and value objects
-- **Domain Errors**: Error definitions specific to domain rules (e.g., `MessageHistoryErrors.cs`)
+- **Domain Errors**: Error definitions specific to domain rules (e.g., `UserErrors.cs`)
 - **Domain Services**: Business logic that doesn't naturally fit into entities
 - **Domain Events**: Events that represent something that happened in the domain
 - **Value Objects**: Immutable objects that represent domain concepts
 - **Domain Exceptions**: Custom exceptions for domain-specific errors
 
 **What should NOT be here:**
+
 - Infrastructure concerns (database, HTTP, file system)
 - Application services
 - DTOs or ViewModels
 - Framework-specific code
 
 **Example from this project:**
-- `Errors/MessageHistoryErrors.cs` - Domain-specific error definitions
+
+- `Errors/UserErrors.cs` - Domain-specific error definitions
 
 ---
 
@@ -42,21 +45,24 @@ This directory contains all the main application projects organized by layer.
 **Purpose**: Defines the API contracts (request/response models) that are shared between the API layer and external consumers.
 
 **What should be here:**
-- **Request Models**: DTOs for incoming API requests (e.g., `GetMessageHistoryRequest.cs`)
-- **Response Models**: DTOs for API responses (e.g., `GetMessageHistoryResponse.cs`, `HistoricalMessage.cs`)
+
+- **Request Models**: DTOs for incoming API requests (e.g., `CreateUserRequest.cs`)
+- **Response Models**: DTOs for API responses (e.g., `GetUsersResponse.cs`, `UserResponse.cs`)
 - **API Contracts**: Interfaces or models that define the shape of data exchanged via the API
 - **Shared Models**: Data transfer objects used across API boundaries
 
 **What should NOT be here:**
+
 - Business logic
 - Domain entities
 - Infrastructure implementations
 - Internal application models
 
 **Example from this project:**
-- `MessageHistory/GetMessageHistoryRequest.cs` - Request DTO
-- `MessageHistory/GetMessageHistoryResponse.cs` - Response DTO
-- `MessageHistory/HistoricalMessage.cs` - Response data model
+
+- `Users/CreateUserRequest.cs` - Request DTO
+- `Users/GetUsersResponse.cs` - Response DTO
+- `Users/UserResponse.cs` - Response data model
 
 ---
 
@@ -65,26 +71,29 @@ This directory contains all the main application projects organized by layer.
 **Purpose**: Contains application-specific business logic, use cases, and orchestrates domain objects. This layer depends on the Domain layer but not on Infrastructure or WebApi.
 
 **What should be here:**
-- **Application Services**: Services that implement use cases and orchestrate domain logic (e.g., `MessageHistoryService.cs`)
-- **Interfaces/Application**: Application service interfaces (e.g., `IMessageHistoryService.cs`)
-- **Interfaces/Infrastructure**: Interfaces for infrastructure dependencies (e.g., `IMessageHistoryRepository.cs`)
-- **Data Models**: Application-specific data models and DTOs (e.g., `GetMessageHistoryResult.cs`, `MessageHistoryRecord.cs`)
-- **Validators**: Application-level validation logic (e.g., `MessageHistoryValidator.cs`)
+
+- **Application Services**: Services that implement use cases and orchestrate domain logic (e.g., `UserService.cs`)
+- **Interfaces/Application**: Application service interfaces (e.g., `IUserService.cs`)
+- **Interfaces/Infrastructure**: Interfaces for infrastructure dependencies (e.g., `IUserRepository.cs`)
+- **Data Models**: Application-specific data models and DTOs (e.g., `GetUsersResult.cs`)
+- **Validators**: Application-level validation logic (e.g., `UserValidator.cs`)
 - **DependencyInjection.cs**: Registration of application services
 - **Mappers**: Mapping logic between domain and application models
 - **Use Cases**: Individual use case implementations
 
 **What should NOT be here:**
+
 - Infrastructure implementations (database access, external API calls)
 - Web/HTTP specific code
 - Framework-specific dependencies (except for abstractions)
 
 **Example from this project:**
-- `MessageHistory/MessageHistoryService.cs` - Application service
-- `MessageHistory/Interfaces/Application/IMessageHistoryService.cs` - Service interface
-- `MessageHistory/Interfaces/Infrastructure/IMessageHistoryRepository.cs` - Repository interface
-- `MessageHistory/Data/` - Application data models
-- `MessageHistory/MessageHistoryValidator.cs` - Validation logic
+
+- `Users/UserService.cs` - Application service
+- `Users/Interfaces/Application/IUserService.cs` - Service interface
+- `Users/Interfaces/Infrastructure/IUserRepository.cs` - Repository interface
+- `Users/Data/` - Application data models
+- `Users/UserValidator.cs` - Validation logic
 
 ---
 
@@ -93,10 +102,11 @@ This directory contains all the main application projects organized by layer.
 **Purpose**: Implements technical concerns and external integrations. This layer depends on Application and Domain layers.
 
 **What should be here:**
-- **Repository Implementations**: Concrete implementations of repository interfaces (e.g., `MessageHistoryRepository.cs`)
+
+- **Repository Implementations**: Concrete implementations of repository interfaces (e.g., `UserRepository.cs`)
 - **Database Contexts**: Entity Framework DbContext or similar
 - **External Service Clients**: HTTP clients, third-party API integrations
-- **Options/Configuration**: Configuration classes for infrastructure (e.g., `MessageHistoryOptions.cs`)
+- **Options/Configuration**: Configuration classes for infrastructure (e.g., `UserOptions.cs`)
 - **DependencyInjection.cs**: Registration of infrastructure services
 - **Caching Implementations**: Redis, in-memory cache implementations
 - **Message Queue Implementations**: RabbitMQ, Azure Service Bus, etc.
@@ -104,15 +114,17 @@ This directory contains all the main application projects organized by layer.
 - **Email/SMS Services**: External communication service implementations
 
 **What should NOT be here:**
+
 - Business logic
 - Domain entities (only references)
 - Web/HTTP controllers
 - Application services
 
 **Example from this project:**
-- `MessageHistory/MessageHistoryRepository.cs` - Repository implementation
-- `MessageHistory/Options/MessageHistoryOptions.cs` - Configuration options
-- `MessageHistory/DependencyInjection.cs` - Infrastructure service registration
+
+- `Users/UserRepository.cs` - Repository implementation
+- `Users/Options/UserOptions.cs` - Configuration options
+- `Users/DependencyInjection.cs` - Infrastructure service registration
 
 ---
 
@@ -121,9 +133,10 @@ This directory contains all the main application projects organized by layer.
 **Purpose**: Handles HTTP requests, routing, and API-specific concerns. This is the outermost layer.
 
 **What should be here:**
-- **Controllers**: API endpoints and request handling (e.g., `MessageHistoryController.cs`, `HealthController.cs`)
+
+- **Controllers**: API endpoints and request handling (e.g., `UsersController.cs`, `HealthController.cs`)
 - **Base Controllers**: Shared controller functionality (e.g., `AppControllerBase.cs` / `ApiControllerBase.cs`)
-- **Mappings**: Mapping between contracts and application models (e.g., `DeviceHistoryMappings.cs`)
+- **Mappings**: Mapping between contracts and application models
 - **Middleware**: Custom middleware for cross-cutting concerns
 - **DependencyInjection.cs**: Registration of API-specific services
 - **Options/**: API-specific configuration classes
@@ -133,15 +146,16 @@ This directory contains all the main application projects organized by layer.
 - **Extensions**: Helper extension methods for HTTP context, diagnostics, etc.
 
 **What should NOT be here:**
+
 - Business logic (delegate to Application layer)
 - Database access (delegate to Infrastructure layer)
 - Domain entities (use DTOs/Contracts instead)
 
 **Example from this project:**
-- `Controllers/MessageHistory/MessageHistoryController.cs` - API controller
+
+- `Controllers/Users/UsersController.cs` - API controller
 - `Controllers/HealthController.cs` - Health check endpoint
 - `Controllers/AppControllerBase.cs` - Base controller with error handling
-- `Mappings/DeviceHistoryMappings.cs` - DTO mapping logic
 - `Program.cs` - Application startup
 - `DependencyInjection.cs` - API service registration
 
@@ -154,6 +168,7 @@ This directory contains all the main application projects organized by layer.
 **Purpose**: Contains Docker-related configuration files.
 
 **What should be here:**
+
 - **build/**: Dockerfiles for building application images
 - **compose/**: Docker Compose files for orchestrating services
 
@@ -164,6 +179,7 @@ This directory contains all the main application projects organized by layer.
 **Purpose**: Contains utility scripts for building, testing, and deploying the application.
 
 **What should be here:**
+
 - Build scripts (e.g., `build.sh`)
 - Deployment scripts
 - Database migration scripts
@@ -194,6 +210,7 @@ WebApi
 ```
 
 **Key Rules:**
+
 1. **Domain** has no dependencies on other layers
 2. **Application** depends only on **Domain**
 3. **Infrastructure** depends on **Application** and **Domain**
@@ -247,8 +264,8 @@ Invoke-WebRequest -Uri http://localhost:5000/health
 ## Summary
 
 This architecture provides:
+
 - **Maintainability**: Clear separation makes code easier to understand and modify
 - **Testability**: Layers can be tested independently with mocked dependencies
 - **Flexibility**: Infrastructure can be swapped without affecting business logic
 - **Scalability**: Clear boundaries make it easier to scale different parts of the system
-
