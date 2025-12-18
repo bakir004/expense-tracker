@@ -9,7 +9,6 @@ using SampleCkWebApp.Infrastructure.Categories;
 using SampleCkWebApp.Infrastructure.TransactionGroups;
 using SampleCkWebApp.Infrastructure.Transactions;
 using SampleCkWebApp.Infrastructure.Users.Options;
-using SampleCkWebApp.WebApi.Options;
 
 namespace SampleCkWebApp.WebApi;
 

@@ -1,12 +1,69 @@
-# directories
+# Build artifacts
 **/bin/
 **/obj/
 **/out/
+**/publish/
 
-# files
-Dockerfile*
+# IDE and editor files
+**/.vs/
+**/.vscode/
+**/.idea/
+**/*.swp
+**/*.swo
+**/*.sublime-*
+**/.DS_Store
+**/Thumbs.db
+
+# Test results
 **/*.trx
+**/*.coverage
+**/TestResults/
+
+# Logs
+**/logs/
+**/*.log
+
+# Documentation
 **/*.md
+!README.md
+
+# Scripts (not needed in container)
 **/*.ps1
 **/*.cmd
 **/*.sh
+!scripts/database.sql
+
+# Docker files (avoid recursive copying)
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Frontend (not needed for backend build)
+frontend/
+node_modules/
+
+# Temporary files
+**/*.tmp
+**/*.temp
+**/todo.txt
+**/.env
+**/.env.local
+
+# NuGet packages cache
+**/.nuget/
+**/packages/
+
+# Rider specific
+**/.idea/
+**/*.iml
+**/rider.project.*
+
+# Solution user options
+**/*.suo
+**/*.user
+**/*.userosscache

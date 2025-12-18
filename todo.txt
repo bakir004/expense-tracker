@@ -1,0 +1,3 @@
+- autorizacija i autentikacija
+- logging
+- testovi
