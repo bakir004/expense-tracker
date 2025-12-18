@@ -3,12 +3,14 @@ using SampleCkWebApp.Application.Transactions;
 using SampleCkWebApp.Application.Transactions.Interfaces.Application;
 using SampleCkWebApp.Application.Transactions.Mappings;
 using SampleCkWebApp.Contracts.Transactions;
+using SampleCkWebApp.WebApi;
+using SampleCkWebApp.WebApi.Controllers;
 
 namespace SampleCkWebApp.WebApi.Controllers.Transactions;
 
 [ApiController]
-[Route("transactions")]
-public class TransactionsController : ControllerBase
+[Route(ApiRoutes.V1Routes.Transactions)]
+public class TransactionsController : ApiControllerBase
 {
     private readonly ITransactionService _transactionService;
 
@@ -25,83 +27,102 @@ public class TransactionsController : ControllerBase
     {
         var result = await _transactionService.GetAllAsync(cancellationToken);
         
-        if (result.IsError)
-        {
-            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
-        }
-        
-        return Ok(result.Value.ToResponse());
+        return result.Match(
+            transactions => Ok(transactions.ToResponse()),
+            Problem);
     }
 
     /// <summary>
     /// Get a single transaction by ID
     /// </summary>
+    /// <summary>
+    /// Get a transaction by ID
+    /// </summary>
+    /// <param name="id">The unique identifier of the transaction</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The transaction</returns>
+    /// <response code="200">Transaction found</response>
+    /// <response code="404">Transaction not found</response>
     [HttpGet("{id:int}")]
+    [ProducesResponseType(typeof(TransactionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
         var result = await _transactionService.GetByIdAsync(id, cancellationToken);
         
-        if (result.IsError)
-        {
-            var error = result.Errors.First();
-            if (error.Type == ErrorOr.ErrorType.NotFound)
-            {
-                return NotFound(new { error = error.Description });
-            }
-            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
-        }
-        
-        return Ok(result.Value.ToResponse());
+        return result.Match(
+            transaction => Ok(transaction.ToResponse()),
+            Problem);
     }
 
     /// <summary>
     /// Get all transactions for a user
     /// </summary>
+    /// <param name="userId">The unique identifier of the user</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of transactions for the user (empty array if user has no transactions)</returns>
+    /// <response code="200">Successfully retrieved transactions (may be empty)</response>
+    /// <response code="404">User not found</response>
     [HttpGet("user/{userId:int}")]
+    [ProducesResponseType(typeof(GetTransactionsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetByUserId(int userId, CancellationToken cancellationToken)
     {
         var result = await _transactionService.GetByUserIdAsync(userId, cancellationToken);
         
-        if (result.IsError)
-        {
-            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
-        }
-        
-        return Ok(result.Value.ToResponse());
+        return result.Match(
+            transactions => Ok(transactions.ToResponse()),
+            Problem);
     }
 
     /// <summary>
     /// Get transactions for a user filtered by type (expenses or income)
     /// </summary>
+    /// <param name="userId">The unique identifier of the user</param>
+    /// <param name="type">Transaction type: 'EXPENSE' or 'INCOME'</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of transactions for the user filtered by type (empty array if user has no transactions of that type)</returns>
+    /// <response code="200">Successfully retrieved transactions (may be empty)</response>
+    /// <response code="400">Invalid transaction type</response>
+    /// <response code="404">User not found</response>
     [HttpGet("user/{userId:int}/type/{type}")]
+    [ProducesResponseType(typeof(GetTransactionsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetByUserIdAndType(int userId, string type, CancellationToken cancellationToken)
     {
         var typeResult = TransactionValidator.ParseTransactionType(type);
         if (typeResult.IsError)
         {
-            return BadRequest(new { errors = typeResult.Errors.Select(e => e.Description) });
+            return Problem(typeResult.Errors);
         }
         
         var result = await _transactionService.GetByUserIdAndTypeAsync(userId, typeResult.Value, cancellationToken);
         
-        if (result.IsError)
-        {
-            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
-        }
-        
-        return Ok(result.Value.ToResponse());
+        return result.Match(
+            transactions => Ok(transactions.ToResponse()),
+            Problem);
     }
 
     /// <summary>
     /// Create a new transaction
     /// </summary>
+    /// <param name="request">Transaction creation request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The created transaction</returns>
+    /// <response code="201">Transaction created successfully</response>
+    /// <response code="400">Validation error</response>
+    /// <response code="404">User, category, or transaction group not found</response>
     [HttpPost]
+    [ProducesResponseType(typeof(TransactionResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create([FromBody] CreateTransactionRequest request, CancellationToken cancellationToken)
     {
         var typeResult = TransactionValidator.ParseTransactionType(request.TransactionType);
         if (typeResult.IsError)
         {
-            return BadRequest(new { errors = typeResult.Errors.Select(e => e.Description) });
+            return Problem(typeResult.Errors);
         }
         
         var result = await _transactionService.CreateAsync(
@@ -117,29 +138,31 @@ public class TransactionsController : ControllerBase
             request.IncomeSource,
             cancellationToken);
         
-        if (result.IsError)
-        {
-            var error = result.Errors.First();
-            if (error.Type == ErrorOr.ErrorType.Validation)
-            {
-                return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
-            }
-            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
-        }
-        
-        return CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value.ToResponse());
+        return result.Match(
+            transaction => CreatedAtAction(nameof(GetById), new { id = transaction.Id }, transaction.ToResponse()),
+            Problem);
     }
 
     /// <summary>
     /// Update an existing transaction
     /// </summary>
+    /// <param name="id">The unique identifier of the transaction to update</param>
+    /// <param name="request">Transaction update request</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The updated transaction</returns>
+    /// <response code="200">Transaction updated successfully</response>
+    /// <response code="400">Validation error</response>
+    /// <response code="404">Transaction, category, or transaction group not found</response>
     [HttpPut("{id:int}")]
+    [ProducesResponseType(typeof(TransactionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateTransactionRequest request, CancellationToken cancellationToken)
     {
         var typeResult = TransactionValidator.ParseTransactionType(request.TransactionType);
         if (typeResult.IsError)
         {
-            return BadRequest(new { errors = typeResult.Errors.Select(e => e.Description) });
+            return Problem(typeResult.Errors);
         }
         
         var result = await _transactionService.UpdateAsync(
@@ -155,38 +178,29 @@ public class TransactionsController : ControllerBase
             request.IncomeSource,
             cancellationToken);
         
-        if (result.IsError)
-        {
-            var error = result.Errors.First();
-            if (error.Type == ErrorOr.ErrorType.NotFound)
-            {
-                return NotFound(new { error = error.Description });
-            }
-            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
-        }
-        
-        return Ok(result.Value.ToResponse());
+        return result.Match(
+            transaction => Ok(transaction.ToResponse()),
+            Problem);
     }
 
     /// <summary>
     /// Delete a transaction
     /// </summary>
+    /// <param name="id">The unique identifier of the transaction to delete</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>No content if successful</returns>
+    /// <response code="204">Transaction deleted successfully</response>
+    /// <response code="404">Transaction not found</response>
     [HttpDelete("{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var result = await _transactionService.DeleteAsync(id, cancellationToken);
         
-        if (result.IsError)
-        {
-            var error = result.Errors.First();
-            if (error.Type == ErrorOr.ErrorType.NotFound)
-            {
-                return NotFound(new { error = error.Description });
-            }
-            return BadRequest(new { errors = result.Errors.Select(e => e.Description) });
-        }
-        
-        return NoContent();
+        return result.Match(
+            _ => NoContent(),
+            Problem);
     }
 }
 

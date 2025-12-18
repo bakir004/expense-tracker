@@ -1,18 +1,24 @@
 using ErrorOr;
 using SampleCkWebApp.Domain.Entities;
+using SampleCkWebApp.Domain.Errors;
 using SampleCkWebApp.Application.TransactionGroups.Data;
 using SampleCkWebApp.Application.TransactionGroups.Interfaces.Application;
 using SampleCkWebApp.Application.TransactionGroups.Interfaces.Infrastructure;
+using SampleCkWebApp.Application.Users.Interfaces.Infrastructure;
 
 namespace SampleCkWebApp.Application.TransactionGroups;
 
 public class TransactionGroupService : ITransactionGroupService
 {
     private readonly ITransactionGroupRepository _transactionGroupRepository;
+    private readonly IUserRepository _userRepository;
 
-    public TransactionGroupService(ITransactionGroupRepository transactionGroupRepository)
+    public TransactionGroupService(
+        ITransactionGroupRepository transactionGroupRepository,
+        IUserRepository userRepository)
     {
         _transactionGroupRepository = transactionGroupRepository ?? throw new ArgumentNullException(nameof(transactionGroupRepository));
+        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
     }
     
     public async Task<ErrorOr<GetTransactionGroupsResult>> GetAllAsync(CancellationToken cancellationToken)
@@ -36,6 +42,14 @@ public class TransactionGroupService : ITransactionGroupService
     
     public async Task<ErrorOr<List<TransactionGroup>>> GetByUserIdAsync(int userId, CancellationToken cancellationToken)
     {
+        // Verify the user exists first
+        var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
+        if (userResult.IsError)
+        {
+            return UserErrors.NotFound;
+        }
+        
+        // User exists, get their transaction groups (may be empty)
         return await _transactionGroupRepository.GetByUserIdAsync(userId, cancellationToken);
     }
     
@@ -45,6 +59,13 @@ public class TransactionGroupService : ITransactionGroupService
         if (validationResult.IsError)
         {
             return validationResult.Errors;
+        }
+        
+        // Verify the user exists
+        var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
+        if (userResult.IsError)
+        {
+            return TransactionGroupErrors.UserNotFound;
         }
         
         var transactionGroup = new TransactionGroup

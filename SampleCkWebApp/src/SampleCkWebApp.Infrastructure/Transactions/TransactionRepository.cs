@@ -426,23 +426,55 @@ public class TransactionRepository : ITransactionRepository
             
             try
             {
-                // Get the transaction to be deleted
-                Transaction transaction;
-                await using (var getCommand = new NpgsqlCommand(
-                    @"SELECT id, user_id, transaction_type, amount, signed_amount, cumulative_delta,
-                             date::timestamp, subject, notes, payment_method, seq, category_id, 
-                             transaction_group_id, income_source, created_at, updated_at
-                      FROM Transaction WHERE id = @id FOR UPDATE",
+                // First, check if transaction exists and get the data we need
+                // Use separate scalar queries to avoid reader disposal issues
+                int userId;
+                long seq;
+                decimal signedAmount;
+                
+                // Check existence and get user_id
+                await using (var checkCommand = new NpgsqlCommand(
+                    @"SELECT user_id FROM Transaction WHERE id = @id",
                     connection, dbTransaction))
                 {
-                    getCommand.Parameters.AddWithValue("id", id);
-                    await using var reader = await getCommand.ExecuteReaderAsync(cancellationToken);
-                    if (!await reader.ReadAsync(cancellationToken))
+                    checkCommand.Parameters.AddWithValue("id", id);
+                    var userIdResult = await checkCommand.ExecuteScalarAsync(cancellationToken);
+                    if (userIdResult == null || userIdResult == DBNull.Value)
                     {
                         await dbTransaction.RollbackAsync(cancellationToken);
                         return TransactionErrors.NotFound;
                     }
-                    transaction = MapToDomainEntityWithoutJoin(reader);
+                    userId = (int)userIdResult;
+                }
+                
+                // Get seq
+                await using (var seqCommand = new NpgsqlCommand(
+                    @"SELECT seq FROM Transaction WHERE id = @id",
+                    connection, dbTransaction))
+                {
+                    seqCommand.Parameters.AddWithValue("id", id);
+                    var seqResult = await seqCommand.ExecuteScalarAsync(cancellationToken);
+                    if (seqResult == null || seqResult == DBNull.Value)
+                    {
+                        await dbTransaction.RollbackAsync(cancellationToken);
+                        return TransactionErrors.NotFound;
+                    }
+                    seq = (long)seqResult;
+                }
+                
+                // Get signed_amount
+                await using (var amountCommand = new NpgsqlCommand(
+                    @"SELECT signed_amount FROM Transaction WHERE id = @id",
+                    connection, dbTransaction))
+                {
+                    amountCommand.Parameters.AddWithValue("id", id);
+                    var amountResult = await amountCommand.ExecuteScalarAsync(cancellationToken);
+                    if (amountResult == null || amountResult == DBNull.Value)
+                    {
+                        await dbTransaction.RollbackAsync(cancellationToken);
+                        return TransactionErrors.NotFound;
+                    }
+                    signedAmount = (decimal)amountResult;
                 }
                 
                 // Update all subsequent transactions' cumulative_delta (subtract the deleted amount)
@@ -451,9 +483,9 @@ public class TransactionRepository : ITransactionRepository
                       SET cumulative_delta = cumulative_delta - @signed_amount, updated_at = CURRENT_TIMESTAMP
                       WHERE user_id = @user_id AND seq > @seq",
                     connection, dbTransaction);
-                updateSubsequentCommand.Parameters.AddWithValue("signed_amount", transaction.SignedAmount);
-                updateSubsequentCommand.Parameters.AddWithValue("user_id", transaction.UserId);
-                updateSubsequentCommand.Parameters.AddWithValue("seq", transaction.Seq);
+                updateSubsequentCommand.Parameters.AddWithValue("signed_amount", signedAmount);
+                updateSubsequentCommand.Parameters.AddWithValue("user_id", userId);
+                updateSubsequentCommand.Parameters.AddWithValue("seq", seq);
                 await updateSubsequentCommand.ExecuteNonQueryAsync(cancellationToken);
                 
                 // Delete the transaction

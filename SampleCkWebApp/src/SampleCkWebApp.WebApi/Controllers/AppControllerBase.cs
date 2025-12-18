@@ -48,6 +48,8 @@ public abstract class ApiControllerBase : ControllerBase
             (int)ErrorType.NotFound => StatusCodes.Status404NotFound,
             StatusCodes.Status401Unauthorized => StatusCodes.Status401Unauthorized,
             (int)ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+            StatusCodes.Status422UnprocessableEntity => StatusCodes.Status422UnprocessableEntity,
+            (int)ErrorType.Failure => StatusCodes.Status422UnprocessableEntity, // Semantic validation errors
             _ => StatusCodes.Status500InternalServerError
         };
 

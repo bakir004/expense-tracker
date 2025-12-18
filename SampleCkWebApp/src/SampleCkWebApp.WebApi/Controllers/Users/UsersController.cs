@@ -29,6 +29,7 @@ using SampleCkWebApp.Users;
 using SampleCkWebApp.Application.Users.Interfaces.Application;
 using SampleCkWebApp.Application.Users.Mappings;
 using SampleCkWebApp.WebApi.Controllers;
+using SampleCkWebApp.WebApi;
 
 namespace SampleCkWebApp.WebApi.Controllers.Users;
 
@@ -36,7 +37,7 @@ namespace SampleCkWebApp.WebApi.Controllers.Users;
 /// Controller for managing users in the expense tracker system
 /// </summary>
 [ApiController]
-[Route("users")]
+[Route(ApiRoutes.V1Routes.Users)]
 [Produces("application/json")]
 public class UsersController : ApiControllerBase
 {

@@ -23,12 +23,12 @@ namespace SampleCkWebApp.Domain.Errors;
 public static class CategoryErrors
 {
     public static Error NotFound =>
-        Error.NotFound($"{nameof(CategoryErrors)}.{nameof(NotFound)}", "Category not found.");
+        Error.NotFound("category", "Category not found.");
     
     public static Error DuplicateName =>
-        Error.Conflict($"{nameof(CategoryErrors)}.{nameof(DuplicateName)}", "A category with this name already exists.");
+        Error.Conflict("name", "A category with this name already exists.");
     
     public static Error InvalidName =>
-        Error.Validation($"{nameof(CategoryErrors)}.{nameof(InvalidName)}", "Category name is required and must be between 1 and 255 characters.");
+        Error.Validation("name", "Category name is required and must be between 1 and 255 characters.");
 }
 

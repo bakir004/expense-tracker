@@ -19,6 +19,7 @@
 
 using ErrorOr;
 using SampleCkWebApp.Domain.Entities;
+using SampleCkWebApp.Domain.Errors;
 using SampleCkWebApp.Application.Categories.Data;
 using SampleCkWebApp.Application.Categories.Interfaces.Application;
 using SampleCkWebApp.Application.Categories.Interfaces.Infrastructure;
@@ -66,6 +67,13 @@ public class CategoryService : ICategoryService
             return validationResult.Errors;
         }
         
+        // Check if category with this name already exists
+        var existingCategory = await _categoryRepository.GetByNameAsync(name, cancellationToken);
+        if (!existingCategory.IsError)
+        {
+            return CategoryErrors.DuplicateName;
+        }
+        
         var category = new Category
         {
             Name = name,
@@ -90,6 +98,13 @@ public class CategoryService : ICategoryService
         if (existingResult.IsError)
         {
             return existingResult.Errors;
+        }
+        
+        // Check if another category with this name already exists (excluding current category)
+        var duplicateCheck = await _categoryRepository.GetByNameAsync(name, cancellationToken);
+        if (!duplicateCheck.IsError && duplicateCheck.Value.Id != id)
+        {
+            return CategoryErrors.DuplicateName;
         }
         
         var category = new Category

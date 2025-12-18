@@ -38,6 +38,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
+        // Define API versions
         c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
         {
             Title = "Expense Tracker API",
@@ -50,11 +51,28 @@ var builder = WebApplication.CreateBuilder(args);
             }
         });
         
-        // Add server with base path so Swagger knows the prefix
-        c.AddServer(new Microsoft.OpenApi.Models.OpenApiServer
+        c.SwaggerDoc("v2", new Microsoft.OpenApi.Models.OpenApiInfo
         {
-            Url = "/api/v1",
-            Description = "API v1"
+            Title = "Expense Tracker API",
+            Version = "v2",
+            Description = "Version 2 of the Expense Tracker API with new features.",
+            Contact = new Microsoft.OpenApi.Models.OpenApiContact
+            {
+                Name = "API Support",
+                Email = "support@expensetracker.com"
+            }
+        });
+        
+        // Route endpoints to correct doc based on path
+        c.DocInclusionPredicate((docName, apiDesc) =>
+        {
+            var path = apiDesc.RelativePath ?? "";
+            return docName switch
+            {
+                "v1" => path.StartsWith("api/v1") || path == "health",
+                "v2" => path.StartsWith("api/v2"),
+                _ => false
+            };
         });
         
         // Include XML comments
@@ -101,13 +119,12 @@ var app = builder.Build();
     // CORS must be early in the pipeline to handle preflight OPTIONS requests
     app.UseCors();
     
-    // Global API version prefix - all controller routes will be prefixed with /api/v1
-    app.UsePathBase("/api/v1");
-    
     // Swagger should be before UseRouting to avoid authorization issues
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
+        // Add endpoints for each version (newest first)
+        c.SwaggerEndpoint("/swagger/v2/swagger.json", "Expense Tracker API v2");
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Expense Tracker API v1");
         c.RoutePrefix = "swagger"; // Swagger UI available at /swagger
         c.DocumentTitle = "Expense Tracker API Documentation";

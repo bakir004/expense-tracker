@@ -95,6 +95,33 @@ public class CategoryRepository : ICategoryRepository
         }
     }
 
+    public async Task<ErrorOr<Category>> GetByNameAsync(string name, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var connection = new NpgsqlConnection(_options.ConnectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = new NpgsqlCommand(
+                "SELECT id, name, description, icon FROM Category WHERE name = @name",
+                connection);
+            command.Parameters.AddWithValue("name", name);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return CategoryErrors.NotFound;
+            }
+
+            return MapToDomainEntity(reader);
+        }
+        catch (Exception ex)
+        {
+            return Error.Failure("Database.Error", $"Failed to retrieve category by name: {ex.Message}");
+        }
+    }
+
     public async Task<ErrorOr<Category>> CreateAsync(Category category, CancellationToken cancellationToken)
     {
         try

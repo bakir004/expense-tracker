@@ -13,9 +13,16 @@ public static class TransactionValidator
         TransactionType transactionType,
         decimal amount,
         DateTime date,
+        string subject,
         int? categoryId)
     {
         var errors = new List<Error>();
+        
+        // Subject is required and cannot be empty
+        if (string.IsNullOrWhiteSpace(subject))
+        {
+            errors.Add(TransactionErrors.InvalidSubject);
+        }
         
         // Amount must be positive
         if (amount <= 0)

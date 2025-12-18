@@ -35,7 +35,7 @@ CREATE INDEX idx_users_email ON "Users"(email);
 
 CREATE TABLE Category (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NOT NULL UNIQUE,
     description TEXT,
     icon VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

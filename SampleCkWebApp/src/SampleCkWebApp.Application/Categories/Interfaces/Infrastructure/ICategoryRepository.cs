@@ -33,6 +33,8 @@ public interface ICategoryRepository
     
     Task<ErrorOr<Category>> GetByIdAsync(int id, CancellationToken cancellationToken);
     
+    Task<ErrorOr<Category>> GetByNameAsync(string name, CancellationToken cancellationToken);
+    
     Task<ErrorOr<Category>> CreateAsync(Category category, CancellationToken cancellationToken);
     
     Task<ErrorOr<Category>> UpdateAsync(Category category, CancellationToken cancellationToken);

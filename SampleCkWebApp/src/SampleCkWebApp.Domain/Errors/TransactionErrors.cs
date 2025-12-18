@@ -8,23 +8,27 @@ namespace SampleCkWebApp.Domain.Errors;
 public static class TransactionErrors
 {
     public static Error NotFound => Error.NotFound(
-        code: "Transaction.NotFound",
+        code: "transaction",
         description: "Transaction not found.");
     
     public static Error InvalidAmount => Error.Validation(
-        code: "Transaction.InvalidAmount",
+        code: "amount",
         description: "Transaction amount must be greater than zero.");
     
     public static Error InvalidDate => Error.Validation(
-        code: "Transaction.InvalidDate",
+        code: "date",
         description: "Transaction date cannot be in the future.");
     
     public static Error ExpenseMissingCategory => Error.Validation(
-        code: "Transaction.ExpenseMissingCategory",
+        code: "categoryId",
         description: "Expense transactions must have a category.");
     
     public static Error InvalidTransactionType => Error.Validation(
-        code: "Transaction.InvalidType",
+        code: "transactionType",
         description: "Invalid transaction type. Must be 'EXPENSE' or 'INCOME'.");
+    
+    public static Error InvalidSubject => Error.Validation(
+        code: "subject",
+        description: "Transaction subject is required and cannot be empty.");
 }
 

@@ -1,8 +1,12 @@
 using ErrorOr;
 using SampleCkWebApp.Domain.Entities;
+using SampleCkWebApp.Domain.Errors;
 using SampleCkWebApp.Application.Transactions.Data;
 using SampleCkWebApp.Application.Transactions.Interfaces.Application;
 using SampleCkWebApp.Application.Transactions.Interfaces.Infrastructure;
+using SampleCkWebApp.Application.Users.Interfaces.Infrastructure;
+using SampleCkWebApp.Application.Categories.Interfaces.Infrastructure;
+using SampleCkWebApp.Application.TransactionGroups.Interfaces.Infrastructure;
 
 namespace SampleCkWebApp.Application.Transactions;
 
@@ -13,10 +17,20 @@ namespace SampleCkWebApp.Application.Transactions;
 public class TransactionService : ITransactionService
 {
     private readonly ITransactionRepository _transactionRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly ICategoryRepository _categoryRepository;
+    private readonly ITransactionGroupRepository _transactionGroupRepository;
 
-    public TransactionService(ITransactionRepository transactionRepository)
+    public TransactionService(
+        ITransactionRepository transactionRepository,
+        IUserRepository userRepository,
+        ICategoryRepository categoryRepository,
+        ITransactionGroupRepository transactionGroupRepository)
     {
         _transactionRepository = transactionRepository ?? throw new ArgumentNullException(nameof(transactionRepository));
+        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+        _categoryRepository = categoryRepository ?? throw new ArgumentNullException(nameof(categoryRepository));
+        _transactionGroupRepository = transactionGroupRepository ?? throw new ArgumentNullException(nameof(transactionGroupRepository));
     }
 
     public async Task<ErrorOr<GetTransactionsResult>> GetAllAsync(CancellationToken cancellationToken)
@@ -37,6 +51,14 @@ public class TransactionService : ITransactionService
 
     public async Task<ErrorOr<GetTransactionsResult>> GetByUserIdAsync(int userId, CancellationToken cancellationToken)
     {
+        // Verify the user exists first
+        var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
+        if (userResult.IsError)
+        {
+            return UserErrors.NotFound;
+        }
+        
+        // User exists, get their transactions (may be empty)
         var result = await _transactionRepository.GetByUserIdAsync(userId, cancellationToken);
         if (result.IsError)
         {
@@ -48,6 +70,14 @@ public class TransactionService : ITransactionService
 
     public async Task<ErrorOr<GetTransactionsResult>> GetByUserIdAndTypeAsync(int userId, TransactionType type, CancellationToken cancellationToken)
     {
+        // Verify the user exists first
+        var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
+        if (userResult.IsError)
+        {
+            return UserErrors.NotFound;
+        }
+        
+        // User exists, get their transactions filtered by type (may be empty)
         var result = await _transactionRepository.GetByUserIdAndTypeAsync(userId, type, cancellationToken);
         if (result.IsError)
         {
@@ -71,10 +101,37 @@ public class TransactionService : ITransactionService
         CancellationToken cancellationToken)
     {
         // Validate
-        var validationResult = TransactionValidator.ValidateCreateTransaction(transactionType, amount, date, categoryId);
+        var validationResult = TransactionValidator.ValidateCreateTransaction(transactionType, amount, date, subject, categoryId);
         if (validationResult.IsError)
         {
             return validationResult.Errors;
+        }
+        
+        // Verify the user exists
+        var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
+        if (userResult.IsError)
+        {
+            return UserErrors.NotFound;
+        }
+        
+        // Verify the category exists (if provided)
+        if (categoryId.HasValue)
+        {
+            var categoryResult = await _categoryRepository.GetByIdAsync(categoryId.Value, cancellationToken);
+            if (categoryResult.IsError)
+            {
+                return CategoryErrors.NotFound;
+            }
+        }
+        
+        // Verify the transaction group exists (if provided)
+        if (transactionGroupId.HasValue)
+        {
+            var transactionGroupResult = await _transactionGroupRepository.GetByIdAsync(transactionGroupId.Value, cancellationToken);
+            if (transactionGroupResult.IsError)
+            {
+                return TransactionGroupErrors.NotFound;
+            }
         }
         
         // Calculate signed amount
@@ -120,10 +177,30 @@ public class TransactionService : ITransactionService
         }
         
         // Validate
-        var validationResult = TransactionValidator.ValidateCreateTransaction(transactionType, amount, date, categoryId);
+        var validationResult = TransactionValidator.ValidateCreateTransaction(transactionType, amount, date, subject, categoryId);
         if (validationResult.IsError)
         {
             return validationResult.Errors;
+        }
+        
+        // Verify the category exists (if provided)
+        if (categoryId.HasValue)
+        {
+            var categoryResult = await _categoryRepository.GetByIdAsync(categoryId.Value, cancellationToken);
+            if (categoryResult.IsError)
+            {
+                return CategoryErrors.NotFound;
+            }
+        }
+        
+        // Verify the transaction group exists (if provided)
+        if (transactionGroupId.HasValue)
+        {
+            var transactionGroupResult = await _transactionGroupRepository.GetByIdAsync(transactionGroupId.Value, cancellationToken);
+            if (transactionGroupResult.IsError)
+            {
+                return TransactionGroupErrors.NotFound;
+            }
         }
         
         // Calculate signed amount

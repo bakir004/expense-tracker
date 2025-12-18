@@ -26,6 +26,7 @@ using SampleCkWebApp.Categories;
 using SampleCkWebApp.Application.Categories.Interfaces.Application;
 using SampleCkWebApp.Application.Categories.Mappings;
 using SampleCkWebApp.WebApi.Controllers;
+using SampleCkWebApp.WebApi;
 
 namespace SampleCkWebApp.WebApi.Controllers.Categories;
 
@@ -33,7 +34,7 @@ namespace SampleCkWebApp.WebApi.Controllers.Categories;
 /// Controller for managing categories in the expense tracker system
 /// </summary>
 [ApiController]
-[Route("categories")]
+[Route(ApiRoutes.V1Routes.Categories)]
 [Produces("application/json")]
 public class CategoriesController : ApiControllerBase
 {
@@ -50,10 +51,8 @@ public class CategoriesController : ApiControllerBase
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of all categories</returns>
     /// <response code="200">Successfully retrieved categories</response>
-    /// <response code="500">Internal server error</response>
     [HttpGet]
     [ProducesResponseType(typeof(GetCategoriesResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetCategories(CancellationToken cancellationToken)
     {
         var result = await _categoryService.GetAllAsync(cancellationToken);
@@ -71,11 +70,9 @@ public class CategoriesController : ApiControllerBase
     /// <returns>The category information</returns>
     /// <response code="200">Category found and returned</response>
     /// <response code="404">Category not found</response>
-    /// <response code="500">Internal server error</response>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(CategoryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetCategoryById(
         [FromRoute, Required] int id, 
         CancellationToken cancellationToken)
@@ -96,12 +93,10 @@ public class CategoriesController : ApiControllerBase
     /// <response code="201">Category successfully created</response>
     /// <response code="400">Validation error</response>
     /// <response code="409">Category with this name already exists</response>
-    /// <response code="500">Internal server error</response>
     [HttpPost]
     [ProducesResponseType(typeof(CategoryResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> CreateCategory(
         [FromBody, Required] CreateCategoryRequest request, 
         CancellationToken cancellationToken)
@@ -128,13 +123,11 @@ public class CategoriesController : ApiControllerBase
     /// <response code="400">Validation error</response>
     /// <response code="404">Category not found</response>
     /// <response code="409">Category with this name already exists</response>
-    /// <response code="500">Internal server error</response>
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(CategoryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UpdateCategory(
         [FromRoute, Required] int id,
         [FromBody, Required] UpdateCategoryRequest request,
@@ -161,12 +154,10 @@ public class CategoriesController : ApiControllerBase
     /// <response code="204">Category successfully deleted</response>
     /// <response code="404">Category not found</response>
     /// <response code="409">Cannot delete category because it is referenced by expenses</response>
-    /// <response code="500">Internal server error</response>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteCategory(
         [FromRoute, Required] int id,
         CancellationToken cancellationToken)
