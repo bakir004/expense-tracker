@@ -203,6 +203,37 @@ public class UserRepository : IUserRepository
         }
     }
 
+    public async Task<ErrorOr<User>> SetInitialBalanceAsync(int userId, decimal initialBalance, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var connection = new NpgsqlConnection(_options.ConnectionString);
+            await connection.OpenAsync(cancellationToken);
+
+            var command = new NpgsqlCommand(
+                @"UPDATE ""Users"" 
+                  SET initial_balance = @initial_balance, updated_at = CURRENT_TIMESTAMP 
+                  WHERE id = @id
+                  RETURNING id, name, email, password_hash, initial_balance, created_at, updated_at",
+                connection);
+            command.Parameters.AddWithValue("id", userId);
+            command.Parameters.AddWithValue("initial_balance", initialBalance);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return UserErrors.NotFound;
+            }
+
+            return MapToDomainEntity(reader);
+        }
+        catch (Exception ex)
+        {
+            return Error.Failure("Database.Error", $"Failed to set initial balance: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Maps a database reader row to a domain entity.
     /// Column order: id, name, email, password_hash, initial_balance, created_at, updated_at

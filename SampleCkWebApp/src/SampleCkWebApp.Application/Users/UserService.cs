@@ -98,5 +98,10 @@ public class UserService : IUserService
     {
         return await _userRepository.GetUserBalanceAsync(userId, cancellationToken);
     }
+    
+    public async Task<ErrorOr<User>> SetInitialBalanceAsync(int userId, decimal initialBalance, CancellationToken cancellationToken)
+    {
+        return await _userRepository.SetInitialBalanceAsync(userId, initialBalance, cancellationToken);
+    }
 }
 

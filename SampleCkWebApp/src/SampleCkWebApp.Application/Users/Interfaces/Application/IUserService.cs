@@ -40,5 +40,10 @@ public interface IUserService
     /// Gets the current balance for a user
     /// </summary>
     Task<ErrorOr<(decimal InitialBalance, decimal CumulativeDelta, decimal CurrentBalance)>> GetUserBalanceAsync(int userId, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Sets the initial balance for a user
+    /// </summary>
+    Task<ErrorOr<User>> SetInitialBalanceAsync(int userId, decimal initialBalance, CancellationToken cancellationToken);
 }
 
