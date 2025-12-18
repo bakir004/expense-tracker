@@ -100,11 +100,21 @@ public class CategoryService : ICategoryService
             return existingResult.Errors;
         }
         
-        // Check if another category with this name already exists (excluding current category)
-        var duplicateCheck = await _categoryRepository.GetByNameAsync(name, cancellationToken);
-        if (!duplicateCheck.IsError && duplicateCheck.Value.Id != id)
+        var existingCategory = existingResult.Value;
+        
+        // Only check for duplicate name if the name is actually changing
+        if (!string.Equals(existingCategory.Name, name, StringComparison.OrdinalIgnoreCase))
         {
-            return CategoryErrors.DuplicateName;
+            // Check if another category with this name already exists
+            var duplicateCheck = await _categoryRepository.GetByNameAsync(name, cancellationToken);
+            if (!duplicateCheck.IsError)
+            {
+                // Found a category with this name - check if it's a different category
+                if (duplicateCheck.Value.Id != id)
+                {
+                    return CategoryErrors.DuplicateName;
+                }
+            }
         }
         
         var category = new Category

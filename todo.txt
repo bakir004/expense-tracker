@@ -1,3 +1,47 @@
 - autorizacija i autentikacija
 - logging
 - testovi
+
+## Security & Reliability
+- Rate limiting (protect APIs from abuse)
+- Input validation (FluentValidation for request DTOs)
+- HTTPS enforcement in production
+- CORS configuration (restrict origins instead of AllowAnyOrigin)
+- API key authentication for service-to-service calls
+
+## Performance & Scalability
+- Caching (Redis for frequently accessed data - user balances, categories)
+- Pagination (add to all list endpoints - GET /transactions?page=1&pageSize=20)
+- Response compression (enable gzip/brotli)
+- Database indexing (add indexes on frequently queried columns - user_id, date, etc.)
+
+## Developer Experience
+- CI/CD pipeline (GitHub Actions/GitLab CI for automated testing and deployment)
+- Health checks (detailed - database connectivity, external services)
+- Metrics & monitoring (Prometheus metrics, Application Insights, or OpenTelemetry)
+- API documentation enhancements (Swagger with examples, request/response samples)
+
+## Business Features
+- Reporting & analytics (endpoints for spending trends, category breakdowns, monthly summaries)
+- Budget management (budgets per category with alerts)
+- Recurring transactions (support for subscriptions/recurring expenses)
+- Export functionality (export transactions to CSV/PDF)
+- Search & filtering (advanced search with date ranges, amounts, categories)
+
+## Code Quality
+- Code coverage (aim for 80%+ coverage)
+- Static analysis (SonarQube or similar)
+- API contract testing (Pact or similar for frontend-backend contracts)
+- Performance testing (load tests with k6 or JMeter)
+
+## Infrastructure
+- Environment configuration (separate configs for dev/staging/prod)
+- Secrets management (Azure Key Vault, AWS Secrets Manager, or HashiCorp Vault)
+- Database migrations (use migration tool - EF Core Migrations or FluentMigrator)
+- Backup strategy (automated database backups)
+
+## User Experience
+- Real-time updates (SignalR for live balance updates)
+- Notifications (email/push notifications for budget alerts)
+- Multi-currency support (handle different currencies)
+- Receipt upload (store receipts with transactions)
