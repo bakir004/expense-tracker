@@ -32,6 +32,12 @@ public class User
     
     public string PasswordHash { get; set; } = string.Empty;
     
+    /// <summary>
+    /// The user's starting balance when they began tracking.
+    /// Actual balance = InitialBalance + last transaction's CumulativeDelta
+    /// </summary>
+    public decimal InitialBalance { get; set; }
+    
     public DateTime CreatedAt { get; set; }
     
     public DateTime UpdatedAt { get; set; }

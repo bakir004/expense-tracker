@@ -35,5 +35,10 @@ public interface IUserService
     Task<ErrorOr<User>> GetUserByIdAsync(int id, CancellationToken cancellationToken);
     
     Task<ErrorOr<User>> CreateUserAsync(string name, string email, string password, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Gets the current balance for a user
+    /// </summary>
+    Task<ErrorOr<(decimal InitialBalance, decimal CumulativeDelta, decimal CurrentBalance)>> GetUserBalanceAsync(int userId, CancellationToken cancellationToken);
 }
 

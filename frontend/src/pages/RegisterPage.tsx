@@ -1,38 +1,47 @@
-import * as React from "react"
-import { api } from "@/lib/api"
-import { navigate } from "@/router"
-import { useAuth } from "@/state/auth"
+import * as React from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "@/lib/api";
+import { useAuth } from "@/state/auth";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 export function RegisterPage() {
-  const { loginAs } = useAuth()
+  const { loginAs } = useAuth();
+  const navigate = useNavigate();
 
-  const [name, setName] = React.useState("")
-  const [email, setEmail] = React.useState("")
-  const [password, setPassword] = React.useState("")
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const [name, setName] = React.useState("");
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
     try {
       const user = await api.createUser({
         name: name.trim(),
         email: email.trim(),
         password,
-      })
-      loginAs(user.id)
-      navigate("/dashboard")
+      });
+      loginAs(user.id);
+      navigate("/dashboard", { replace: true });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Registration failed")
+      setError(e instanceof Error ? e.message : "Registration failed");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -83,19 +92,24 @@ export function RegisterPage() {
                 <Button type="submit" disabled={loading}>
                   Create account
                 </Button>
-                <Button type="button" variant="outline" onClick={() => navigate("/login")}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/login", { replace: true })}
+                >
                   Back to login
                 </Button>
               </Field>
             </FieldGroup>
           </form>
         </CardContent>
-        <CardFooter className="justify-end">
-          {error ? <div className="text-sm text-destructive">{error}</div> : null}
+        <CardFooter className="justify-between gap-4">
+          <ThemeToggle />
+          {error ? (
+            <div className="text-sm text-destructive">{error}</div>
+          ) : null}
         </CardFooter>
       </Card>
     </div>
-  )
+  );
 }
-
-

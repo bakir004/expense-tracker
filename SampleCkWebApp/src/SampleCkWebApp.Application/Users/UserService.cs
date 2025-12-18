@@ -90,9 +90,13 @@ public class UserService : IUserService
             UpdatedAt = DateTime.UtcNow
         };
         
-        // Persist the user
-        var createResult = await _userRepository.CreateUserAsync(user, cancellationToken);
-        return createResult;
+        // Persist the user (initial_balance defaults to 0 in the database)
+        return await _userRepository.CreateUserAsync(user, cancellationToken);
+    }
+    
+    public async Task<ErrorOr<(decimal InitialBalance, decimal CumulativeDelta, decimal CurrentBalance)>> GetUserBalanceAsync(int userId, CancellationToken cancellationToken)
+    {
+        return await _userRepository.GetUserBalanceAsync(userId, cancellationToken);
     }
 }
 

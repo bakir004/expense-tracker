@@ -13,7 +13,7 @@ docker run --name postgres-db \
   -e POSTGRES_PASSWORD=mypassword \
   -e POSTGRES_DB=mydatabase \
   -p 5432:5432 \
-  -v "$PROJECT_ROOT/scripts/dbinit-postgres.sql:/docker-entrypoint-initdb.d/01-init.sql:ro" \
+  -v "$PROJECT_ROOT/scripts/database.sql:/docker-entrypoint-initdb.d/01-init.sql:ro" \
   -d postgres:latest
 
 echo "PostgreSQL container started. Waiting for initialization..."

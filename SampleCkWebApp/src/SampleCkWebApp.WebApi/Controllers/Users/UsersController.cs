@@ -36,7 +36,7 @@ namespace SampleCkWebApp.WebApi.Controllers.Users;
 /// Controller for managing users in the expense tracker system
 /// </summary>
 [ApiController]
-[Route("[controller]")]
+[Route("users")]
 [Produces("application/json")]
 public class UsersController : ApiControllerBase
 {
@@ -117,6 +117,36 @@ public class UsersController : ApiControllerBase
         
         return result.Match(
             user => CreatedAtAction(nameof(GetUserById), new { id = user.Id }, user.ToResponse()),
+            Problem);
+    }
+    
+    /// <summary>
+    /// Gets the current balance for a user
+    /// </summary>
+    /// <param name="id">The unique identifier of the user</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>User's balance information including initial balance, cumulative delta, and current balance</returns>
+    /// <response code="200">Balance retrieved successfully</response>
+    /// <response code="404">User not found</response>
+    /// <response code="500">Internal server error</response>
+    [HttpGet("{id}/balance")]
+    [ProducesResponseType(typeof(UserBalanceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetUserBalance(
+        [FromRoute, Required] int id,
+        CancellationToken cancellationToken)
+    {
+        var result = await _userService.GetUserBalanceAsync(id, cancellationToken);
+        
+        return result.Match(
+            balance => Ok(new UserBalanceResponse
+            {
+                UserId = id,
+                InitialBalance = balance.InitialBalance,
+                CumulativeDelta = balance.CumulativeDelta,
+                CurrentBalance = balance.CurrentBalance
+            }),
             Problem);
     }
 }

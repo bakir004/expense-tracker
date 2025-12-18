@@ -1,7 +1,8 @@
 import * as React from "react";
+import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
-import { navigate } from "@/router";
 import { useAuth } from "@/state/auth";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import type {
   Category,
   Expense,
@@ -47,10 +48,12 @@ function paymentLabel(m: PaymentMethod) {
 
 export function DashboardPage() {
   const { userId, logout } = useAuth();
+  const navigate = useNavigate();
 
   const [user, setUser] = React.useState<User | null>(null);
   const [balance, setBalance] = React.useState<UserBalance | null>(null);
   const [balanceError, setBalanceError] = React.useState<string | null>(null);
+  const [balanceChecked, setBalanceChecked] = React.useState(false);
 
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [groups, setGroups] = React.useState<ExpenseGroup[]>([]);
@@ -83,10 +86,12 @@ export function DashboardPage() {
   const [incomeDescription, setIncomeDescription] = React.useState("");
 
   React.useEffect(() => {
-    if (!userId) navigate("/login");
-  }, [userId]);
+    if (!userId) navigate("/login", { replace: true });
+  }, [userId, navigate]);
 
-  const needsInitialBalance = userId !== null && balance === null;
+  // Only show onboarding if we've checked for balance and it doesn't exist
+  const needsInitialBalance =
+    userId !== null && balanceChecked && balance === null;
 
   const refreshAll = React.useCallback(async () => {
     if (!userId) return;
@@ -110,8 +115,10 @@ export function DashboardPage() {
       try {
         const b = await api.getUserBalance(userId);
         setBalance(b);
+        setBalanceChecked(true);
       } catch (e: unknown) {
         setBalance(null);
+        setBalanceChecked(true);
         setBalanceError(
           e instanceof Error ? e.message : "Failed to load balance"
         );
@@ -268,7 +275,20 @@ export function DashboardPage() {
 
   function onLogout() {
     logout();
-    navigate("/login");
+    navigate("/login", { replace: true });
+  }
+
+  // Show loading state while checking balance
+  if (userId && !balanceChecked) {
+    return (
+      <div className="mx-auto flex min-h-dvh w-full max-w-xl items-center justify-center px-4 py-10">
+        <Card className="w-full">
+          <CardContent className="pt-6">
+            <div className="text-center text-muted-foreground">Loading...</div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Onboarding screen: require initial balance before showing the rest of the dashboard
@@ -336,6 +356,7 @@ export function DashboardPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <ThemeToggle />
           <Button
             variant="outline"
             onClick={() => void refreshAll()}

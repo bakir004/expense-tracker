@@ -50,6 +50,13 @@ var builder = WebApplication.CreateBuilder(args);
             }
         });
         
+        // Add server with base path so Swagger knows the prefix
+        c.AddServer(new Microsoft.OpenApi.Models.OpenApiServer
+        {
+            Url = "/api/v1",
+            Description = "API v1"
+        });
+        
         // Include XML comments
         var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -93,6 +100,9 @@ var app = builder.Build();
     
     // CORS must be early in the pipeline to handle preflight OPTIONS requests
     app.UseCors();
+    
+    // Global API version prefix - all controller routes will be prefixed with /api/v1
+    app.UsePathBase("/api/v1");
     
     // Swagger should be before UseRouting to avoid authorization issues
     app.UseSwagger();

@@ -36,5 +36,10 @@ public interface IUserRepository
     Task<ErrorOr<User>> GetUserByEmailAsync(string email, CancellationToken cancellationToken);
     
     Task<ErrorOr<User>> CreateUserAsync(User user, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Gets user balance by combining initial_balance with the cumulative_delta from latest transaction
+    /// </summary>
+    Task<ErrorOr<(decimal InitialBalance, decimal CumulativeDelta, decimal CurrentBalance)>> GetUserBalanceAsync(int userId, CancellationToken cancellationToken);
 }
 

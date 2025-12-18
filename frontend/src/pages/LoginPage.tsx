@@ -1,85 +1,104 @@
-import * as React from "react"
-import { api } from "@/lib/api"
-import { navigate, useRouter } from "@/router"
-import { useAuth } from "@/state/auth"
-import type { User } from "@/lib/types"
+import * as React from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { api } from "@/lib/api";
+import { useAuth } from "@/state/auth";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import type { User } from "@/lib/types";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 
 export function LoginPage() {
-  const { userId, loginAs } = useAuth()
-  const { path } = useRouter()
+  const { userId, loginAs } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const [users, setUsers] = React.useState<User[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const [users, setUsers] = React.useState<User[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const [email, setEmail] = React.useState("")
-  const [password, setPassword] = React.useState("")
-  const [selectedUserId, setSelectedUserId] = React.useState<string>("")
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [selectedUserId, setSelectedUserId] = React.useState<string>("");
 
   React.useEffect(() => {
     // If already logged in, go dashboard
-    if (userId && path !== "/dashboard") navigate("/dashboard")
-  }, [userId, path])
+    if (userId && location.pathname !== "/dashboard")
+      navigate("/dashboard", { replace: true });
+  }, [userId, location.pathname, navigate]);
 
   React.useEffect(() => {
-    let cancelled = false
-    setLoading(true)
+    let cancelled = false;
+    setLoading(true);
     api
       .getUsers()
       .then((u) => {
-        if (cancelled) return
-        setUsers(u)
+        if (cancelled) return;
+        setUsers(u);
       })
       .catch((e: unknown) => {
-        if (cancelled) return
-        setError(e instanceof Error ? e.message : "Failed to load users")
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Failed to load users");
       })
       .finally(() => {
-        if (cancelled) return
-        setLoading(false)
-      })
+        if (cancelled) return;
+        setLoading(false);
+      });
     return () => {
-      cancelled = true
-    }
-  }, [])
+      cancelled = true;
+    };
+  }, []);
 
   async function onLoginByEmail(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setLoading(true)
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
     try {
-      const all = users.length ? users : await api.getUsers()
-      const match = all.find((u) => u.email.toLowerCase() === email.trim().toLowerCase())
-      if (!match) throw new Error("No user found with that email.")
+      const all = users.length ? users : await api.getUsers();
+      const match = all.find(
+        (u) => u.email.toLowerCase() === email.trim().toLowerCase()
+      );
+      if (!match) throw new Error("No user found with that email.");
       // Note: API currently has no login endpoint; this is a simple “select user” login for now.
       // Password is collected for future auth support.
-      void password
-      loginAs(match.id)
-      navigate("/dashboard")
+      void password;
+      loginAs(match.id);
+      navigate("/dashboard", { replace: true });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Login failed")
+      setError(e instanceof Error ? e.message : "Login failed");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   function onLoginByUserId(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    const id = Number(selectedUserId)
+    e.preventDefault();
+    setError(null);
+    const id = Number(selectedUserId);
     if (!Number.isFinite(id) || id <= 0) {
-      setError("Pick a user to continue.")
-      return
+      setError("Pick a user to continue.");
+      return;
     }
-    loginAs(id)
-    navigate("/dashboard")
+    loginAs(id);
+    navigate("/dashboard", { replace: true });
   }
 
   return (
@@ -118,7 +137,11 @@ export function LoginPage() {
                 <Button type="submit" disabled={loading}>
                   Login
                 </Button>
-                <Button type="button" variant="outline" onClick={() => navigate("/register")}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => navigate("/register", { replace: true })}
+                >
                   Register
                 </Button>
               </Field>
@@ -132,9 +155,14 @@ export function LoginPage() {
               <FieldGroup>
                 <Field>
                   <FieldLabel>User</FieldLabel>
-                  <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                  <Select
+                    value={selectedUserId}
+                    onValueChange={setSelectedUserId}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder={loading ? "Loading..." : "Select a user"} />
+                      <SelectValue
+                        placeholder={loading ? "Loading..." : "Select a user"}
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -157,14 +185,25 @@ export function LoginPage() {
           </div>
         </CardContent>
         <CardFooter className="justify-between gap-4">
-          <div className="text-muted-foreground text-sm">
-            Swagger: <a className="underline" href="http://localhost:5000/swagger" target="_blank" rel="noreferrer">/swagger</a>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <div className="text-muted-foreground text-sm">
+              Swagger:{" "}
+              <a
+                className="underline"
+                href="http://localhost:5000/swagger"
+                target="_blank"
+                rel="noreferrer"
+              >
+                /swagger
+              </a>
+            </div>
           </div>
-          {error ? <div className="text-sm text-destructive">{error}</div> : null}
+          {error ? (
+            <div className="text-sm text-destructive">{error}</div>
+          ) : null}
         </CardFooter>
       </Card>
     </div>
-  )
+  );
 }
-
-

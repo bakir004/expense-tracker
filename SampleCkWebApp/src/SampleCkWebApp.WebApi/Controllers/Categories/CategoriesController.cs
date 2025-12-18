@@ -33,7 +33,7 @@ namespace SampleCkWebApp.WebApi.Controllers.Categories;
 /// Controller for managing categories in the expense tracker system
 /// </summary>
 [ApiController]
-[Route("[controller]")]
+[Route("categories")]
 [Produces("application/json")]
 public class CategoriesController : ApiControllerBase
 {
