@@ -149,5 +149,31 @@ public class UsersController : ApiControllerBase
             }),
             Problem);
     }
+    
+    /// <summary>
+    /// Sets the initial balance for a user
+    /// </summary>
+    /// <param name="id">The unique identifier of the user</param>
+    /// <param name="request">Request containing the initial balance to set</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The updated user</returns>
+    /// <response code="200">Initial balance updated successfully</response>
+    /// <response code="404">User not found</response>
+    /// <response code="500">Internal server error</response>
+    [HttpPut("{id}/initial-balance")]
+    [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> SetInitialBalance(
+        [FromRoute, Required] int id,
+        [FromBody, Required] SetInitialBalanceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _userService.SetInitialBalanceAsync(id, request.InitialBalance, cancellationToken);
+        
+        return result.Match(
+            user => Ok(user.ToResponse()),
+            Problem);
+    }
 }
 
