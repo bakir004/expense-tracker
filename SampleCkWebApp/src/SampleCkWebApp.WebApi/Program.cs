@@ -7,6 +7,28 @@ var builder = WebApplication.CreateBuilder(args);
     Directory.SetCurrentDirectory(AppContext.BaseDirectory);
     builder.Configuration
         .SetBasePath(AppContext.BaseDirectory);
+    
+    // Support DATABASE_URL environment variable (common in cloud platforms)
+    // This must be done BEFORE any configuration is read
+    var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+    if (!string.IsNullOrWhiteSpace(databaseUrl))
+    {
+        // Convert DATABASE_URL format (postgresql://user:pass@host:port/db?params)
+        // to Npgsql connection string format
+        var connectionString = ConvertDatabaseUrlToConnectionString(databaseUrl);
+        builder.Configuration["Database:ConnectionString"] = connectionString;
+    }
+    else
+    {
+        // Also check if it's set in configuration (for appsettings.json)
+        var configConnectionString = builder.Configuration["Database:ConnectionString"];
+        if (string.IsNullOrWhiteSpace(configConnectionString))
+        {
+            // If neither is set, throw a clear error
+            throw new InvalidOperationException(
+                "Database connection string is required. Set DATABASE_URL environment variable or Database:ConnectionString in appsettings.json");
+        }
+    }
 
     // Create the logger
     Log.Logger = new LoggerConfiguration()
@@ -152,3 +174,43 @@ foreach (var url in app.Urls)
 app.WaitForShutdown();
 
 Log.Logger.Information("Application shutdown gracefully");
+
+// Converts DATABASE_URL format (postgresql://user:pass@host:port/db?params)
+// to Npgsql connection string format (Host=host;Port=port;Database=db;Username=user;Password=pass;params)
+static string ConvertDatabaseUrlToConnectionString(string databaseUrl)
+{
+    try
+    {
+        var uri = new Uri(databaseUrl);
+        var host = uri.Host;
+        var port = uri.Port > 0 ? uri.Port : 5432;
+        var database = uri.AbsolutePath.TrimStart('/');
+        var username = uri.UserInfo.Split(':')[0];
+        var password = uri.UserInfo.Split(':').Length > 1 ? uri.UserInfo.Split(':')[1] : "";
+        
+        var connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={Uri.UnescapeDataString(password)}";
+        
+        // Add query string parameters (like sslmode)
+        if (!string.IsNullOrEmpty(uri.Query))
+        {
+            var query = uri.Query.TrimStart('?');
+            var pairs = query.Split('&');
+            foreach (var pair in pairs)
+            {
+                var parts = pair.Split('=');
+                if (parts.Length == 2)
+                {
+                    var key = Uri.UnescapeDataString(parts[0]);
+                    var value = Uri.UnescapeDataString(parts[1]);
+                    connectionString += $";{key}={value}";
+                }
+            }
+        }
+        
+        return connectionString;
+    }
+    catch (Exception ex)
+    {
+        throw new InvalidOperationException($"Failed to parse DATABASE_URL: {ex.Message}", ex);
+    }
+}

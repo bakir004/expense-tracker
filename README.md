@@ -16,6 +16,32 @@ On startup, the database will be populated with the necessary tables and seeded 
 
 To see what the API has to offer, Swagger is enabled at route `/swagger`.
 
+## Database Setup
+
+### Using Neon PostgreSQL (Cloud)
+
+1. Set the `DATABASE_URL` environment variable:
+
+   ```bash
+   export DATABASE_URL="postgresql://user:password@host:port/database?sslmode=require"
+   ```
+
+2. Initialize the database schema:
+
+   ```bash
+   # Linux/Mac
+   ./scripts/init-db.sh
+
+   # Windows PowerShell
+   .\scripts\init-db.ps1
+   ```
+
+3. Run the application - it will automatically use the `DATABASE_URL` environment variable.
+
+### Using Local PostgreSQL
+
+For local development, update `appsettings.development.json` with your local database connection string, or set the `DATABASE_URL` environment variable.
+
 ## Documentation
 
 For detailed API documentation, see [SampleCkWebApp/docs/API.md](SampleCkWebApp/docs/API.md).

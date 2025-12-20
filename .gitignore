@@ -456,3 +456,13 @@ $RECYCLE.BIN/
 !.vscode/launch.json
 !.vscode/extensions.json
 
+##
+## Environment and secrets
+##
+.env
+.env.local
+*.env
+appsettings.*.json
+!appsettings.json
+!appsettings.development.json.example
+
