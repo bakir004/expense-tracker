@@ -2,6 +2,8 @@
 - logging
 - testovi
 
+HELLA PROBLEMS WITH MODIFYING TRANSACTION DATES
+
 ## Security & Reliability
 - Rate limiting (protect APIs from abuse)
 - Input validation (FluentValidation for request DTOs)
