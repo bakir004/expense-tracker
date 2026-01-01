@@ -220,7 +220,7 @@ public class TransactionRepository : ITransactionRepository
                     decimal amountDelta = transaction.SignedAmount - oldTransaction.SignedAmount;
                     
                     // Get previous cumulative_delta to calculate new value for this transaction
-                    var previousCumulativeDelta = await _context.Transactions
+                    var prevCumulativeDelta = await _context.Transactions
                         .Where(t => t.UserId == transaction.UserId)
                         .Where(t => t.Date < transaction.Date || 
                                    (t.Date == transaction.Date && t.Id < transaction.Id))
@@ -230,7 +230,7 @@ public class TransactionRepository : ITransactionRepository
                         .FirstOrDefaultAsync(cancellationToken);
                     
                     // Update this transaction's cumulative_delta (default is 0m if no previous transaction)
-                    transaction.CumulativeDelta = previousCumulativeDelta + transaction.SignedAmount;
+                    transaction.CumulativeDelta = prevCumulativeDelta + transaction.SignedAmount;
                     transaction.UpdatedAt = DateTime.UtcNow;
                     _context.Transactions.Update(transaction);
                     await _context.SaveChangesAsync(cancellationToken);
@@ -252,45 +252,65 @@ public class TransactionRepository : ITransactionRepository
                     return transaction;
                 }
                 
-                // DATE CHANGED: Need full recalculation from earliest affected point
-                transaction.UpdatedAt = DateTime.UtcNow;
-                _context.Transactions.Update(transaction);
-                await _context.SaveChangesAsync(cancellationToken);
+                // DATE CHANGED: Optimized two-phase update
+                // Phase 1: Transactions in range [minDate, maxDate] get the new transaction amount added
+                // Phase 2: Transactions after maxDate get net delta = (newAmount - oldAmount)
                 
-                // Find the earliest date that needs recalculation
-                var earliestDate = oldTransaction.Date < transaction.Date ? oldTransaction.Date : transaction.Date;
+                var minDate = oldTransaction.Date < transaction.Date ? oldTransaction.Date : transaction.Date;
+                var maxDate = oldTransaction.Date > transaction.Date ? oldTransaction.Date : transaction.Date;
                 
-                // Get all transactions from the earliest affected point, ordered chronologically
-                var transactionsToRecalculate = await _context.Transactions
+                // Get cumulative_delta before minDate to calculate the transaction's new cumulative_delta
+                var previousCumulativeDelta = await _context.Transactions
                     .Where(t => t.UserId == transaction.UserId)
-                    .Where(t => t.Date > earliestDate || 
-                               (t.Date == earliestDate))
-                    .OrderBy(t => t.Date)
-                    .ThenBy(t => t.Id)
-                    .ToListAsync(cancellationToken);
-                
-                // Get the cumulative_delta before the earliest affected transaction
-                var previousCumulativeDeltaForRecalc = await _context.Transactions
-                    .Where(t => t.UserId == transaction.UserId)
-                    .Where(t => t.Date < earliestDate)
+                    .Where(t => t.Date < minDate)
                     .OrderByDescending(t => t.Date)
                     .ThenByDescending(t => t.Id)
                     .Select(t => t.CumulativeDelta)
                     .FirstOrDefaultAsync(cancellationToken);
                 
-                decimal runningCumulativeDelta = previousCumulativeDeltaForRecalc; // Default is 0m if no previous transaction
+                // Calculate the transaction's cumulative_delta at its new position
+                transaction.CumulativeDelta = previousCumulativeDelta + transaction.SignedAmount;
+                transaction.UpdatedAt = DateTime.UtcNow;
+                _context.Transactions.Update(transaction);
+                await _context.SaveChangesAsync(cancellationToken);
                 
-                // Recalculate cumulative_delta for all affected transactions
-                foreach (var tx in transactionsToRecalculate)
+                // Phase 1: Add the new transaction amount to all other transactions in range [minDate, maxDate]
+                // These transactions now have the moved transaction before them in the order
+                await _context.Database.ExecuteSqlRawAsync(
+                    @"UPDATE ""Transaction""
+                      SET cumulative_delta = cumulative_delta + {0},
+                          updated_at = CURRENT_TIMESTAMP
+                      WHERE user_id = {1}
+                        AND date >= {2}
+                        AND date <= {3}
+                        AND id != {4}",
+                    transaction.SignedAmount,
+                    transaction.UserId,
+                    minDate,
+                    maxDate,
+                    transaction.Id,
+                    cancellationToken);
+                
+                // Phase 2: Transactions after maxDate need to:
+                // - Remove the old amount (transaction was at oldDate, now it's gone from there)
+                // - Add the new amount (transaction is now at newDate, affecting them)
+                // Net effect: (newAmount - oldAmount)
+                decimal netDelta = transaction.SignedAmount - oldTransaction.SignedAmount;
+                
+                if (netDelta != 0)
                 {
-                    runningCumulativeDelta += tx.SignedAmount;
-                    tx.CumulativeDelta = runningCumulativeDelta;
-                    tx.UpdatedAt = DateTime.UtcNow;
+                    await _context.Database.ExecuteSqlRawAsync(
+                        @"UPDATE ""Transaction""
+                          SET cumulative_delta = cumulative_delta + {0},
+                              updated_at = CURRENT_TIMESTAMP
+                          WHERE user_id = {1} AND date > {2}",
+                        netDelta,
+                        transaction.UserId,
+                        maxDate,
+                        cancellationToken);
                 }
                 
-                await _context.SaveChangesAsync(cancellationToken);
                 await dbTransaction.CommitAsync(cancellationToken);
-                
                 return transaction;
             }
             catch
@@ -313,37 +333,27 @@ public class TransactionRepository : ITransactionRepository
             
             try
             {
-                // Step 1: Get the transaction to delete
-                var transactionToDelete = await _context.Transactions
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
-                
-                if (transactionToDelete == null)
-                {
-                    return TransactionErrors.NotFound;
-                }
-                
-                // Step 2: Bulk update all subsequent transactions (1 query - subtract deleted amount)
-                await _context.Database.ExecuteSqlRawAsync(
-                    @"UPDATE ""Transaction""
-                      SET cumulative_delta = cumulative_delta - {0},
+                // Single query: Delete transaction AND update all subsequent transactions in one statement
+                // Uses CTE (Common Table Expression) to capture deleted row data, then update subsequent rows
+                var rowsAffected = await _context.Database.ExecuteSqlRawAsync(
+                    @"WITH deleted AS (
+                        DELETE FROM ""Transaction""
+                        WHERE id = {0}
+                        RETURNING user_id, date, id, signed_amount
+                      )
+                      UPDATE ""Transaction"" t
+                      SET cumulative_delta = t.cumulative_delta - d.signed_amount,
                           updated_at = CURRENT_TIMESTAMP
-                      WHERE user_id = {1}
-                        AND (date > {2} OR (date = {2} AND id > {3}))",
-                    transactionToDelete.SignedAmount,
-                    transactionToDelete.UserId,
-                    transactionToDelete.Date,
-                    transactionToDelete.Id,
+                      FROM deleted d
+                      WHERE t.user_id = d.user_id
+                        AND (t.date > d.date OR (t.date = d.date AND t.id > d.id))",
+                    id,
                     cancellationToken);
                 
-                // Step 3: Delete the transaction
-                var entityToDelete = await _context.Transactions
-                    .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
-                
-                if (entityToDelete != null)
+                // If no rows were deleted, transaction didn't exist
+                if (rowsAffected == 0)
                 {
-                    _context.Transactions.Remove(entityToDelete);
-                    await _context.SaveChangesAsync(cancellationToken);
+                    return TransactionErrors.NotFound;
                 }
                 
                 await dbTransaction.CommitAsync(cancellationToken);
