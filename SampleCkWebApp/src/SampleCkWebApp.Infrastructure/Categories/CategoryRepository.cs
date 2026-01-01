@@ -1,64 +1,50 @@
 // ============================================================================
 // FILE: CategoryRepository.cs
 // ============================================================================
-// WHAT: PostgreSQL implementation of the category repository interface.
+// WHAT: Entity Framework Core implementation of the category repository interface.
 //
 // WHY: This repository exists in the Infrastructure layer to handle all
 //      database operations for categories. It implements ICategoryRepository (defined
 //      in Application layer) following the Dependency Inversion Principle.
-//      By keeping database-specific code (Npgsql, SQL queries) here, the
-//      Application layer remains database-agnostic. If we need to switch
-//      databases, only this file changes, not the business logic.
+//      Uses Entity Framework Core for all operations since categories only
+//      require simple CRUD operations with no complex queries.
 //
 // WHAT IT DOES:
-//      - Implements ICategoryRepository interface with PostgreSQL/Npgsql
-//      - Executes SQL queries for CRUD operations on categories
-//      - Maps database records to Category domain entities
-//      - Handles database exceptions (connection errors, foreign key violations)
+//      - Implements ICategoryRepository interface with Entity Framework Core
+//      - Uses EF Core LINQ for all CRUD operations on categories
+//      - Handles database exceptions (unique violations, foreign key violations)
 //      - Returns ErrorOr results for consistent error handling
-//      - Uses UserOptions for database connection string configuration
 // ============================================================================
 
 using ErrorOr;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using SampleCkWebApp.Domain.Entities;
 using SampleCkWebApp.Domain.Errors;
 using SampleCkWebApp.Application.Categories.Interfaces.Infrastructure;
-using SampleCkWebApp.Infrastructure.Users.Options;
+using SampleCkWebApp.Infrastructure.Shared;
 
 namespace SampleCkWebApp.Infrastructure.Categories;
 
 /// <summary>
-/// PostgreSQL implementation of the category repository.
-/// Maps database records to domain entities.
+/// Entity Framework Core implementation of the category repository.
 /// </summary>
 public class CategoryRepository : ICategoryRepository
 {
-    private readonly UserOptions _options;
+    private readonly ExpenseTrackerDbContext _context;
 
-    public CategoryRepository(UserOptions options)
+    public CategoryRepository(ExpenseTrackerDbContext context)
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
     public async Task<ErrorOr<List<Category>>> GetAllAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
-
-            var command = new NpgsqlCommand(
-                "SELECT id, name, description, icon FROM Category ORDER BY id",
-                connection);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var categories = new List<Category>();
-
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                categories.Add(MapToDomainEntity(reader));
-            }
+            var categories = await _context.Categories
+                .OrderBy(c => c.Id)
+                .ToListAsync(cancellationToken);
 
             return categories;
         }
@@ -72,22 +58,15 @@ public class CategoryRepository : ICategoryRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            var category = await _context.Categories
+                .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
-            var command = new NpgsqlCommand(
-                "SELECT id, name, description, icon FROM Category WHERE id = @id",
-                connection);
-            command.Parameters.AddWithValue("id", id);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+            if (category == null)
             {
                 return CategoryErrors.NotFound;
             }
 
-            return MapToDomainEntity(reader);
+            return category;
         }
         catch (Exception ex)
         {
@@ -99,22 +78,15 @@ public class CategoryRepository : ICategoryRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            var category = await _context.Categories
+                .FirstOrDefaultAsync(c => c.Name == name, cancellationToken);
 
-            var command = new NpgsqlCommand(
-                "SELECT id, name, description, icon FROM Category WHERE name = @name",
-                connection);
-            command.Parameters.AddWithValue("name", name);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+            if (category == null)
             {
                 return CategoryErrors.NotFound;
             }
 
-            return MapToDomainEntity(reader);
+            return category;
         }
         catch (Exception ex)
         {
@@ -126,29 +98,12 @@ public class CategoryRepository : ICategoryRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            _context.Categories.Add(category);
+            await _context.SaveChangesAsync(cancellationToken);
 
-            var command = new NpgsqlCommand(
-                @"INSERT INTO Category (name, description, icon) 
-                  VALUES (@name, @description, @icon) 
-                  RETURNING id, name, description, icon",
-                connection);
-            
-            command.Parameters.AddWithValue("name", category.Name);
-            command.Parameters.AddWithValue("description", (object?)category.Description ?? DBNull.Value);
-            command.Parameters.AddWithValue("icon", (object?)category.Icon ?? DBNull.Value);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
-            {
-                return Error.Failure("Database.Error", "Failed to create category");
-            }
-
-            return MapToDomainEntity(reader);
+            return category;
         }
-        catch (PostgresException ex) when (ex.SqlState == "23505") // Unique violation
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
         {
             return CategoryErrors.DuplicateName;
         }
@@ -162,31 +117,23 @@ public class CategoryRepository : ICategoryRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            var existingCategory = await _context.Categories
+                .FirstOrDefaultAsync(c => c.Id == category.Id, cancellationToken);
 
-            var command = new NpgsqlCommand(
-                @"UPDATE Category 
-                  SET name = @name, description = @description, icon = @icon 
-                  WHERE id = @id 
-                  RETURNING id, name, description, icon",
-                connection);
-            
-            command.Parameters.AddWithValue("id", category.Id);
-            command.Parameters.AddWithValue("name", category.Name);
-            command.Parameters.AddWithValue("description", (object?)category.Description ?? DBNull.Value);
-            command.Parameters.AddWithValue("icon", (object?)category.Icon ?? DBNull.Value);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+            if (existingCategory == null)
             {
                 return CategoryErrors.NotFound;
             }
 
-            return MapToDomainEntity(reader);
+            existingCategory.Name = category.Name;
+            existingCategory.Description = category.Description;
+            existingCategory.Icon = category.Icon;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            return existingCategory;
         }
-        catch (PostgresException ex) when (ex.SqlState == "23505") // Unique violation
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
         {
             return CategoryErrors.DuplicateName;
         }
@@ -200,24 +147,20 @@ public class CategoryRepository : ICategoryRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            var category = await _context.Categories
+                .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
-            var command = new NpgsqlCommand(
-                "DELETE FROM Category WHERE id = @id",
-                connection);
-            command.Parameters.AddWithValue("id", id);
-
-            var rowsAffected = await command.ExecuteNonQueryAsync(cancellationToken);
-
-            if (rowsAffected == 0)
+            if (category == null)
             {
                 return CategoryErrors.NotFound;
             }
 
+            _context.Categories.Remove(category);
+            await _context.SaveChangesAsync(cancellationToken);
+
             return Result.Deleted;
         }
-        catch (PostgresException ex) when (ex.SqlState == "23503") // Foreign key violation
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23503")
         {
             return Error.Conflict("Database.Error", "Cannot delete category because it is referenced by expenses.");
         }
@@ -226,19 +169,4 @@ public class CategoryRepository : ICategoryRepository
             return Error.Failure("Database.Error", $"Failed to delete category: {ex.Message}");
         }
     }
-
-    /// <summary>
-    /// Maps a database reader row to a domain entity.
-    /// </summary>
-    private static Category MapToDomainEntity(NpgsqlDataReader reader)
-    {
-        return new Category
-        {
-            Id = reader.GetInt32(0),
-            Name = reader.GetString(1),
-            Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-            Icon = reader.IsDBNull(3) ? null : reader.GetString(3)
-        };
-    }
 }
-

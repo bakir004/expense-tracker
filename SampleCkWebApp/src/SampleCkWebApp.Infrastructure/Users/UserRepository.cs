@@ -1,65 +1,53 @@
 // ============================================================================
 // FILE: UserRepository.cs
 // ============================================================================
-// WHAT: PostgreSQL implementation of the user repository interface.
+// WHAT: Entity Framework Core implementation of the user repository interface.
 //
 // WHY: This repository exists in the Infrastructure layer to handle all
 //      database operations for users. It implements IUserRepository (defined
 //      in Application layer) following the Dependency Inversion Principle.
-//      By keeping database-specific code (Npgsql, SQL queries) here, the
-//      Application layer remains database-agnostic. If we need to switch
-//      databases, only this file changes, not the business logic.
+//      Uses Entity Framework Core for simple CRUD operations and raw SQL
+//      for complex queries (like balance calculation with lateral joins).
 //
 // WHAT IT DOES:
-//      - Implements IUserRepository interface with PostgreSQL/Npgsql
-//      - Executes SQL queries to: get all users, get user by ID, get user by
-//        email, and create new users
-//      - Maps database records to User domain entities
+//      - Implements IUserRepository interface with Entity Framework Core
+//      - Uses EF Core LINQ for simple operations: get all users, get user by ID,
+//        get user by email, create users, and set initial balance
+//      - Uses raw SQL for complex balance calculations with lateral joins
 //      - Handles database exceptions (unique violations, connection errors)
 //      - Returns ErrorOr results for consistent error handling
-//      - Uses UserOptions for database connection string configuration
 // ============================================================================
 
 using ErrorOr;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using SampleCkWebApp.Domain.Entities;
 using SampleCkWebApp.Domain.Errors;
 using SampleCkWebApp.Application.Users.Interfaces.Infrastructure;
-using SampleCkWebApp.Infrastructure.Users.Options;
+using SampleCkWebApp.Infrastructure.Shared;
 
 namespace SampleCkWebApp.Infrastructure.Users;
 
 /// <summary>
-/// PostgreSQL implementation of the user repository.
-/// Maps database records to domain entities.
+/// Entity Framework Core implementation of the user repository.
+/// Uses EF Core for simple CRUD and raw SQL for complex queries.
 /// </summary>
 public class UserRepository : IUserRepository
 {
-    private readonly UserOptions _options;
+    private readonly ExpenseTrackerDbContext _context;
 
-    public UserRepository(UserOptions options)
+    public UserRepository(ExpenseTrackerDbContext context)
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
     public async Task<ErrorOr<List<User>>> GetUsersAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
-
-            var command = new NpgsqlCommand(
-                "SELECT id, name, email, password_hash, initial_balance, created_at, updated_at FROM \"Users\" ORDER BY id",
-                connection);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var users = new List<User>();
-
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                users.Add(MapToDomainEntity(reader));
-            }
+            var users = await _context.Users
+                .OrderBy(u => u.Id)
+                .ToListAsync(cancellationToken);
 
             return users;
         }
@@ -73,22 +61,15 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 
-            var command = new NpgsqlCommand(
-                "SELECT id, name, email, password_hash, initial_balance, created_at, updated_at FROM \"Users\" WHERE id = @id",
-                connection);
-            command.Parameters.AddWithValue("id", id);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+            if (user == null)
             {
                 return UserErrors.NotFound;
             }
 
-            return MapToDomainEntity(reader);
+            return user;
         }
         catch (Exception ex)
         {
@@ -100,22 +81,15 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
 
-            var command = new NpgsqlCommand(
-                "SELECT id, name, email, password_hash, initial_balance, created_at, updated_at FROM \"Users\" WHERE email = @email",
-                connection);
-            command.Parameters.AddWithValue("email", email);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+            if (user == null)
             {
                 return UserErrors.NotFound;
             }
 
-            return MapToDomainEntity(reader);
+            return user;
         }
         catch (Exception ex)
         {
@@ -127,30 +101,15 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            user.CreatedAt = DateTime.UtcNow;
+            user.UpdatedAt = DateTime.UtcNow;
 
-            var command = new NpgsqlCommand(
-                @"INSERT INTO ""Users"" (name, email, password_hash, initial_balance, created_at, updated_at) 
-                  VALUES (@name, @email, @password_hash, @initial_balance, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
-                  RETURNING id, name, email, password_hash, initial_balance, created_at, updated_at",
-                connection);
-            
-            command.Parameters.AddWithValue("name", user.Name);
-            command.Parameters.AddWithValue("email", user.Email);
-            command.Parameters.AddWithValue("password_hash", user.PasswordHash);
-            command.Parameters.AddWithValue("initial_balance", user.InitialBalance);
+            _context.Users.Add(user);
+            await _context.SaveChangesAsync(cancellationToken);
 
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
-            {
-                return Error.Failure("Database.Error", "Failed to create user");
-            }
-
-            return MapToDomainEntity(reader);
+            return user;
         }
-        catch (PostgresException ex) when (ex.SqlState == "23505") // Unique violation
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
         {
             return UserErrors.DuplicateEmail;
         }
@@ -164,25 +123,32 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
-
-            // Get user's initial_balance and the cumulative_delta from their latest transaction
-            var command = new NpgsqlCommand(
-                @"SELECT 
+            // Complex query with LATERAL join - using raw SQL for precision
+            var connection = _context.Database.GetDbConnection();
+            await using var command = connection.CreateCommand();
+            command.CommandText = @"
+                SELECT 
                     u.initial_balance,
                     COALESCE(t.cumulative_delta, 0) AS cumulative_delta
-                  FROM ""Users"" u
-                  LEFT JOIN LATERAL (
-                      SELECT cumulative_delta 
-                      FROM Transaction 
-                      WHERE user_id = u.id 
-                      ORDER BY seq DESC 
-                      LIMIT 1
-                  ) t ON true
-                  WHERE u.id = @user_id",
-                connection);
-            command.Parameters.AddWithValue("user_id", userId);
+                FROM ""Users"" u
+                LEFT JOIN LATERAL (
+                    SELECT cumulative_delta 
+                    FROM Transaction 
+                    WHERE user_id = u.id 
+                    ORDER BY date DESC, id DESC 
+                    LIMIT 1
+                ) t ON true
+                WHERE u.id = @user_id";
+
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@user_id";
+            parameter.Value = userId;
+            command.Parameters.Add(parameter);
+
+            if (connection.State != System.Data.ConnectionState.Open)
+            {
+                await connection.OpenAsync(cancellationToken);
+            }
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
 
@@ -207,49 +173,24 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
 
-            var command = new NpgsqlCommand(
-                @"UPDATE ""Users"" 
-                  SET initial_balance = @initial_balance, updated_at = CURRENT_TIMESTAMP 
-                  WHERE id = @id
-                  RETURNING id, name, email, password_hash, initial_balance, created_at, updated_at",
-                connection);
-            command.Parameters.AddWithValue("id", userId);
-            command.Parameters.AddWithValue("initial_balance", initialBalance);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+            if (user == null)
             {
                 return UserErrors.NotFound;
             }
 
-            return MapToDomainEntity(reader);
+            user.InitialBalance = initialBalance;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            return user;
         }
         catch (Exception ex)
         {
             return Error.Failure("Database.Error", $"Failed to set initial balance: {ex.Message}");
         }
     }
-
-    /// <summary>
-    /// Maps a database reader row to a domain entity.
-    /// Column order: id, name, email, password_hash, initial_balance, created_at, updated_at
-    /// </summary>
-    private static User MapToDomainEntity(NpgsqlDataReader reader)
-    {
-        return new User
-        {
-            Id = reader.GetInt32(0),
-            Name = reader.GetString(1),
-            Email = reader.GetString(2),
-            PasswordHash = reader.GetString(3),
-            InitialBalance = reader.GetDecimal(4),
-            CreatedAt = reader.GetDateTime(5),
-            UpdatedAt = reader.GetDateTime(6)
-        };
-    }
 }
-

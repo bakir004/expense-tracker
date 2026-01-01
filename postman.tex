@@ -1,0 +1,258 @@
+\subsection{Opis API-ja}
+
+Expense Tracker API je RESTful API izgrađen pomoću ASP.NET Core-a za upravljanje korisnicima, kategorijama, transakcijama i grupama transakcija. API prati Onion Architecture obrazac sa jasnom separacijom između Domain, Application, Infrastructure i WebApi slojeva.
+
+\textbf{Osnovne karakteristike:}
+\begin{itemize}
+    \item \textbf{Base URL}: \texttt{/api/v1}
+    \item \textbf{Swagger UI}: \texttt{/swagger} (interaktivna dokumentacija)
+    \item \textbf{Format podataka}: JSON
+    \item \textbf{Verzija}: v1 (sve rute su verzionisane)
+    \item \textbf{Error handling}: RFC 9110 Problem Details format
+    \item \textbf{Arhitektura}: Onion Architecture sa Repository pattern i ErrorOr pattern za funkcionalno rukovanje greškama
+\end{itemize}
+
+\textbf{Link na dokumentaciju}: \url{https://github.com/bakir004/expense-tracker}
+
+\subsection{REST principi}
+
+API prati REST (Representational State Transfer) principe:
+
+\begin{itemize}
+    \item \textbf{Stateless komunikacija}: Svaki HTTP zahtjev sadrži sve potrebne informacije. Server ne čuva stanje između zahtjeva.
+    
+    \item \textbf{HTTP metode}: API koristi standardne HTTP metode:
+    \begin{itemize}
+        \item \texttt{GET} - za dohvaćanje resursa (npr. \texttt{GET /api/v1/users})
+        \item \texttt{POST} - za kreiranje novih resursa (npr. \texttt{POST /api/v1/categories})
+        \item \texttt{PUT} - za ažuriranje postojećih resursa (npr. \texttt{PUT /api/v1/transactions/\{id\}})
+        \item \texttt{DELETE} - za brisanje resursa (npr. \texttt{DELETE /api/v1/categories/\{id\}})
+    \end{itemize}
+    
+    \item \textbf{Resource-based URL-ovi}: URL-ovi predstavljaju resurse, ne akcije:
+    \begin{itemize}
+        \item \texttt{/api/v1/users} - kolekcija korisnika
+        \item \texttt{/api/v1/users/\{id\}} - pojedinačni korisnik
+        \item \texttt{/api/v1/transactions/user/\{userId\}} - transakcije određenog korisnika
+    \end{itemize}
+    
+    \item \textbf{JSON format}: Svi podaci se razmjenjuju u JSON formatu. Request body i Response body su u JSON-u.
+    
+    \item \textbf{HTTP status kodovi}: API koristi standardne HTTP status kodove:
+    \begin{itemize}
+        \item \texttt{200 OK} - uspješan zahtjev
+        \item \texttt{201 Created} - resurs uspješno kreiran
+        \item \texttt{204 No Content} - uspješno brisanje (bez body-ja)
+        \item \texttt{400 Bad Request} - validacione greške
+        \item \texttt{404 Not Found} - resurs nije pronađen
+        \item \texttt{409 Conflict} - konflikt (npr. duplikat imena kategorije)
+        \item \texttt{422 Unprocessable Entity} - semantičke validacione greške
+        \item \texttt{500 Internal Server Error} - neočekivane greške
+    \end{itemize}
+\end{itemize}
+
+\subsection{Klase u bazi podataka}
+
+API koristi PostgreSQL bazu podataka sa sljedećim glavnim entitetima:
+
+\subsubsection{User (Korisnik)}
+Entitet koji predstavlja korisnika sistema.
+\begin{itemize}
+    \item \texttt{Id}: \texttt{int} - jedinstveni identifikator
+    \item \texttt{Name}: \texttt{string} - puno ime korisnika (1-100 karaktera)
+    \item \texttt{Email}: \texttt{string} - email adresa (jedinstvena, validan email format)
+    \item \texttt{PasswordHash}: \texttt{string} - hash lozinke (ne vraća se u API odgovorima)
+    \item \texttt{InitialBalance}: \texttt{decimal} - početni balans korisnika
+    \item \texttt{CreatedAt}: \texttt{DateTime} - vrijeme kreiranja
+    \item \texttt{UpdatedAt}: \texttt{DateTime} - vrijeme posljednje izmjene
+\end{itemize}
+
+\subsubsection{Category (Kategorija)}
+Entitet koji predstavlja kategoriju transakcija.
+\begin{itemize}
+    \item \texttt{Id}: \texttt{int} - jedinstveni identifikator
+    \item \texttt{Name}: \texttt{string} - naziv kategorije (1-255 karaktera, jedinstven)
+    \item \texttt{Description}: \texttt{string?} - opcioni opis kategorije
+    \item \texttt{Icon}: \texttt{string?} - opcioni ikona (maksimalno 100 karaktera, npr. emoji)
+    \item \texttt{CreatedAt}: \texttt{DateTime} - vrijeme kreiranja
+\end{itemize}
+
+\subsubsection{Transaction (Transakcija)}
+Entitet koji predstavlja financijsku transakciju (rashod ili prihod).
+\begin{itemize}
+    \item \texttt{Id}: \texttt{int} - jedinstveni identifikator
+    \item \texttt{UserId}: \texttt{int} - ID korisnika (foreign key)
+    \item \texttt{TransactionType}: \texttt{TransactionType} - tip transakcije (\texttt{Expense} ili \texttt{Income})
+    \item \texttt{Amount}: \texttt{decimal} - apsolutni iznos (uvijek pozitivan)
+    \item \texttt{SignedAmount}: \texttt{decimal} - potpisani iznos (negativan za rashode, pozitivan za prihode)
+    \item \texttt{Date}: \texttt{DateTime} - datum transakcije
+    \item \texttt{Subject}: \texttt{string} - kratak opis transakcije (obavezno, ne može biti prazan string)
+    \item \texttt{Notes}: \texttt{string?} - opcioni detaljniji opis
+    \item \texttt{PaymentMethod}: \texttt{PaymentMethod} - način plaćanja (Cash, DebitCard, CreditCard, BankTransfer, MobilePayment, PayPal, Crypto, Other)
+    \item \texttt{CumulativeDelta}: \texttt{decimal} - kumulativna suma svih \texttt{signed\_amount} vrijednosti do i uključujući ovu transakciju
+    \item \texttt{Seq}: \texttt{long} - redni broj za determinističko sortiranje transakcija
+    \item \texttt{CategoryId}: \texttt{int?} - ID kategorije (obavezno za rashode, opciono za prihode)
+    \item \texttt{TransactionGroupId}: \texttt{int?} - ID grupe transakcija (opcionalno)
+    \item \texttt{IncomeSource}: \texttt{string?} - izvor prihoda (npr. "ABC Corporation") - samo za prihode
+    \item \texttt{CreatedAt}: \texttt{DateTime} - vrijeme kreiranja
+    \item \texttt{UpdatedAt}: \texttt{DateTime} - vrijeme posljednje izmjene
+\end{itemize}
+
+\textbf{Napomena}: Balans korisnika se računa kao \texttt{InitialBalance + CumulativeDelta} iz posljednje transakcije.
+
+\subsubsection{TransactionGroup (Grupa transakcija)}
+Entitet koji predstavlja grupu povezanih transakcija (npr. putovanje, projekat, vjenčanje).
+\begin{itemize}
+    \item \texttt{Id}: \texttt{int} - jedinstveni identifikator
+    \item \texttt{Name}: \texttt{string} - naziv grupe
+    \item \texttt{Description}: \texttt{string?} - opcioni opis grupe
+    \item \texttt{UserId}: \texttt{int} - ID korisnika (foreign key)
+    \item \texttt{CreatedAt}: \texttt{DateTime} - vrijeme kreiranja
+\end{itemize}
+
+\subsection{Rute API-ja}
+
+Sve rute API-ja su verzionisane pod \texttt{/api/v1}. U tabeli ispod su navedene sve dostupne rute sa opisom njihove funkcionalnosti:
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabular}{|l|l|p{9cm}|}
+\hline
+\textbf{HTTP Metoda} & \textbf{Endpoint} & \textbf{Opis} \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Users (Korisnici)}} \\
+\hline
+GET & \texttt{/api/v1/users} & Dohvaća listu svih korisnika. Vraća \texttt{GetUsersResponse} sa listom korisnika i ukupnim brojem. \\
+\hline
+GET & \texttt{/api/v1/users/\{id\}} & Dohvaća korisnika po ID-u. Vraća \texttt{UserResponse} ili 404 ako korisnik ne postoji. \\
+\hline
+POST & \texttt{/api/v1/users} & Kreira novog korisnika. Zahtijeva \texttt{CreateUserRequest} (name, email, password). Vraća 201 sa kreiranim korisnikom, 400 za validacione greške, ili 409 ako email već postoji. \\
+\hline
+GET & \texttt{/api/v1/users/\{id\}/balance} & Dohvaća trenutni balans korisnika. Vraća \texttt{UserBalanceResponse} sa initial balance, cumulative delta i current balance. Vraća 404 ako korisnik ne postoji. \\
+\hline
+PUT & \texttt{/api/v1/users/\{id\}/initial-balance} & Postavlja početni balans korisnika. Zahtijeva \texttt{SetInitialBalanceRequest}. Vraća 200 sa ažuriranim korisnikom ili 404 ako korisnik ne postoji. \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Categories (Kategorije)}} \\
+\hline
+GET & \texttt{/api/v1/categories} & Dohvaća listu svih kategorija. Vraća \texttt{GetCategoriesResponse} sa listom kategorija i ukupnim brojem. \\
+\hline
+GET & \texttt{/api/v1/categories/\{id\}} & Dohvaća kategoriju po ID-u. Vraća \texttt{CategoryResponse} ili 404 ako kategorija ne postoji. \\
+\hline
+POST & \texttt{/api/v1/categories} & Kreira novu kategoriju. Zahtijeva \texttt{CreateCategoryRequest} (name, description, icon). Naziv mora biti jedinstven. Vraća 201 sa kreiranom kategorijom, 400 za validacione greške, ili 409 ako naziv već postoji. \\
+\hline
+PUT & \texttt{/api/v1/categories/\{id\}} & Ažurira postojeću kategoriju. Zahtijeva \texttt{UpdateCategoryRequest}. Vraća 200 sa ažuriranom kategorijom, 400 za validacione greške, 404 ako kategorija ne postoji, ili 409 ako novi naziv već postoji. \\
+\hline
+DELETE & \texttt{/api/v1/categories/\{id\}} & Briše kategoriju. Vraća 204 ako je uspješno obrisana, 404 ako kategorija ne postoji, ili 409 ako je kategorija referencirana u transakcijama. \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Transactions (Transakcije)}} \\
+\hline
+GET & \texttt{/api/v1/transactions} & Dohvaća sve transakcije (admin/debug svrhe). Vraća \texttt{GetTransactionsResponse} sa listom transakcija, ukupnim brojem i sažetkom statistika. \\
+\hline
+GET & \texttt{/api/v1/transactions/\{id\}} & Dohvaća transakciju po ID-u. Vraća \texttt{TransactionResponse} ili 404 ako transakcija ne postoji. \\
+\hline
+GET & \texttt{/api/v1/transactions/user/\{userId\}} & Dohvaća sve transakcije određenog korisnika. Vraća \texttt{GetTransactionsResponse} ili 404 ako korisnik ne postoji. \\
+\hline
+GET & \texttt{/api/v1/transactions/user/\{userId\}/type/\{type\}} & Dohvaća transakcije korisnika filtrirane po tipu (EXPENSE ili INCOME). Vraća \texttt{GetTransactionsResponse} ili 400 za nevažeći tip, ili 404 ako korisnik ne postoji. \\
+\hline
+POST & \texttt{/api/v1/transactions} & Kreira novu transakciju. Zahtijeva \texttt{CreateTransactionRequest} sa svim podacima transakcije. Validira postojanje korisnika, kategorije (ako je navedena) i grupe transakcija (ako je navedena). Subject ne može biti prazan string. Vraća 201 sa kreiranom transakcijom, 400 za validacione greške, ili 404 ako referencirani entiteti ne postoje. \\
+\hline
+PUT & \texttt{/api/v1/transactions/\{id\}} & Ažurira postojeću transakciju. Zahtijeva \texttt{UpdateTransactionRequest}. Validira postojanje kategorije i grupe transakcija (ako su navedene). Subject ne može biti prazan string. Vraća 200 sa ažuriranom transakcijom, 400 za validacione greške, ili 404 ako transakcija ili referencirani entiteti ne postoje. \\
+\hline
+DELETE & \texttt{/api/v1/transactions/\{id\}} & Briše transakciju i automatski ažurira cumulative delta za sve naredne transakcije korisnika. Vraća 204 ako je uspješno obrisana ili 404 ako transakcija ne postoji. \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Transaction Groups (Grupe transakcija)}} \\
+\hline
+GET & \texttt{/api/v1/transaction-groups} & Dohvaća sve grupe transakcija. Vraća \texttt{GetTransactionGroupsResponse} sa listom grupa i ukupnim brojem. \\
+\hline
+GET & \texttt{/api/v1/transaction-groups/\{id\}} & Dohvaća grupu transakcija po ID-u. Vraća \texttt{TransactionGroupResponse} ili 404 ako grupa ne postoji. \\
+\hline
+GET & \texttt{/api/v1/transaction-groups/user/\{userId\}} & Dohvaća sve grupe transakcija određenog korisnika. Vraća listu \texttt{TransactionGroupResponse} ili 404 ako korisnik ne postoji. \\
+\hline
+POST & \texttt{/api/v1/transaction-groups} & Kreira novu grupu transakcija. Zahtijeva \texttt{CreateTransactionGroupRequest} (name, description, userId). Validira postojanje korisnika. Vraća 201 sa kreiranom grupom, 400 za validacione greške, 422 ako korisnik ne postoji, ili 500 za neočekivane greške. \\
+\hline
+PUT & \texttt{/api/v1/transaction-groups/\{id\}} & Ažurira postojeću grupu transakcija. Zahtijeva \texttt{UpdateTransactionGroupRequest} (name, description). Vraća 200 sa ažuriranom grupom ili 404 ako grupa ne postoji. \\
+\hline
+DELETE & \texttt{/api/v1/transaction-groups/\{id\}} & Briše grupu transakcija. Vraća 204 ako je uspješno obrisana ili 404 ako grupa ne postoji. \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Health Check}} \\
+\hline
+GET & \texttt{/health} & Provjerava zdravlje aplikacije. Vraća status aplikacije. \\
+\hline
+\end{tabular}
+\caption{Pregled svih ruta Expense Tracker API-ja}
+\label{tab:api-routes}
+\end{table}
+
+\subsection{Postman kolekcija}
+
+Testovi u Postman kolekciji su organizovani po resursima u sljedećim folderima:
+
+\begin{itemize}
+    \item \textbf{Users} - testovi za sve korisničke endpoint-e (GET, POST, PUT za balance)
+    \item \textbf{Categories} - testovi za CRUD operacije nad kategorijama
+    \item \textbf{Transactions} - testovi za sve transakcije endpoint-e (uključujući filtriranje po korisniku i tipu)
+    \item \textbf{Transaction Groups} - testovi za CRUD operacije nad grupama transakcija
+    \item \textbf{Health Check} - testovi za provjeru zdravlja aplikacije
+\end{itemize}
+
+Svaki folder sadrži testove koji pokrivaju pozitivne i negativne scenarije, uključujući validacione greške, nepostojeće resurse i konflikte.
+
+\subsection{Testni slučajevi}
+
+Postman kolekcija sadrži sljedeće glavne testne slučajeve koji pokrivaju sve funkcionalnosti aplikacije:
+
+\subsubsection{Users testovi}
+\begin{itemize}
+    \item \textbf{GET All Users} - Testira dohvaćanje liste svih korisnika. Očekivani rezultat: 200 OK sa listom korisnika.
+    \item \textbf{GET User by ID} - Testira dohvaćanje korisnika po ID-u. Očekivani rezultat: 200 OK sa korisnikom ili 404 Not Found.
+    \item \textbf{POST Create User} - Testira kreiranje novog korisnika. Očekivani rezultat: 201 Created sa kreiranim korisnikom, 400 Bad Request za validacione greške, ili 409 Conflict za duplikat email-a.
+    \item \textbf{GET User Balance} - Testira dohvaćanje balansa korisnika. Očekivani rezultat: 200 OK sa balance informacijama ili 404 Not Found.
+    \item \textbf{PUT Set Initial Balance} - Testira postavljanje početnog balansa. Očekivani rezultat: 200 OK sa ažuriranim korisnikom ili 404 Not Found.
+\end{itemize}
+
+\subsubsection{Categories testovi}
+\begin{itemize}
+    \item \textbf{GET All Categories} - Testira dohvaćanje liste svih kategorija. Očekivani rezultat: 200 OK sa listom kategorija.
+    \item \textbf{GET Category by ID} - Testira dohvaćanje kategorije po ID-u. Očekivani rezultat: 200 OK sa kategorijom ili 404 Not Found.
+    \item \textbf{POST Create Category} - Testira kreiranje nove kategorije. Očekivani rezultat: 201 Created sa kreiranom kategorijom, 400 Bad Request za validacione greške, ili 409 Conflict za duplikat naziva.
+    \item \textbf{PUT Update Category} - Testira ažuriranje kategorije. Očekivani rezultat: 200 OK sa ažuriranom kategorijom, 404 Not Found, ili 409 Conflict za duplikat naziva.
+    \item \textbf{DELETE Category} - Testira brisanje kategorije. Očekivani rezultat: 204 No Content, 404 Not Found, ili 409 Conflict ako je kategorija referencirana.
+\end{itemize}
+
+\subsubsection{Transactions testovi}
+\begin{itemize}
+    \item \textbf{GET All Transactions} - Testira dohvaćanje svih transakcija. Očekivani rezultat: 200 OK sa listom transakcija i sažetkom.
+    \item \textbf{GET Transaction by ID} - Testira dohvaćanje transakcije po ID-u. Očekivani rezultat: 200 OK sa transakcijom ili 404 Not Found.
+    \item \textbf{GET Transactions by User} - Testira dohvaćanje transakcija određenog korisnika. Očekivani rezultat: 200 OK sa listom transakcija ili 404 Not Found ako korisnik ne postoji.
+    \item \textbf{GET Transactions by User and Type} - Testira filtriranje transakcija po tipu. Očekivani rezultat: 200 OK sa filtriranim transakcijama, 400 Bad Request za nevažeći tip, ili 404 Not Found.
+    \item \textbf{POST Create Transaction} - Testira kreiranje nove transakcije. Očekivani rezultat: 201 Created sa kreiranom transakcijom, 400 Bad Request za validacione greške (npr. prazan subject), ili 404 Not Found ako referencirani entiteti ne postoje.
+    \item \textbf{PUT Update Transaction} - Testira ažuriranje transakcije. Očekivani rezultat: 200 OK sa ažuriranom transakcijom, 400 Bad Request, ili 404 Not Found.
+    \item \textbf{DELETE Transaction} - Testira brisanje transakcije. Očekivani rezultat: 204 No Content ili 404 Not Found.
+\end{itemize}
+
+\subsubsection{Transaction Groups testovi}
+\begin{itemize}
+    \item \textbf{GET All Transaction Groups} - Testira dohvaćanje svih grupa transakcija. Očekivani rezultat: 200 OK sa listom grupa.
+    \item \textbf{GET Transaction Group by ID} - Testira dohvaćanje grupe po ID-u. Očekivani rezultat: 200 OK sa grupom ili 404 Not Found.
+    \item \textbf{GET Transaction Groups by User} - Testira dohvaćanje grupa određenog korisnika. Očekivani rezultat: 200 OK sa listom grupa ili 404 Not Found.
+    \item \textbf{POST Create Transaction Group} - Testira kreiranje nove grupe. Očekivani rezultat: 201 Created sa kreiranom grupom, 400 Bad Request, 422 Unprocessable Entity ako korisnik ne postoji, ili 500 Internal Server Error.
+    \item \textbf{PUT Update Transaction Group} - Testira ažuriranje grupe. Očekivani rezultat: 200 OK sa ažuriranom grupom ili 404 Not Found.
+    \item \textbf{DELETE Transaction Group} - Testira brisanje grupe. Očekivani rezultat: 204 No Content ili 404 Not Found.
+\end{itemize}
+
+\subsection{Link/komanda za izvršavanje kolekcije}
+
+Postman kolekcija se može izvršiti na sljedeće načine:
+
+\begin{itemize}
+    \item \textbf{Postman aplikacija}: Učitati \texttt{collection.json} fajl u Postman aplikaciju i pokrenuti kolekciju kroz GUI interfejs.
+    \item \textbf{Newman CLI}: Koristiti Newman komandu za izvršavanje kolekcije iz terminala:
+    \begin{verbatim}
+    newman run collection.json
+    \end{verbatim}
+    \item \textbf{CI/CD integracija}: Newman se može integrisati u CI/CD pipeline za automatsko testiranje API-ja.
+\end{itemize}
+
+\textbf{Napomena}: Prije izvršavanja kolekcije, potrebno je konfigurisati environment varijable u Postman-u (npr. base URL API-ja).
+

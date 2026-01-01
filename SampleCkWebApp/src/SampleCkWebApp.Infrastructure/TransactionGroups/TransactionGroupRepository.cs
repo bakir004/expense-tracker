@@ -1,43 +1,31 @@
 using ErrorOr;
-using Npgsql;
+using Microsoft.EntityFrameworkCore;
 using SampleCkWebApp.Domain.Entities;
 using SampleCkWebApp.Domain.Errors;
 using SampleCkWebApp.Application.TransactionGroups.Interfaces.Infrastructure;
-using SampleCkWebApp.Infrastructure.Users.Options;
+using SampleCkWebApp.Infrastructure.Shared;
 
 namespace SampleCkWebApp.Infrastructure.TransactionGroups;
 
 /// <summary>
-/// PostgreSQL implementation of the transaction group repository.
-/// Maps database records to domain entities.
+/// Entity Framework Core implementation of the transaction group repository.
 /// </summary>
 public class TransactionGroupRepository : ITransactionGroupRepository
 {
-    private readonly UserOptions _options;
+    private readonly ExpenseTrackerDbContext _context;
 
-    public TransactionGroupRepository(UserOptions options)
+    public TransactionGroupRepository(ExpenseTrackerDbContext context)
     {
-        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
     public async Task<ErrorOr<List<TransactionGroup>>> GetAllAsync(CancellationToken cancellationToken)
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
-
-            var command = new NpgsqlCommand(
-                "SELECT id, name, description, user_id, created_at FROM TransactionGroup ORDER BY id",
-                connection);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var transactionGroups = new List<TransactionGroup>();
-
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                transactionGroups.Add(MapToDomainEntity(reader));
-            }
+            var transactionGroups = await _context.TransactionGroups
+                .OrderBy(tg => tg.Id)
+                .ToListAsync(cancellationToken);
 
             return transactionGroups;
         }
@@ -51,22 +39,15 @@ public class TransactionGroupRepository : ITransactionGroupRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            var transactionGroup = await _context.TransactionGroups
+                .FirstOrDefaultAsync(tg => tg.Id == id, cancellationToken);
 
-            var command = new NpgsqlCommand(
-                "SELECT id, name, description, user_id, created_at FROM TransactionGroup WHERE id = @id",
-                connection);
-            command.Parameters.AddWithValue("id", id);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+            if (transactionGroup == null)
             {
                 return TransactionGroupErrors.NotFound;
             }
 
-            return MapToDomainEntity(reader);
+            return transactionGroup;
         }
         catch (Exception ex)
         {
@@ -78,21 +59,10 @@ public class TransactionGroupRepository : ITransactionGroupRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
-
-            var command = new NpgsqlCommand(
-                "SELECT id, name, description, user_id, created_at FROM TransactionGroup WHERE user_id = @user_id ORDER BY id",
-                connection);
-            command.Parameters.AddWithValue("user_id", userId);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            var transactionGroups = new List<TransactionGroup>();
-
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                transactionGroups.Add(MapToDomainEntity(reader));
-            }
+            var transactionGroups = await _context.TransactionGroups
+                .Where(tg => tg.UserId == userId)
+                .OrderBy(tg => tg.Id)
+                .ToListAsync(cancellationToken);
 
             return transactionGroups;
         }
@@ -106,27 +76,12 @@ public class TransactionGroupRepository : ITransactionGroupRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            transactionGroup.CreatedAt = DateTime.UtcNow;
 
-            var command = new NpgsqlCommand(
-                @"INSERT INTO TransactionGroup (name, description, user_id) 
-                  VALUES (@name, @description, @user_id) 
-                  RETURNING id, name, description, user_id, created_at",
-                connection);
-            
-            command.Parameters.AddWithValue("name", transactionGroup.Name);
-            command.Parameters.AddWithValue("description", (object?)transactionGroup.Description ?? DBNull.Value);
-            command.Parameters.AddWithValue("user_id", transactionGroup.UserId);
+            _context.TransactionGroups.Add(transactionGroup);
+            await _context.SaveChangesAsync(cancellationToken);
 
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
-            {
-                return Error.Failure("Database.Error", "Failed to create transaction group");
-            }
-
-            return MapToDomainEntity(reader);
+            return transactionGroup;
         }
         catch (Exception ex)
         {
@@ -138,28 +93,20 @@ public class TransactionGroupRepository : ITransactionGroupRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            var existingGroup = await _context.TransactionGroups
+                .FirstOrDefaultAsync(tg => tg.Id == transactionGroup.Id, cancellationToken);
 
-            var command = new NpgsqlCommand(
-                @"UPDATE TransactionGroup 
-                  SET name = @name, description = @description 
-                  WHERE id = @id 
-                  RETURNING id, name, description, user_id, created_at",
-                connection);
-            
-            command.Parameters.AddWithValue("id", transactionGroup.Id);
-            command.Parameters.AddWithValue("name", transactionGroup.Name);
-            command.Parameters.AddWithValue("description", (object?)transactionGroup.Description ?? DBNull.Value);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+            if (existingGroup == null)
             {
                 return TransactionGroupErrors.NotFound;
             }
 
-            return MapToDomainEntity(reader);
+            existingGroup.Name = transactionGroup.Name;
+            existingGroup.Description = transactionGroup.Description;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            return existingGroup;
         }
         catch (Exception ex)
         {
@@ -171,20 +118,16 @@ public class TransactionGroupRepository : ITransactionGroupRepository
     {
         try
         {
-            await using var connection = new NpgsqlConnection(_options.ConnectionString);
-            await connection.OpenAsync(cancellationToken);
+            var transactionGroup = await _context.TransactionGroups
+                .FirstOrDefaultAsync(tg => tg.Id == id, cancellationToken);
 
-            var command = new NpgsqlCommand(
-                "DELETE FROM TransactionGroup WHERE id = @id",
-                connection);
-            command.Parameters.AddWithValue("id", id);
-
-            var rowsAffected = await command.ExecuteNonQueryAsync(cancellationToken);
-
-            if (rowsAffected == 0)
+            if (transactionGroup == null)
             {
                 return TransactionGroupErrors.NotFound;
             }
+
+            _context.TransactionGroups.Remove(transactionGroup);
+            await _context.SaveChangesAsync(cancellationToken);
 
             return Result.Deleted;
         }
@@ -193,21 +136,4 @@ public class TransactionGroupRepository : ITransactionGroupRepository
             return Error.Failure("Database.Error", $"Failed to delete transaction group: {ex.Message}");
         }
     }
-
-    /// <summary>
-    /// Maps a database reader row to a domain entity.
-    /// Column order: id, name, description, user_id, created_at
-    /// </summary>
-    private static TransactionGroup MapToDomainEntity(NpgsqlDataReader reader)
-    {
-        return new TransactionGroup
-        {
-            Id = reader.GetInt32(0),
-            Name = reader.GetString(1),
-            Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-            UserId = reader.GetInt32(3),
-            CreatedAt = reader.GetDateTime(4)
-        };
-    }
 }
-

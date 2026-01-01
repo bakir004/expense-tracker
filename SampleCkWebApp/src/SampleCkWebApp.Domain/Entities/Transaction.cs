@@ -52,11 +52,6 @@ public class Transaction
     /// </summary>
     public decimal? BalanceAfter { get; set; }
     
-    /// <summary>
-    /// Sequence number for deterministic ordering of transactions.
-    /// </summary>
-    public long Seq { get; set; }
-    
     // ============================================================
     // Optional fields
     // ============================================================
