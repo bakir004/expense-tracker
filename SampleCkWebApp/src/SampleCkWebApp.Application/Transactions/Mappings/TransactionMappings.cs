@@ -32,6 +32,7 @@ public static class TransactionMappings
             TransactionType = transaction.TransactionType.ToDatabaseString(),
             Amount = transaction.Amount,
             SignedAmount = transaction.SignedAmount,
+            CumulativeDelta = transaction.CumulativeDelta,
             Date = transaction.Date,
             Subject = transaction.Subject,
             Notes = transaction.Notes,

@@ -23,6 +23,11 @@ public class TransactionResponse
     /// </summary>
     public decimal SignedAmount { get; set; }
     
+    /// <summary>
+    /// Cumulative delta: running sum of signed amounts up to and including this transaction
+    /// </summary>
+    public decimal CumulativeDelta { get; set; }
+    
     public DateTime Date { get; set; }
     
     /// <summary>
