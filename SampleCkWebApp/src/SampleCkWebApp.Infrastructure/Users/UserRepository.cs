@@ -133,7 +133,7 @@ public class UserRepository : IUserRepository
                 FROM ""Users"" u
                 LEFT JOIN LATERAL (
                     SELECT cumulative_delta 
-                    FROM Transaction 
+                    FROM ""Transaction"" 
                     WHERE user_id = u.id 
                     ORDER BY date DESC, id DESC 
                     LIMIT 1

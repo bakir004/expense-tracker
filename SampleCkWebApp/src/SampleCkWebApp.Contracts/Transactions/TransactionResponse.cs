@@ -37,11 +37,6 @@ public class TransactionResponse
     
     public PaymentMethod PaymentMethod { get; set; }
     
-    /// <summary>
-    /// The user's balance after this transaction
-    /// </summary>
-    public decimal? BalanceAfter { get; set; }
-    
     // Optional fields
     public int? CategoryId { get; set; }
     public int? TransactionGroupId { get; set; }

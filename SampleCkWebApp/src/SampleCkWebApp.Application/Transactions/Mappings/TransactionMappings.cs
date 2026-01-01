@@ -36,7 +36,6 @@ public static class TransactionMappings
             Subject = transaction.Subject,
             Notes = transaction.Notes,
             PaymentMethod = transaction.PaymentMethod,
-            BalanceAfter = transaction.BalanceAfter,
             CategoryId = transaction.CategoryId,
             TransactionGroupId = transaction.TransactionGroupId,
             IncomeSource = transaction.IncomeSource,
