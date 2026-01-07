@@ -10,7 +10,7 @@ namespace SampleCkWebApp.WebApi.Controllers.V2;
 public class TestController : ControllerBase
 {
     /// <summary>
-    /// Simple test endpoint for v2
+    /// Simple test for v2
     /// </summary>
     [HttpGet]
     public IActionResult Get()
