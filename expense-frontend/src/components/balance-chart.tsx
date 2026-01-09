@@ -5,7 +5,6 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
-  ReferenceLine,
   XAxis,
   YAxis,
 } from "recharts";
@@ -36,15 +35,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import type { Transaction } from "@/lib/types";
+import { TransactionsModal } from "@/components/transactions-modal";
 
 const chartConfig = {
   balance: {
     label: "Balance",
     color: "var(--chart-1)",
-  },
-  balanceNegative: {
-    label: "Balance (Negative)",
-    color: "hsl(0, 84.2%, 60.2%)", // Red color for negative values
   },
 } satisfies ChartConfig;
 
@@ -337,17 +333,7 @@ export function BalanceChart() {
     return chartDataPoints;
   }, [transactions]);
 
-  // Transform data to separate positive and negative values
-  // Use NaN for values that shouldn't be displayed so Recharts doesn't render them
-  const transformedChartData = React.useMemo(() => {
-    return chartData.map((point) => ({
-      ...point,
-      balancePositive: point.balance >= 0 ? point.balance : NaN,
-      balanceNegative: point.balance < 0 ? point.balance : NaN,
-    }));
-  }, [chartData]);
-
-  // Calculate Y axis domain with rounded upper bound to thousands
+  // Calculate Y axis domain with rounded bounds to thousands
   const yAxisDomain = React.useMemo(() => {
     if (chartData.length === 0) return [0, 1000];
 
@@ -362,6 +348,75 @@ export function BalanceChart() {
 
     return [roundedMin, roundedMax];
   }, [chartData]);
+
+  // Custom dot component that's clickable with vertical rectangle
+  const CustomDot = React.useCallback(
+    (props: any) => {
+      const { cx, cy, payload } = props;
+      if (!cx || !cy || !payload) {
+        return <g />;
+      }
+
+      // Create a vertical rectangle that spans the full chart height
+      // Chart height is approximately 250px, accounting for padding/margins
+      const chartHeight = 250;
+      const rectWidth = 40; // Wide enough to be easily clickable
+      const rectX = cx - rectWidth / 2;
+
+      return (
+        <g>
+          {/* Vertical clickable rectangle for the entire day */}
+          <foreignObject
+            x={rectX}
+            y={0}
+            width={rectWidth}
+            height={chartHeight}
+            style={{ overflow: "visible", pointerEvents: "all" }}
+          >
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                position: "relative",
+                pointerEvents: "all",
+              }}
+            >
+              <TransactionsModal date={payload.date} transactions={transactions}>
+                <button
+                  type="button"
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: "100%",
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    padding: 0,
+                    margin: 0,
+                    outline: "none",
+                  }}
+                  onMouseDown={(e) => e.preventDefault()}
+                  aria-label={`View transactions for ${payload.date}`}
+                />
+              </TransactionsModal>
+            </div>
+          </foreignObject>
+          {/* Visible dot overlay for better visibility */}
+          <circle
+            cx={cx}
+            cy={cy}
+            r={5}
+            fill="var(--color-balance)"
+            style={{ pointerEvents: "none" }}
+          />
+        </g>
+      );
+    },
+    [transactions]
+  );
+
 
   if (loading && transactions.length === 0) {
     return (
@@ -562,7 +617,7 @@ export function BalanceChart() {
             config={chartConfig}
             className="aspect-auto h-[250px] w-full"
           >
-            <AreaChart data={transformedChartData}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="fillBalance" x1="0" y1="0" x2="0" y2="1">
                   <stop
@@ -573,24 +628,6 @@ export function BalanceChart() {
                   <stop
                     offset="95%"
                     stopColor="var(--color-balance)"
-                    stopOpacity={0.1}
-                  />
-                </linearGradient>
-                <linearGradient
-                  id="fillBalanceNegative"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop
-                    offset="5%"
-                    stopColor="var(--color-balanceNegative)"
-                    stopOpacity={0.8}
-                  />
-                  <stop
-                    offset="95%"
-                    stopColor="var(--color-balanceNegative)"
                     stopOpacity={0.1}
                   />
                 </linearGradient>
@@ -626,13 +663,8 @@ export function BalanceChart() {
                   }).format(value);
                 }}
               />
-              <ReferenceLine
-                y={0}
-                stroke="var(--border)"
-                strokeDasharray="3 3"
-              />
               <ChartTooltip
-                cursor={false}
+                cursor={{ stroke: "var(--color-balance)", strokeWidth: 1 }}
                 content={
                   <ChartTooltipContent
                     labelFormatter={(value) => {
@@ -645,23 +677,14 @@ export function BalanceChart() {
                   />
                 }
               />
-              {/* Area for positive values */}
               <Area
-                dataKey="balancePositive"
+                dataKey="balance"
                 type="linear"
                 fill="url(#fillBalance)"
                 stroke="var(--color-balance)"
                 fillOpacity={0.6}
-                baseLine={0}
-              />
-              {/* Area for negative values */}
-              <Area
-                dataKey="balanceNegative"
-                type="linear"
-                fill="url(#fillBalanceNegative)"
-                stroke="var(--color-balanceNegative)"
-                fillOpacity={0.6}
-                baseLine={0}
+                dot={CustomDot}
+                activeDot={false}
               />
             </AreaChart>
           </ChartContainer>
