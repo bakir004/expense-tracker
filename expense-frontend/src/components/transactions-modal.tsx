@@ -51,7 +51,10 @@ export function TransactionsModal({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
-      <AlertDialogContent className="dark max-w-2xl max-h-[80vh] overflow-y-auto">
+      <AlertDialogContent 
+        className="dark max-w-2xl max-h-[80vh] overflow-y-auto"
+        onOverlayClick={() => setOpen(false)}
+      >
         <AlertDialogHeader className="relative">
           <X
             className="absolute right-0 top-0 h-4 w-4 cursor-pointer dark:text-zinc-300 dark:hover:text-red-400 transition"
