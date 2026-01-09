@@ -99,7 +99,7 @@ public class CategoryServiceTests
         // Arrange
         var name = "Food";
         var description = "Food expenses";
-        var icon = "🍔";
+        var icon = "food-icon";
         var createdCategory = new Category
         {
             Id = 1,
@@ -136,7 +136,7 @@ public class CategoryServiceTests
         // Arrange
         var name = "";
         var description = "Food expenses";
-        var icon = "🍔";
+        var icon = "food-icon";
 
         // Act
         var result = await _service.CreateAsync(name, description, icon, CancellationToken.None);
@@ -153,7 +153,7 @@ public class CategoryServiceTests
         // Arrange
         var name = "Food";
         var description = "Food expenses";
-        var icon = "🍔";
+        var icon = "food-icon";
         var existingCategory = new Category { Id = 1, Name = name };
 
         _mockRepository
@@ -209,7 +209,7 @@ public class CategoryServiceTests
         var id = 999;
         var name = "Food";
         var description = "Food expenses";
-        var icon = "🍔";
+        var icon = "food-icon";
 
         _mockRepository
             .Setup(r => r.GetByIdAsync(id, It.IsAny<CancellationToken>()))
@@ -231,7 +231,7 @@ public class CategoryServiceTests
         var id = 1;
         var name = "Food";
         var description = "Updated description";
-        var icon = "🍔";
+        var icon = "food-icon";
         var existingCategory = new Category { Id = id, Name = name, Description = "Old description" };
         var updatedCategory = new Category { Id = id, Name = name, Description = description, Icon = icon };
 
@@ -258,7 +258,7 @@ public class CategoryServiceTests
         var id = 1;
         var name = "Food Updated";
         var description = "Food expenses";
-        var icon = "🍔";
+        var icon = "food-icon";
         var existingCategory = new Category { Id = id, Name = "Food", Description = "Food expenses" };
         var duplicateCategory = new Category { Id = 2, Name = name };
 
