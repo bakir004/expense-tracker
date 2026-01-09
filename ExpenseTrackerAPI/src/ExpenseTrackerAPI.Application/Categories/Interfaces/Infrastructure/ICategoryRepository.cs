@@ -1,0 +1,44 @@
+// ============================================================================
+// FILE: ICategoryRepository.cs
+// ============================================================================
+// WHAT: Interface defining the contract for category data persistence operations.
+//
+// WHY: This interface exists in the Application layer (under Interfaces/Infrastructure)
+//      to follow the Dependency Inversion Principle. The Application layer defines
+//      what it needs from persistence, and the Infrastructure layer implements it.
+//      This allows the Application layer to remain independent of database-specific
+//      implementations, making it testable and allowing database technology to be
+//      swapped without changing business logic.
+//
+// WHAT IT DOES:
+//      - Defines methods for category persistence: GetAllAsync, GetByIdAsync,
+//        CreateAsync, UpdateAsync, and DeleteAsync
+//      - Returns domain entities (Category) not database-specific types
+//      - Uses ErrorOr pattern for consistent error handling
+//      - Implemented by CategoryRepository in Infrastructure layer using PostgreSQL
+// ============================================================================
+
+using ErrorOr;
+using ExpenseTrackerAPI.Domain.Entities;
+
+namespace ExpenseTrackerAPI.Application.Categories.Interfaces.Infrastructure;
+
+/// <summary>
+/// Repository interface for category persistence operations.
+/// This interface is defined in the Application layer but implemented in the Infrastructure layer.
+/// </summary>
+public interface ICategoryRepository
+{
+    Task<ErrorOr<List<Category>>> GetAllAsync(CancellationToken cancellationToken);
+    
+    Task<ErrorOr<Category>> GetByIdAsync(int id, CancellationToken cancellationToken);
+    
+    Task<ErrorOr<Category>> GetByNameAsync(string name, CancellationToken cancellationToken);
+    
+    Task<ErrorOr<Category>> CreateAsync(Category category, CancellationToken cancellationToken);
+    
+    Task<ErrorOr<Category>> UpdateAsync(Category category, CancellationToken cancellationToken);
+    
+    Task<ErrorOr<Deleted>> DeleteAsync(int id, CancellationToken cancellationToken);
+}
+

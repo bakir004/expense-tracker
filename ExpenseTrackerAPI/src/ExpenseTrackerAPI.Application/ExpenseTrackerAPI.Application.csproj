@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+      <PackageReference Include="ErrorOr" Version="2.1.0" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\ExpenseTrackerAPI.Domain\ExpenseTrackerAPI.Domain.csproj" />
+      <ProjectReference Include="..\ExpenseTrackerAPI.Contracts\ExpenseTrackerAPI.Contracts.csproj" />
+    </ItemGroup>
+
+</Project>
