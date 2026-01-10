@@ -1,3 +1,7 @@
+> [!IMPORTANT]
+> VVS INFO!!!
+> Verzija Expense Tracker API-ja koja je koristena u Tasku 3 je na branchu `VVS`
+
 # Expense Tracker
 
 Simple .NET expense tracker for managing your finances.
