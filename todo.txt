@@ -1,8 +1,3 @@
-- autorizacija i autentikacija
-- logging
-- testovi
-
-HELLA PROBLEMS WITH MODIFYING TRANSACTION DATES
 
 ## Security & Reliability
 - Rate limiting (protect APIs from abuse)
@@ -23,7 +18,6 @@ HELLA PROBLEMS WITH MODIFYING TRANSACTION DATES
 - Metrics & monitoring (Prometheus metrics, Application Insights, or OpenTelemetry)
 - API documentation enhancements (Swagger with examples, request/response samples)
 
-## Business Features
 - Reporting & analytics (endpoints for spending trends, category breakdowns, monthly summaries)
 - Budget management (budgets per category with alerts)
 - Recurring transactions (support for subscriptions/recurring expenses)

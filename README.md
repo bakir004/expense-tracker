@@ -48,4 +48,4 @@ For local development, update `appsettings.development.json` with your local dat
 
 ## Documentation
 
-For detailed API documentation, see [SampleCkWebApp/docs/API.md](SampleCkWebApp/docs/API.md).
+For detailed API documentation, see [ExpenseTrackerAPI/docs/API.md](ExpenseTrackerAPI/docs/API.md).

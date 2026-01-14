@@ -19,3 +19,4 @@ docker run --name postgres-db \
 echo "PostgreSQL container started. Waiting for initialization..."
 sleep 3
 docker logs postgres-db --tail 20
+

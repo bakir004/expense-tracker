@@ -51,14 +51,12 @@ public class TransactionService : ITransactionService
 
     public async Task<ErrorOr<GetTransactionsResult>> GetByUserIdAsync(int userId, CancellationToken cancellationToken)
     {
-        // Verify the user exists first
         var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
         if (userResult.IsError)
         {
             return UserErrors.NotFound;
         }
         
-        // User exists, get their transactions (may be empty)
         var result = await _transactionRepository.GetByUserIdAsync(userId, cancellationToken);
         if (result.IsError)
         {
@@ -70,14 +68,12 @@ public class TransactionService : ITransactionService
 
     public async Task<ErrorOr<GetTransactionsResult>> GetByUserIdAndTypeAsync(int userId, TransactionType type, CancellationToken cancellationToken)
     {
-        // Verify the user exists first
         var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
         if (userResult.IsError)
         {
             return UserErrors.NotFound;
         }
         
-        // User exists, get their transactions filtered by type (may be empty)
         var result = await _transactionRepository.GetByUserIdAndTypeAsync(userId, type, cancellationToken);
         if (result.IsError)
         {
@@ -100,21 +96,18 @@ public class TransactionService : ITransactionService
         string? incomeSource,
         CancellationToken cancellationToken)
     {
-        // Validate
         var validationResult = TransactionValidator.ValidateCreateTransaction(transactionType, amount, date, subject, categoryId);
         if (validationResult.IsError)
         {
             return validationResult.Errors;
         }
         
-        // Verify the user exists
         var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
         if (userResult.IsError)
         {
             return UserErrors.NotFound;
         }
         
-        // Verify the category exists (if provided)
         if (categoryId.HasValue)
         {
             var categoryResult = await _categoryRepository.GetByIdAsync(categoryId.Value, cancellationToken);
@@ -124,7 +117,6 @@ public class TransactionService : ITransactionService
             }
         }
         
-        // Verify the transaction group exists (if provided)
         if (transactionGroupId.HasValue)
         {
             var transactionGroupResult = await _transactionGroupRepository.GetByIdAsync(transactionGroupId.Value, cancellationToken);
@@ -133,11 +125,9 @@ public class TransactionService : ITransactionService
                 return TransactionGroupErrors.NotFound;
             }
         }
-        
-        // Calculate signed amount
+
         var signedAmount = transactionType == TransactionType.Expense ? -amount : amount;
         
-        // Create domain entity
         var transaction = new Transaction
         {
             UserId = userId,
@@ -169,21 +159,18 @@ public class TransactionService : ITransactionService
         string? incomeSource,
         CancellationToken cancellationToken)
     {
-        // Check if transaction exists
         var existingResult = await _transactionRepository.GetByIdAsync(id, cancellationToken);
         if (existingResult.IsError)
         {
             return existingResult.Errors;
         }
         
-        // Validate
         var validationResult = TransactionValidator.ValidateCreateTransaction(transactionType, amount, date, subject, categoryId);
         if (validationResult.IsError)
         {
             return validationResult.Errors;
         }
         
-        // Verify the category exists (if provided)
         if (categoryId.HasValue)
         {
             var categoryResult = await _categoryRepository.GetByIdAsync(categoryId.Value, cancellationToken);
@@ -193,7 +180,6 @@ public class TransactionService : ITransactionService
             }
         }
         
-        // Verify the transaction group exists (if provided)
         if (transactionGroupId.HasValue)
         {
             var transactionGroupResult = await _transactionGroupRepository.GetByIdAsync(transactionGroupId.Value, cancellationToken);
@@ -203,14 +189,12 @@ public class TransactionService : ITransactionService
             }
         }
         
-        // Calculate signed amount
         var signedAmount = transactionType == TransactionType.Expense ? -amount : amount;
         
-        // Update domain entity
         var transaction = new Transaction
         {
             Id = id,
-            UserId = existingResult.Value.UserId,  // Preserve original user
+            UserId = existingResult.Value.UserId,
             TransactionType = transactionType,
             Amount = amount,
             SignedAmount = signedAmount,
