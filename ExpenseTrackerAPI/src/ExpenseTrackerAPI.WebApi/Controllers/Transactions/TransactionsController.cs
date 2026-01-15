@@ -26,7 +26,7 @@ public class TransactionsController : ApiControllerBase
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
         var result = await _transactionService.GetAllAsync(cancellationToken);
-        
+
         return result.Match(
             transactions => Ok(transactions.ToResponse()),
             Problem);
@@ -49,7 +49,7 @@ public class TransactionsController : ApiControllerBase
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
     {
         var result = await _transactionService.GetByIdAsync(id, cancellationToken);
-        
+
         return result.Match(
             transaction => Ok(transaction.ToResponse()),
             Problem);
@@ -69,7 +69,7 @@ public class TransactionsController : ApiControllerBase
     public async Task<IActionResult> GetByUserId(int userId, CancellationToken cancellationToken)
     {
         var result = await _transactionService.GetByUserIdAsync(userId, cancellationToken);
-        
+
         return result.Match(
             transactions => Ok(transactions.ToResponse()),
             Problem);
@@ -96,9 +96,9 @@ public class TransactionsController : ApiControllerBase
         {
             return Problem(typeResult.Errors);
         }
-        
+
         var result = await _transactionService.GetByUserIdAndTypeAsync(userId, typeResult.Value, cancellationToken);
-        
+
         return result.Match(
             transactions => Ok(transactions.ToResponse()),
             Problem);
@@ -124,7 +124,7 @@ public class TransactionsController : ApiControllerBase
         {
             return Problem(typeResult.Errors);
         }
-        
+
         var result = await _transactionService.CreateAsync(
             request.UserId,
             typeResult.Value,
@@ -137,7 +137,7 @@ public class TransactionsController : ApiControllerBase
             request.TransactionGroupId,
             request.IncomeSource,
             cancellationToken);
-        
+
         return result.Match(
             transaction => CreatedAtAction(nameof(GetById), new { id = transaction.Id }, transaction.ToResponse()),
             Problem);
@@ -164,7 +164,7 @@ public class TransactionsController : ApiControllerBase
         {
             return Problem(typeResult.Errors);
         }
-        
+
         var result = await _transactionService.UpdateAsync(
             id,
             typeResult.Value,
@@ -177,7 +177,7 @@ public class TransactionsController : ApiControllerBase
             request.TransactionGroupId,
             request.IncomeSource,
             cancellationToken);
-        
+
         return result.Match(
             transaction => Ok(transaction.ToResponse()),
             Problem);
@@ -197,7 +197,7 @@ public class TransactionsController : ApiControllerBase
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var result = await _transactionService.DeleteAsync(id, cancellationToken);
-        
+
         return result.Match(
             _ => NoContent(),
             Problem);
