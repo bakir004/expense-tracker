@@ -1,3 +1,5 @@
+k6 performance testing
+logovi za bazu za proucavanje round tripova
 
 ## Security & Reliability
 - Rate limiting (protect APIs from abuse)

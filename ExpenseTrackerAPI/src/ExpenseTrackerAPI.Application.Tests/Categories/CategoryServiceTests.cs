@@ -99,7 +99,7 @@ public class CategoryServiceTests
         // Arrange
         var name = "Food";
         var description = "Food expenses";
-h        var icon = "food-icon";
+        var icon = "food-icon";
         var createdCategory = new Category
         {
             Id = 1,
