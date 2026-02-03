@@ -2,6 +2,7 @@ using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using ExpenseTrackerAPI.Domain.Entities;
 using ExpenseTrackerAPI.Domain.Errors;
+using ExpenseTrackerAPI.Application.Transactions.Data;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Infrastructure;
 using ExpenseTrackerAPI.Infrastructure.Shared;
 
@@ -9,12 +10,12 @@ namespace ExpenseTrackerAPI.Infrastructure.Transactions;
 
 /// <summary>
 /// EF Core implementation of the transaction repository.
-/// 
+///
 /// DESIGN:
 /// - Each transaction stores cumulative_delta (running sum of signed_amounts)
 /// - User.initial_balance + cumulative_delta = actual balance
 /// - No separate UserBalance or UserBalanceHistory tables needed
-/// 
+///
 /// IMPLEMENTATION:
 /// - Uses EF Core for all operations (reads and writes)
 /// - Supports non-sequential transaction dates by recalculating cumulative_delta
@@ -84,6 +85,71 @@ public class TransactionRepository : ITransactionRepository
         }
     }
 
+    public async Task<ErrorOr<List<Transaction>>> GetByUserIdWithFiltersAsync(int userId, TransactionQueryOptions options, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var query = _context.Transactions.Where(t => t.UserId == userId);
+
+            if (!string.IsNullOrWhiteSpace(options.Subject))
+            {
+                var subject = options.Subject.Trim();
+                query = query.Where(t => EF.Functions.ILike(t.Subject, $"%{subject}%"));
+            }
+
+            if (options.CategoryIds is { Count: > 0 })
+            {
+                var ids = options.CategoryIds;
+                query = query.Where(t => t.CategoryId != null && ids.Contains(t.CategoryId.Value));
+            }
+
+            if (options.PaymentMethods is { Count: > 0 })
+            {
+                var methods = options.PaymentMethods;
+                query = query.Where(t => methods.Contains(t.PaymentMethod));
+            }
+
+            if (options.TransactionType.HasValue)
+            {
+                query = query.Where(t => t.TransactionType == options.TransactionType.Value);
+            }
+
+            if (options.DateFromUtc.HasValue)
+            {
+                var from = options.DateFromUtc.Value;
+                query = query.Where(t => t.Date >= from);
+            }
+
+            if (options.DateToUtc.HasValue)
+            {
+                var to = options.DateToUtc.Value;
+                query = query.Where(t => t.Date <= to);
+            }
+
+            var desc = options.SortDescending;
+
+            IOrderedQueryable<Transaction> ordered = desc
+                ? query.OrderByDescending(t => t.Date)
+                : query.OrderBy(t => t.Date);
+
+            ordered = options.SortBy?.ToLowerInvariant() switch
+            {
+                "subject" => desc ? ordered.ThenByDescending(t => t.Subject).ThenByDescending(t => t.CreatedAt) : ordered.ThenBy(t => t.Subject).ThenBy(t => t.CreatedAt),
+                "paymentmethod" => desc ? ordered.ThenByDescending(t => t.PaymentMethod).ThenByDescending(t => t.CreatedAt) : ordered.ThenBy(t => t.PaymentMethod).ThenBy(t => t.CreatedAt),
+                "category" => desc ? ordered.ThenByDescending(t => t.CategoryId).ThenByDescending(t => t.CreatedAt) : ordered.ThenBy(t => t.CategoryId).ThenBy(t => t.CreatedAt),
+                "amount" => desc ? ordered.ThenByDescending(t => t.SignedAmount).ThenByDescending(t => t.CreatedAt) : ordered.ThenBy(t => t.SignedAmount).ThenBy(t => t.CreatedAt),
+                _ => desc ? ordered.ThenByDescending(t => t.CreatedAt) : ordered.ThenBy(t => t.CreatedAt)
+            };
+
+            var transactions = await ordered.ToListAsync(cancellationToken);
+            return transactions;
+        }
+        catch (Exception ex)
+        {
+            return Error.Failure("Database.Error", $"Failed to retrieve transactions: {ex.Message}");
+        }
+    }
+
     public async Task<ErrorOr<List<Transaction>>> GetByUserIdAndTypeAsync(int userId, TransactionType type, CancellationToken cancellationToken)
     {
         try
@@ -131,41 +197,41 @@ public class TransactionRepository : ITransactionRepository
         try
         {
             await using var dbTransaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-            
+
             try
             {
                 transaction.CreatedAt = DateTime.UtcNow;
                 transaction.UpdatedAt = DateTime.UtcNow;
-                
+
                 // Step 1: Get previous cumulative_delta (1 query - optimized to select only the value)
                 // Order by Date DESC, CreatedAt DESC to find the last transaction before this one
                 var previousCumulativeDelta = await _context.Transactions
                     .Where(t => t.UserId == transaction.UserId)
-                    .Where(t => t.Date < transaction.Date || 
+                    .Where(t => t.Date < transaction.Date ||
                                (t.Date == transaction.Date && t.CreatedAt < transaction.CreatedAt))
                     .OrderByDescending(t => t.Date)
                     .ThenByDescending(t => t.CreatedAt)
                     .Select(t => t.CumulativeDelta)
                     .FirstOrDefaultAsync(cancellationToken);
-                
+
                 // Step 2: Calculate cumulative_delta for new transaction (default is 0m if no previous transaction)
                 transaction.CumulativeDelta = previousCumulativeDelta + transaction.SignedAmount;
-                
+
                 // Step 3: Insert with correct cumulative_delta (1 query)
                 _context.Transactions.Add(transaction);
                 await _context.SaveChangesAsync(cancellationToken);
-                
+
                 // Step 4: Bulk update all subsequent transactions (1 query - handles 0 to 10,000+ rows efficiently!)
                 // Update transactions that come after this one in the ordering (Date > this.Date OR (Date == this.Date AND CreatedAt > this.CreatedAt))
                 await _context.Transactions
                     .Where(t => t.UserId == transaction.UserId)
-                    .Where(t => t.Date > transaction.Date || 
+                    .Where(t => t.Date > transaction.Date ||
                                (t.Date == transaction.Date && t.CreatedAt > transaction.CreatedAt))
                     .ExecuteUpdateAsync(setters => setters
                         .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta + transaction.SignedAmount)
                         .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
                         cancellationToken);
-                
+
                 await dbTransaction.CommitAsync(cancellationToken);
                 return transaction;
             }
@@ -186,23 +252,23 @@ public class TransactionRepository : ITransactionRepository
         try
         {
             await using var dbTransaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-            
+
             try
             {
                 // Step 1: Get the old transaction to compare changes
                 var oldTransaction = await _context.Transactions
                     .AsNoTracking()
                     .FirstOrDefaultAsync(t => t.Id == transaction.Id, cancellationToken);
-                
+
                 if (oldTransaction == null)
                 {
                     return TransactionErrors.NotFound;
                 }
-                
+
                 // Step 2: Check if date or signed_amount changed (affects cumulative calculations)
                 bool dateChanged = oldTransaction.Date != transaction.Date;
                 bool amountChanged = oldTransaction.SignedAmount != transaction.SignedAmount;
-                
+
                 if (!dateChanged && !amountChanged)
                 {
                     // Simple update - no cumulative recalculation needed
@@ -212,12 +278,12 @@ public class TransactionRepository : ITransactionRepository
                     await dbTransaction.CommitAsync(cancellationToken);
                     return transaction;
                 }
-                
+
                 // OPTIMIZATION: If only amount changed (date stayed same), use bulk update
                 if (!dateChanged && amountChanged)
                 {
                     decimal amountDelta = transaction.SignedAmount - oldTransaction.SignedAmount;
-                    
+
                     // Calculate new cumulative_delta directly from old transaction's cumulative_delta
                     // oldTransaction.CumulativeDelta = previousCumulativeDelta + oldTransaction.SignedAmount
                     // Therefore: newCumulativeDelta = previousCumulativeDelta + newSignedAmount
@@ -227,28 +293,28 @@ public class TransactionRepository : ITransactionRepository
                     transaction.UpdatedAt = DateTime.UtcNow;
                     _context.Transactions.Update(transaction);
                     await _context.SaveChangesAsync(cancellationToken);
-                    
+
                     // Bulk update all subsequent transactions (1 query for any number of rows!)
                     await _context.Transactions
                         .Where(t => t.UserId == transaction.UserId)
-                        .Where(t => t.Date > transaction.Date || 
+                        .Where(t => t.Date > transaction.Date ||
                                    (t.Date == transaction.Date && t.CreatedAt > transaction.CreatedAt))
                         .ExecuteUpdateAsync(setters => setters
                             .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta + amountDelta)
                             .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
                             cancellationToken);
-                    
+
                     await dbTransaction.CommitAsync(cancellationToken);
                     return transaction;
                 }
-                
+
                 // DATE CHANGED: Optimized two-phase update
                 // Phase 1: Transactions in range [minDate, maxDate] get the new transaction amount added
                 // Phase 2: Transactions after maxDate get net delta = (newAmount - oldAmount)
-                
+
                 var minDate = oldTransaction.Date < transaction.Date ? oldTransaction.Date : transaction.Date;
                 var maxDate = oldTransaction.Date > transaction.Date ? oldTransaction.Date : transaction.Date;
-                
+
                 // Get cumulative_delta before minDate to calculate the transaction's new cumulative_delta
                 // OPTIMIZATION: If date moved forwards (newDate > oldDate), minDate = oldDate
                 // We can infer previousCumulativeDelta from oldTransaction without a query
@@ -271,13 +337,13 @@ public class TransactionRepository : ITransactionRepository
                         .Select(t => t.CumulativeDelta)
                         .FirstOrDefaultAsync(cancellationToken);
                 }
-                
+
                 // Calculate the transaction's cumulative_delta at its new position
                 transaction.CumulativeDelta = previousCumulativeDelta + transaction.SignedAmount;
                 transaction.UpdatedAt = DateTime.UtcNow;
                 _context.Transactions.Update(transaction);
                 await _context.SaveChangesAsync(cancellationToken);
-                
+
                 // Phase 1: Add the new transaction amount to all other transactions in range [minDate, maxDate]
                 // These transactions now have the moved transaction before them in the order
                 await _context.Transactions
@@ -287,13 +353,13 @@ public class TransactionRepository : ITransactionRepository
                         .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta + transaction.SignedAmount)
                         .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
                         cancellationToken);
-                
+
                 // Phase 2: Transactions after maxDate need to:
                 // - Remove the old amount (transaction was at oldDate, now it's gone from there)
                 // - Add the new amount (transaction is now at newDate, affecting them)
                 // Net effect: (newAmount - oldAmount)
                 decimal netDelta = transaction.SignedAmount - oldTransaction.SignedAmount;
-                
+
                 if (netDelta != 0)
                 {
                     await _context.Transactions
@@ -303,7 +369,7 @@ public class TransactionRepository : ITransactionRepository
                             .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
                             cancellationToken);
                 }
-                
+
                 await dbTransaction.CommitAsync(cancellationToken);
                 return transaction;
             }
@@ -324,7 +390,7 @@ public class TransactionRepository : ITransactionRepository
         try
         {
             await using var dbTransaction = await _context.Database.BeginTransactionAsync(cancellationToken);
-            
+
             try
             {
                 // Single query: Delete transaction AND update all subsequent transactions in one statement
@@ -342,13 +408,13 @@ public class TransactionRepository : ITransactionRepository
                       WHERE t.user_id = d.user_id
                         AND (t.date > d.date OR (t.date = d.date AND t.created_at > d.created_at))"
                     );
-                
+
                 // If no rows were deleted, transaction didn't exist
                 if (rowsAffected == 0)
                 {
                     return TransactionErrors.NotFound;
                 }
-                
+
                 await dbTransaction.CommitAsync(cancellationToken);
                 return Result.Deleted;
             }

@@ -13,22 +13,32 @@ public interface ITransactionService
     /// Get all transactions with summary statistics
     /// </summary>
     Task<ErrorOr<GetTransactionsResult>> GetAllAsync(CancellationToken cancellationToken);
-    
+
     /// <summary>
     /// Get a single transaction by ID
     /// </summary>
     Task<ErrorOr<Transaction>> GetByIdAsync(int id, CancellationToken cancellationToken);
-    
+
     /// <summary>
     /// Get all transactions for a user with summary statistics
     /// </summary>
     Task<ErrorOr<GetTransactionsResult>> GetByUserIdAsync(int userId, CancellationToken cancellationToken);
-    
+
+    /// <summary>
+    /// Get transactions for a user with optional filters and sorting (date first, then secondary sort).
+    /// </summary>
+    Task<ErrorOr<GetTransactionsResult>> GetByUserIdWithFiltersAsync(int userId, TransactionQueryOptions options, CancellationToken cancellationToken);
+
     /// <summary>
     /// Get transactions for a user filtered by type (EXPENSE or INCOME)
     /// </summary>
     Task<ErrorOr<GetTransactionsResult>> GetByUserIdAndTypeAsync(int userId, TransactionType type, CancellationToken cancellationToken);
-    
+
+    /// <summary>
+    /// Get transactions for a user within a date range
+    /// </summary>
+    Task<ErrorOr<GetTransactionsResult>> GetByUserIdAndDateRangeAsync(int userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken);
+
     /// <summary>
     /// Create a new transaction
     /// </summary>
@@ -44,7 +54,7 @@ public interface ITransactionService
         int? transactionGroupId,
         string? incomeSource,
         CancellationToken cancellationToken);
-    
+
     /// <summary>
     /// Update an existing transaction
     /// </summary>
@@ -60,7 +70,7 @@ public interface ITransactionService
         int? transactionGroupId,
         string? incomeSource,
         CancellationToken cancellationToken);
-    
+
     /// <summary>
     /// Delete a transaction
     /// </summary>

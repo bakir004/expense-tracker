@@ -40,7 +40,7 @@ public class TransactionService : ITransactionService
         {
             return result.Errors;
         }
-        
+
         return BuildResult(result.Value);
     }
 
@@ -56,13 +56,30 @@ public class TransactionService : ITransactionService
         {
             return UserErrors.NotFound;
         }
-        
+
         var result = await _transactionRepository.GetByUserIdAsync(userId, cancellationToken);
         if (result.IsError)
         {
             return result.Errors;
         }
-        
+
+        return BuildResult(result.Value);
+    }
+
+    public async Task<ErrorOr<GetTransactionsResult>> GetByUserIdWithFiltersAsync(int userId, TransactionQueryOptions options, CancellationToken cancellationToken)
+    {
+        var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
+        if (userResult.IsError)
+        {
+            return UserErrors.NotFound;
+        }
+
+        var result = await _transactionRepository.GetByUserIdWithFiltersAsync(userId, options, cancellationToken);
+        if (result.IsError)
+        {
+            return result.Errors;
+        }
+
         return BuildResult(result.Value);
     }
 
@@ -73,13 +90,30 @@ public class TransactionService : ITransactionService
         {
             return UserErrors.NotFound;
         }
-        
+
         var result = await _transactionRepository.GetByUserIdAndTypeAsync(userId, type, cancellationToken);
         if (result.IsError)
         {
             return result.Errors;
         }
-        
+
+        return BuildResult(result.Value);
+    }
+
+    public async Task<ErrorOr<GetTransactionsResult>> GetByUserIdAndDateRangeAsync(int userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
+    {
+        var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
+        if (userResult.IsError)
+        {
+            return UserErrors.NotFound;
+        }
+
+        var result = await _transactionRepository.GetByUserIdAndDateRangeAsync(userId, startDate, endDate, cancellationToken);
+        if (result.IsError)
+        {
+            return result.Errors;
+        }
+
         return BuildResult(result.Value);
     }
 
@@ -101,13 +135,13 @@ public class TransactionService : ITransactionService
         {
             return validationResult.Errors;
         }
-        
+
         var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
         if (userResult.IsError)
         {
             return UserErrors.NotFound;
         }
-        
+
         if (categoryId.HasValue)
         {
             var categoryResult = await _categoryRepository.GetByIdAsync(categoryId.Value, cancellationToken);
@@ -116,7 +150,7 @@ public class TransactionService : ITransactionService
                 return CategoryErrors.NotFound;
             }
         }
-        
+
         if (transactionGroupId.HasValue)
         {
             var transactionGroupResult = await _transactionGroupRepository.GetByIdAsync(transactionGroupId.Value, cancellationToken);
@@ -127,7 +161,7 @@ public class TransactionService : ITransactionService
         }
 
         var signedAmount = transactionType == TransactionType.Expense ? -amount : amount;
-        
+
         var transaction = new Transaction
         {
             UserId = userId,
@@ -142,7 +176,7 @@ public class TransactionService : ITransactionService
             TransactionGroupId = transactionGroupId,
             IncomeSource = transactionType == TransactionType.Income ? incomeSource : null
         };
-        
+
         return await _transactionRepository.CreateAsync(transaction, cancellationToken);
     }
 
@@ -164,13 +198,13 @@ public class TransactionService : ITransactionService
         {
             return existingResult.Errors;
         }
-        
+
         var validationResult = TransactionValidator.ValidateCreateTransaction(transactionType, amount, date, subject, categoryId);
         if (validationResult.IsError)
         {
             return validationResult.Errors;
         }
-        
+
         if (categoryId.HasValue)
         {
             var categoryResult = await _categoryRepository.GetByIdAsync(categoryId.Value, cancellationToken);
@@ -179,7 +213,7 @@ public class TransactionService : ITransactionService
                 return CategoryErrors.NotFound;
             }
         }
-        
+
         if (transactionGroupId.HasValue)
         {
             var transactionGroupResult = await _transactionGroupRepository.GetByIdAsync(transactionGroupId.Value, cancellationToken);
@@ -188,9 +222,9 @@ public class TransactionService : ITransactionService
                 return TransactionGroupErrors.NotFound;
             }
         }
-        
+
         var signedAmount = transactionType == TransactionType.Expense ? -amount : amount;
-        
+
         var transaction = new Transaction
         {
             Id = id,
@@ -206,7 +240,7 @@ public class TransactionService : ITransactionService
             TransactionGroupId = transactionGroupId,
             IncomeSource = transactionType == TransactionType.Income ? incomeSource : null
         };
-        
+
         return await _transactionRepository.UpdateAsync(transaction, cancellationToken);
     }
 
@@ -220,11 +254,11 @@ public class TransactionService : ITransactionService
         var totalIncome = transactions
             .Where(t => t.TransactionType == TransactionType.Income)
             .Sum(t => t.Amount);
-        
+
         var totalExpenses = transactions
             .Where(t => t.TransactionType == TransactionType.Expense)
             .Sum(t => t.Amount);
-        
+
         return new GetTransactionsResult
         {
             Transactions = transactions,

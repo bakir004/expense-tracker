@@ -16,6 +16,13 @@ export type Transaction = {
   updatedAt: string;
 };
 
+export type Category = {
+  id: number;
+  name: string;
+  description?: string | null;
+  icon?: string | null;
+};
+
 export type UserBalanceResponse = {
   userId: number;
   initialBalance: number;
@@ -33,4 +40,29 @@ export type GetTransactionsResponse = {
     incomeCount: number;
     expenseCount: number;
   } | null;
+};
+
+export type GetCategoriesResponse = {
+  categories: Category[];
+  totalCount: number;
+};
+
+export type TransactionGroup = {
+  id: number;
+  name: string;
+  description?: string | null;
+  userId: number;
+  createdAt: string;
+};
+
+/** Query params for GET /transactions/user/:id (filtering and sorting) */
+export type TransactionQueryParams = {
+  subject?: string;
+  categoryIds?: number[];
+  paymentMethods?: number[];
+  transactionType?: "EXPENSE" | "INCOME";
+  dateFrom?: string; // dd-MM-yyyy
+  dateTo?: string;
+  sortBy?: "subject" | "paymentMethod" | "category" | "amount";
+  sortDirection?: "asc" | "desc";
 };

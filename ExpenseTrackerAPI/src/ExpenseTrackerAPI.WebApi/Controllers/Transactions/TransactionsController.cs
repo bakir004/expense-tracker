@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Mvc;
 using ExpenseTrackerAPI.Application.Transactions;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
@@ -56,19 +57,31 @@ public class TransactionsController : ApiControllerBase
     }
 
     /// <summary>
-    /// Get all transactions for a user
+    /// Get all transactions for a user, with optional filtering and sorting via query parameters.
     /// </summary>
     /// <param name="userId">The unique identifier of the user</param>
+    /// <param name="query">Optional: subject (fuzzy), categoryIds, paymentMethods, transactionType, dateFrom, dateTo, sortBy (subject|paymentMethod|category|amount), sortDirection (asc|desc). Date is always primary sort.</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of transactions for the user (empty array if user has no transactions)</returns>
     /// <response code="200">Successfully retrieved transactions (may be empty)</response>
+    /// <response code="400">Invalid query parameter value</response>
     /// <response code="404">User not found</response>
     [HttpGet("user/{userId:int}")]
     [ProducesResponseType(typeof(GetTransactionsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetByUserId(int userId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetByUserId(
+        int userId,
+        [FromQuery] TransactionQueryParameters? query,
+        CancellationToken cancellationToken)
     {
-        var result = await _transactionService.GetByUserIdAsync(userId, cancellationToken);
+        var optionsResult = TransactionValidator.BuildQueryOptions(query);
+        if (optionsResult.IsError)
+        {
+            return Problem(optionsResult.Errors);
+        }
+
+        var result = await _transactionService.GetByUserIdWithFiltersAsync(userId, optionsResult.Value, cancellationToken);
 
         return result.Match(
             transactions => Ok(transactions.ToResponse()),
@@ -98,6 +111,55 @@ public class TransactionsController : ApiControllerBase
         }
 
         var result = await _transactionService.GetByUserIdAndTypeAsync(userId, typeResult.Value, cancellationToken);
+
+        return result.Match(
+            transactions => Ok(transactions.ToResponse()),
+            Problem);
+    }
+
+    /// <summary>
+    /// Get transactions for a user within a date range
+    /// </summary>
+    /// <param name="userId">The unique identifier of the user</param>
+    /// <param name="from">Start date in dd-MM-yyyy format</param>
+    /// <param name="to">End date in dd-MM-yyyy format</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>List of transactions for the user within the date range</returns>
+    /// <response code="200">Successfully retrieved transactions (may be empty)</response>
+    /// <response code="400">Invalid date format</response>
+    /// <response code="404">User not found</response>
+    [HttpGet("user/{userId:int}/range")]
+    [ProducesResponseType(typeof(GetTransactionsResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetByUserIdAndDateRange(
+        int userId,
+        [FromQuery] string from,
+        [FromQuery] string to,
+        CancellationToken cancellationToken)
+    {
+        const string dateFormat = "dd-MM-yyyy";
+
+        if (!DateTime.TryParseExact(from, dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var startDate))
+        {
+            return BadRequest(new { error = $"Invalid 'from' date format. Expected format: {dateFormat}" });
+        }
+
+        if (!DateTime.TryParseExact(to, dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var endDate))
+        {
+            return BadRequest(new { error = $"Invalid 'to' date format. Expected format: {dateFormat}" });
+        }
+
+        if (startDate > endDate)
+        {
+            return BadRequest(new { error = "'from' date must be before or equal to 'to' date" });
+        }
+
+        // Npgsql requires DateTime with Kind=Utc for timestamp with time zone
+        var startUtc = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+        var endUtc = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
+
+        var result = await _transactionService.GetByUserIdAndDateRangeAsync(userId, startUtc, endUtc, cancellationToken);
 
         return result.Match(
             transactions => Ok(transactions.ToResponse()),

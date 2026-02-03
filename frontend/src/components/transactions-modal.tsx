@@ -51,7 +51,7 @@ export function TransactionsModal({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
-      <AlertDialogContent 
+      <AlertDialogContent
         className="dark max-w-2xl max-h-[80vh] overflow-y-auto"
         onOverlayClick={() => setOpen(false)}
       >
@@ -75,7 +75,7 @@ export function TransactionsModal({
         </AlertDialogHeader>
         <div className="space-y-2">
           {transactionsForDate.map((tx) => (
-            <Card key={tx.id} className="p-4 dark:bg-zinc-800 dark:border-zinc-700">
+            <Card key={tx.id} className="p-4">
               <div className="flex items-start justify-between">
                 <div className="space-y-1">
                   <div className="font-medium dark:text-zinc-100">{tx.subject}</div>

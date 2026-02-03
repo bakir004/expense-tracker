@@ -201,6 +201,154 @@ public class TransactionServiceTests
     }
 
     [Fact]
+    public async Task GetByUserIdWithFiltersAsync_ShouldReturnTransactions_WhenUserExists()
+    {
+        // Arrange
+        var userId = 1;
+        var user = new User { Id = userId, Name = "John Doe", Email = "john@example.com" };
+        var options = new TransactionQueryOptions { Subject = "grocery", SortBy = "amount", SortDescending = true };
+        var transactions = new List<Transaction>
+        {
+            new Transaction { Id = 1, UserId = userId, TransactionType = TransactionType.Expense, Amount = 50m, SignedAmount = -50m, Subject = "Grocery" }
+        };
+
+        _mockUserRepository
+            .Setup(r => r.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        _mockTransactionRepository
+            .Setup(r => r.GetByUserIdWithFiltersAsync(userId, options, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(transactions);
+
+        // Act
+        var result = await _service.GetByUserIdWithFiltersAsync(userId, options, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        Assert.NotNull(result.Value);
+        Assert.Single(result.Value.Transactions);
+        Assert.Equal(transactions[0].Id, result.Value.Transactions[0].Id);
+        Assert.Equal(50m, result.Value.TotalExpenses);
+        Assert.Equal(0m, result.Value.TotalIncome);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFiltersAsync_ShouldReturnUserNotFound_WhenUserDoesNotExist()
+    {
+        // Arrange
+        var userId = 999;
+        var options = new TransactionQueryOptions();
+        _mockUserRepository
+            .Setup(r => r.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(UserErrors.NotFound);
+
+        // Act
+        var result = await _service.GetByUserIdWithFiltersAsync(userId, options, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.IsError);
+        Assert.Contains(UserErrors.NotFound, result.Errors);
+        _mockTransactionRepository.Verify(
+            r => r.GetByUserIdWithFiltersAsync(It.IsAny<int>(), It.IsAny<TransactionQueryOptions>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFiltersAsync_ShouldReturnError_WhenRepositoryReturnsError()
+    {
+        // Arrange
+        var userId = 1;
+        var user = new User { Id = userId, Name = "John", Email = "j@x.com" };
+        var options = new TransactionQueryOptions { TransactionType = TransactionType.Expense };
+        var error = Error.Failure("Database.Error", "Connection failed");
+
+        _mockUserRepository
+            .Setup(r => r.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        _mockTransactionRepository
+            .Setup(r => r.GetByUserIdWithFiltersAsync(userId, options, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(error);
+
+        // Act
+        var result = await _service.GetByUserIdWithFiltersAsync(userId, options, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.IsError);
+        Assert.Contains(error, result.Errors);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFiltersAsync_ShouldCallRepositoryWithSameOptions()
+    {
+        // Arrange
+        var userId = 1;
+        var user = new User { Id = userId, Name = "Jane", Email = "jane@x.com" };
+        var options = new TransactionQueryOptions
+        {
+            Subject = "rent",
+            CategoryIds = new[] { 1, 2 },
+            PaymentMethods = new List<PaymentMethod> { PaymentMethod.BankTransfer },
+            TransactionType = TransactionType.Expense,
+            DateFromUtc = DateTime.UtcNow.AddDays(-30),
+            DateToUtc = DateTime.UtcNow,
+            SortBy = "subject",
+            SortDescending = false
+        };
+        var transactions = new List<Transaction>();
+
+        _mockUserRepository
+            .Setup(r => r.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        _mockTransactionRepository
+            .Setup(r => r.GetByUserIdWithFiltersAsync(userId, It.IsAny<TransactionQueryOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(transactions);
+
+        // Act
+        await _service.GetByUserIdWithFiltersAsync(userId, options, CancellationToken.None);
+
+        // Assert
+        _mockTransactionRepository.Verify(
+            r => r.GetByUserIdWithFiltersAsync(userId, options, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFiltersAsync_ShouldBuildResultWithSummary()
+    {
+        // Arrange
+        var userId = 1;
+        var user = new User { Id = userId, Name = "Bob", Email = "bob@x.com" };
+        var options = new TransactionQueryOptions();
+        var transactions = new List<Transaction>
+        {
+            new Transaction { Id = 1, UserId = userId, TransactionType = TransactionType.Income, Amount = 200m, SignedAmount = 200m },
+            new Transaction { Id = 2, UserId = userId, TransactionType = TransactionType.Expense, Amount = 80m, SignedAmount = -80m }
+        };
+
+        _mockUserRepository
+            .Setup(r => r.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        _mockTransactionRepository
+            .Setup(r => r.GetByUserIdWithFiltersAsync(userId, It.IsAny<TransactionQueryOptions>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(transactions);
+
+        // Act
+        var result = await _service.GetByUserIdWithFiltersAsync(userId, options, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        Assert.Equal(2, result.Value.Transactions.Count);
+        Assert.Equal(200m, result.Value.TotalIncome);
+        Assert.Equal(80m, result.Value.TotalExpenses);
+        Assert.Equal(120m, result.Value.NetChange);
+        Assert.Equal(1, result.Value.IncomeCount);
+        Assert.Equal(1, result.Value.ExpenseCount);
+    }
+
+    [Fact]
     public async Task CreateAsync_ShouldReturnTransaction_WhenValidExpense()
     {
         // Arrange

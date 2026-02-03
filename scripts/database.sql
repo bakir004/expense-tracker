@@ -1,6 +1,6 @@
 -- Personal Finance Database Schema (PostgreSQL)
 -- SIMPLIFIED DESIGN: Transaction table with cumulative_delta
--- 
+--
 -- Key Design Decisions:
 -- 1. initial_balance stored on User (not separate table)
 -- 2. Each transaction stores cumulative_delta (running sum of effects)
@@ -63,38 +63,38 @@ CREATE INDEX idx_transaction_group_user ON "TransactionGroup"(user_id);
 CREATE TABLE "Transaction" (
     id SERIAL PRIMARY KEY,
     user_id INT NOT NULL,
-    
+
     -- Transaction type
     transaction_type VARCHAR(20) NOT NULL,  -- 'EXPENSE', 'INCOME'
-    
+
     -- Amounts
     amount DECIMAL(12, 2) NOT NULL CHECK (amount > 0),  -- Always positive
     signed_amount DECIMAL(12, 2) NOT NULL,              -- Negative for expense, positive for income
-    
+
     -- CUMULATIVE DELTA: Running sum of all signed_amounts up to this transaction
     -- actual_balance = User.initial_balance + cumulative_delta
     cumulative_delta DECIMAL(12, 2) NOT NULL,
-    
+
     -- Transaction details
     date DATE NOT NULL,
     subject VARCHAR(255) NOT NULL,          -- Brief description: what/why (e.g., "Grocery shopping", "Monthly salary")
     notes TEXT,                             -- Optional longer description
     payment_method VARCHAR(20) NOT NULL,
-    
+
     -- Optional fields
     category_id INT,              -- Required for EXPENSE, optional for INCOME
     transaction_group_id INT,     -- Optional: group related transactions (trips, projects, etc.)
     income_source VARCHAR(255),   -- Optional, only for INCOME
-    
+
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
+
     -- Foreign keys
     FOREIGN KEY (user_id) REFERENCES "Users"(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES "Category"(id) ON DELETE RESTRICT,
     FOREIGN KEY (transaction_group_id) REFERENCES "TransactionGroup"(id) ON DELETE SET NULL,
-    
+
     -- Expenses must have a category
     CONSTRAINT chk_expense_has_category CHECK (
         transaction_type != 'EXPENSE' OR category_id IS NOT NULL
@@ -140,55 +140,57 @@ INSERT INTO "TransactionGroup" (name, description, user_id) VALUES
 -- ============================================================
 -- USER 1 (John Doe) TRANSACTIONS
 -- initial_balance = 0, cumulative_delta tracks running total
+-- Dates are relative to CURRENT_DATE (today)
 -- ============================================================
 
--- Nov 1: Salary +3500 → cumulative: +3500
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id, income_source) 
-VALUES (1, 'INCOME', 3500.00, 3500.00, 3500.00, '2024-11-01', 'Monthly salary', 'BANK_TRANSFER', 9, 'ABC Corporation');
+-- 30 days ago: Salary +3500 → cumulative: +3500
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id, income_source)
+VALUES (1, 'INCOME', 3500.00, 3500.00, 3500.00, CURRENT_DATE - INTERVAL '30 days', 'Monthly salary', 'BANK_TRANSFER', 9, 'ABC Corporation');
 
--- Nov 1: Grocery -45.50 → cumulative: +3454.50
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, notes, payment_method, category_id) 
-VALUES (1, 'EXPENSE', 45.50, -45.50, 3454.50, '2024-11-01', 'Grocery shopping', 'Weekly groceries at Whole Foods', 'DEBIT_CARD', 1);
+-- 30 days ago: Grocery -45.50 → cumulative: +3454.50
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, notes, payment_method, category_id)
+VALUES (1, 'EXPENSE', 45.50, -45.50, 3454.50, CURRENT_DATE - INTERVAL '30 days', 'Grocery shopping', 'Weekly groceries at Whole Foods', 'DEBIT_CARD', 1);
 
--- Nov 2: Gas -60 → cumulative: +3394.50
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id) 
-VALUES (1, 'EXPENSE', 60.00, -60.00, 3394.50, '2024-11-02', 'Gas station fill-up', 'CREDIT_CARD', 2);
+-- 29 days ago: Gas -60 → cumulative: +3394.50
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id)
+VALUES (1, 'EXPENSE', 60.00, -60.00, 3394.50, CURRENT_DATE - INTERVAL '29 days', 'Gas station fill-up', 'CREDIT_CARD', 2);
 
--- Nov 3: Rent -1200 → cumulative: +2194.50
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id) 
-VALUES (1, 'EXPENSE', 1200.00, -1200.00, 2194.50, '2024-11-03', 'Monthly rent payment', 'BANK_TRANSFER', 3);
+-- 28 days ago: Rent -1200 → cumulative: +2194.50
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id)
+VALUES (1, 'EXPENSE', 1200.00, -1200.00, 2194.50, CURRENT_DATE - INTERVAL '28 days', 'Monthly rent payment', 'BANK_TRANSFER', 3);
 
--- Nov 5: Freelance +500 → cumulative: +2694.50
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id, income_source) 
-VALUES (1, 'INCOME', 500.00, 500.00, 2694.50, '2024-11-05', 'Freelance project', 'PAYPAL', 11, 'Client Project');
+-- 26 days ago: Freelance +500 → cumulative: +2694.50
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id, income_source)
+VALUES (1, 'INCOME', 500.00, 500.00, 2694.50, CURRENT_DATE - INTERVAL '26 days', 'Freelance project', 'PAYPAL', 11, 'Client Project');
 
--- Nov 7: Flight -350 → cumulative: +2344.50 (grouped under Europe Trip)
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, notes, payment_method, category_id, transaction_group_id) 
-VALUES (1, 'EXPENSE', 350.00, -350.00, 2344.50, '2024-11-07', 'Flight tickets', 'Round trip to Paris', 'CREDIT_CARD', 2, 1);
+-- 24 days ago: Flight -350 → cumulative: +2344.50 (grouped under Europe Trip)
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, notes, payment_method, category_id, transaction_group_id)
+VALUES (1, 'EXPENSE', 350.00, -350.00, 2344.50, CURRENT_DATE - INTERVAL '24 days', 'Flight tickets', 'Round trip to Paris', 'CREDIT_CARD', 2, 1);
 
--- Nov 10: Bonus +1000 → cumulative: +3344.50
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id, income_source) 
-VALUES (1, 'INCOME', 1000.00, 1000.00, 3344.50, '2024-11-10', 'Bonus payment', 'BANK_TRANSFER', 9, 'ABC Corporation');
+-- 21 days ago: Bonus +1000 → cumulative: +3344.50
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id, income_source)
+VALUES (1, 'INCOME', 1000.00, 1000.00, 3344.50, CURRENT_DATE - INTERVAL '21 days', 'Bonus payment', 'BANK_TRANSFER', 9, 'ABC Corporation');
 
 -- ============================================================
 -- USER 2 (Jane Smith) TRANSACTIONS
+-- Dates are relative to CURRENT_DATE (today)
 -- ============================================================
 
--- Nov 1: Salary +4200 → cumulative: +4200
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id, income_source) 
-VALUES (2, 'INCOME', 4200.00, 4200.00, 4200.00, '2024-11-01', 'Monthly salary', 'BANK_TRANSFER', 9, 'XYZ Tech Inc');
+-- 30 days ago: Salary +4200 → cumulative: +4200
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id, income_source)
+VALUES (2, 'INCOME', 4200.00, 4200.00, 4200.00, CURRENT_DATE - INTERVAL '30 days', 'Monthly salary', 'BANK_TRANSFER', 9, 'XYZ Tech Inc');
 
--- Nov 5: Doctor -150 → cumulative: +4050
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id) 
-VALUES (2, 'EXPENSE', 150.00, -150.00, 4050.00, '2024-11-05', 'Doctor visit copay', 'DEBIT_CARD', 5);
+-- 26 days ago: Doctor -150 → cumulative: +4050
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id)
+VALUES (2, 'EXPENSE', 150.00, -150.00, 4050.00, CURRENT_DATE - INTERVAL '26 days', 'Doctor visit copay', 'DEBIT_CARD', 5);
 
--- Nov 8: Dividend +150 → cumulative: +4200
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id, income_source) 
-VALUES (2, 'INCOME', 150.00, 150.00, 4200.00, '2024-11-08', 'Stock dividend', 'BANK_TRANSFER', 10, 'Investment Portfolio');
+-- 23 days ago: Dividend +150 → cumulative: +4200
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, payment_method, category_id, income_source)
+VALUES (2, 'INCOME', 150.00, 150.00, 4200.00, CURRENT_DATE - INTERVAL '23 days', 'Stock dividend', 'BANK_TRANSFER', 10, 'Investment Portfolio');
 
--- Nov 10: Wedding deposit -500 → cumulative: +3700 (grouped under Wedding Planning)
-INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, notes, payment_method, category_id, transaction_group_id) 
-VALUES (2, 'EXPENSE', 500.00, -500.00, 3700.00, '2024-11-10', 'Wedding venue deposit', 'Initial deposit for the reception venue', 'BANK_TRANSFER', 4, 3);
+-- 21 days ago: Wedding deposit -500 → cumulative: +3700 (grouped under Wedding Planning)
+INSERT INTO "Transaction" (user_id, transaction_type, amount, signed_amount, cumulative_delta, date, subject, notes, payment_method, category_id, transaction_group_id)
+VALUES (2, 'EXPENSE', 500.00, -500.00, 3700.00, CURRENT_DATE - INTERVAL '21 days', 'Wedding venue deposit', 'Initial deposit for the reception venue', 'BANK_TRANSFER', 4, 3);
 
 -- ============================================================
 -- VERIFICATION QUERIES
@@ -200,7 +202,7 @@ SELECT '=== Users with Initial Balance ===' AS section;
 SELECT id, name, email, initial_balance FROM "Users";
 
 SELECT '=== User Balances (computed) ===' AS section;
-SELECT 
+SELECT
     u.id,
     u.name,
     u.initial_balance,
@@ -208,15 +210,15 @@ SELECT
     u.initial_balance + COALESCE(t.cumulative_delta, 0) AS current_balance
 FROM "Users" u
 LEFT JOIN LATERAL (
-    SELECT cumulative_delta 
-    FROM "Transaction" 
-    WHERE user_id = u.id 
-    ORDER BY date DESC, id DESC 
+    SELECT cumulative_delta
+    FROM "Transaction"
+    WHERE user_id = u.id
+    ORDER BY date DESC, id DESC
     LIMIT 1
 ) t ON true;
 
 SELECT '=== User 1 Transaction History ===' AS section;
-SELECT 
+SELECT
     transaction_type,
     date,
     subject,
