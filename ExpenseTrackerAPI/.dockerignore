@@ -1,0 +1,39 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+**/publish/
+
+# IDE and editor files
+**/.vs/
+**/.vscode/
+**/.idea/
+**/.DS_Store
+
+# Test results
+**/*.trx
+**/*.coverage
+**/TestResults/
+
+# Docker and scripts (not needed in container)
+docker/
+scripts/
+**/*.ps1
+**/*.cmd
+**/*.sh
+
+# Documentation and misc
+**/*.md
+**/todo.txt
+**/.env
+**/.env.local
+
+# NuGet
+**/.nuget/
+**/packages/
+
+# Rider / solution user options
+**/*.suo
+**/*.user
+**/*.userosscache
+**/*.iml

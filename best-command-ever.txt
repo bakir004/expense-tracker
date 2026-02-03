@@ -1,1 +1,0 @@
- ascii-image-converter ~/Downloads/saul_fixed.gif -C --save-txt ~/.config/fastfetch/my_animation/ --width 120

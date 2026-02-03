@@ -1,9 +1,10 @@
 #!/bin/bash
 # Generate HTML coverage report from Cobertura XML using ReportGenerator
+# Run from repo root or ExpenseTrackerAPI/
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TESTS_DIR="$PROJECT_ROOT/ExpenseTrackerAPI/src/ExpenseTrackerAPI.Application.Tests"
+EXPENSE_TRACKER_API_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TESTS_DIR="$EXPENSE_TRACKER_API_ROOT/src/ExpenseTrackerAPI.Application.Tests"
 COVERAGE_DIR="$TESTS_DIR/TestResults/CoverageReport"
 
 # Find the most recent coverage XML file
@@ -11,14 +12,13 @@ COVERAGE_XML=$(find "$TESTS_DIR/TestResults" -name "coverage.cobertura.xml" -typ
 
 if [ -z "$COVERAGE_XML" ]; then
     echo "Error: No coverage.cobertura.xml file found in TestResults directory"
-    echo "Run 'dotnet test --collect:\"XPlat Code Coverage\" --settings:coverlet.runsettings' first to generate coverage data"
+    echo "Run 'dotnet test --collect:\"XPlat Code Coverage\" --settings:coverlet.runsettings' from ExpenseTrackerAPI or repo root first"
     exit 1
 fi
 
 echo "Found coverage file: $COVERAGE_XML"
 echo "Generating HTML report..."
 
-# Use the global tool path (adjust if needed)
 REPORTGEN="$HOME/.dotnet/tools/reportgenerator"
 
 if [ ! -f "$REPORTGEN" ]; then
@@ -27,7 +27,6 @@ if [ ! -f "$REPORTGEN" ]; then
     exit 1
 fi
 
-# Generate the report
 "$REPORTGEN" \
     -reports:"$COVERAGE_XML" \
     -targetdir:"$COVERAGE_DIR" \
@@ -41,4 +40,3 @@ else
     echo "Error: Failed to generate coverage report"
     exit 1
 fi
-
