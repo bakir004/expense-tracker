@@ -19,6 +19,7 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using ExpenseTrackerAPI.Domain.Constants;
 using ExpenseTrackerAPI.Domain.Entities;
 using ExpenseTrackerAPI.Domain.Errors;
 using ExpenseTrackerAPI.Application.Categories.Interfaces.Infrastructure;
@@ -103,7 +104,7 @@ public class CategoryRepository : ICategoryRepository
 
             return category;
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresSqlState.UniqueViolation)
         {
             return CategoryErrors.DuplicateName;
         }
@@ -133,7 +134,7 @@ public class CategoryRepository : ICategoryRepository
 
             return existingCategory;
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresSqlState.UniqueViolation)
         {
             return CategoryErrors.DuplicateName;
         }
@@ -160,7 +161,7 @@ public class CategoryRepository : ICategoryRepository
 
             return Result.Deleted;
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23503")
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresSqlState.ForeignKeyViolation)
         {
             return Error.Conflict("Database.Error", "Cannot delete category because it is referenced by expenses.");
         }

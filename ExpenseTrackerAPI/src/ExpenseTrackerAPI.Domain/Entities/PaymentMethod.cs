@@ -20,13 +20,13 @@ namespace ExpenseTrackerAPI.Domain.Entities;
 /// </summary>
 public enum PaymentMethod
 {
-    Cash,
-    DebitCard,
-    CreditCard,
-    BankTransfer,
-    MobilePayment,
-    PayPal,
-    Crypto,
-    Other
+    CASH,
+    DEBIT_CARD,
+    CREDIT_CARD,
+    BANK_TRANSFER,
+    MOBILE_PAYMENT,
+    PAYPAL,
+    CRYPTO,
+    OTHER
 }
 

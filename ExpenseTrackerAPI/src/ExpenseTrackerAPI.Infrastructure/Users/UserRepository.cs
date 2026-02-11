@@ -21,6 +21,7 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using ExpenseTrackerAPI.Domain.Constants;
 using ExpenseTrackerAPI.Domain.Entities;
 using ExpenseTrackerAPI.Domain.Errors;
 using ExpenseTrackerAPI.Application.Users.Interfaces.Infrastructure;
@@ -109,7 +110,7 @@ public class UserRepository : IUserRepository
 
             return user;
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresSqlState.UniqueViolation)
         {
             return UserErrors.DuplicateEmail;
         }
@@ -127,15 +128,15 @@ public class UserRepository : IUserRepository
             var connection = _context.Database.GetDbConnection();
             await using var command = connection.CreateCommand();
             command.CommandText = @"
-                SELECT 
+                SELECT
                     u.initial_balance,
                     COALESCE(t.cumulative_delta, 0) AS cumulative_delta
                 FROM ""Users"" u
                 LEFT JOIN LATERAL (
-                    SELECT cumulative_delta 
-                    FROM ""Transaction"" 
-                    WHERE user_id = u.id 
-                    ORDER BY date DESC, id DESC 
+                    SELECT cumulative_delta
+                    FROM ""Transaction""
+                    WHERE user_id = u.id
+                    ORDER BY date DESC, id DESC
                     LIMIT 1
                 ) t ON true
                 WHERE u.id = @user_id";

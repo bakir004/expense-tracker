@@ -1,23 +1,25 @@
 #!/bin/bash
-# Start PostgreSQL container with database initialization script
-# Run from repo root or ExpenseTrackerAPI/
+# Start PostgreSQL container for local development.
+#
+# The database is left empty. When you run the API, it will:
+#   1. Apply EF Core migrations (create/update tables)
+#   2. Seed demo data if the database is empty (users, categories, groups, sample transactions)
+#
+# Demo users have password: password123
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# ExpenseTrackerAPI root (parent of scripts/)
-EXPENSE_TRACKER_API_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Remove existing container if it exists
 docker rm -f postgres-db 2>/dev/null || true
 
-# Start PostgreSQL with volume mount for init script
+# Start PostgreSQL (no init script; API handles schema + seed via EF Core)
 docker run --name postgres-db \
   -e POSTGRES_USER=myuser \
   -e POSTGRES_PASSWORD=mypassword \
   -e POSTGRES_DB=mydatabase \
   -p 5432:5432 \
-  -v "$EXPENSE_TRACKER_API_ROOT/scripts/database.sql:/docker-entrypoint-initdb.d/01-init.sql:ro" \
   -d postgres:latest
 
-echo "PostgreSQL container started. Waiting for initialization..."
+echo "PostgreSQL container started. Run the API to apply migrations and seed the database."
 sleep 3
 docker logs postgres-db --tail 20

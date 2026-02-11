@@ -11,8 +11,8 @@ public class TransactionQueryOptions
     public IReadOnlyList<int>? CategoryIds { get; init; }
     public IReadOnlyList<PaymentMethod>? PaymentMethods { get; init; }
     public TransactionType? TransactionType { get; init; }
-    public DateTime? DateFromUtc { get; init; }
-    public DateTime? DateToUtc { get; init; }
+    public DateOnly? DateFrom { get; init; }
+    public DateOnly? DateTo { get; init; }
     public string? SortBy { get; init; }  // "subject" | "paymentMethod" | "category" | "amount"
     public bool SortDescending { get; init; } = true;  // date and secondary sort direction
 }

@@ -38,7 +38,7 @@ public interface ITransactionRepository
     /// <summary>
     /// Get transactions for a user within a date range
     /// </summary>
-    Task<ErrorOr<List<Transaction>>> GetByUserIdAndDateRangeAsync(int userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken);
+    Task<ErrorOr<List<Transaction>>> GetByUserIdAndDateRangeAsync(int userId, DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken);
 
     /// <summary>
     /// Create a new transaction, update balance, and record in history

@@ -37,7 +37,7 @@ public interface ITransactionService
     /// <summary>
     /// Get transactions for a user within a date range
     /// </summary>
-    Task<ErrorOr<GetTransactionsResult>> GetByUserIdAndDateRangeAsync(int userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken);
+    Task<ErrorOr<GetTransactionsResult>> GetByUserIdAndDateRangeAsync(int userId, DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken);
 
     /// <summary>
     /// Create a new transaction
@@ -46,7 +46,7 @@ public interface ITransactionService
         int userId,
         TransactionType transactionType,
         decimal amount,
-        DateTime date,
+        DateOnly date,
         string subject,
         string? notes,
         PaymentMethod paymentMethod,
@@ -62,7 +62,7 @@ public interface ITransactionService
         int id,
         TransactionType transactionType,
         decimal amount,
-        DateTime date,
+        DateOnly date,
         string subject,
         string? notes,
         PaymentMethod paymentMethod,

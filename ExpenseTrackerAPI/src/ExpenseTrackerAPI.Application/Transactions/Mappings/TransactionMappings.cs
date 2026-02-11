@@ -22,7 +22,7 @@ public static class TransactionMappings
             }
         };
     }
-    
+
     public static TransactionResponse ToResponse(this Transaction transaction)
     {
         return new TransactionResponse
@@ -44,23 +44,23 @@ public static class TransactionMappings
             UpdatedAt = transaction.UpdatedAt
         };
     }
-    
+
     public static string ToDatabaseString(this TransactionType type)
     {
         return type switch
         {
-            TransactionType.Expense => "EXPENSE",
-            TransactionType.Income => "INCOME",
+            TransactionType.EXPENSE => "EXPENSE",
+            TransactionType.INCOME => "INCOME",
             _ => throw new ArgumentOutOfRangeException(nameof(type))
         };
     }
-    
+
     public static TransactionType FromDatabaseString(string value)
     {
         return value.ToUpperInvariant() switch
         {
-            "EXPENSE" => TransactionType.Expense,
-            "INCOME" => TransactionType.Income,
+            "EXPENSE" => TransactionType.EXPENSE,
+            "INCOME" => TransactionType.INCOME,
             _ => throw new ArgumentException($"Unknown transaction type: {value}")
         };
     }

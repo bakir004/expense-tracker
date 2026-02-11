@@ -101,9 +101,9 @@ public class ExpenseTrackerDbContext : DbContext
                 .HasColumnName("transaction_type")
                 .HasMaxLength(20)
                 .HasConversion(
-                    v => v == TransactionType.Expense ? "EXPENSE" : "INCOME",
-                    v => v == "EXPENSE" ? TransactionType.Expense : TransactionType.Income);
-            
+                    v => v == TransactionType.EXPENSE ? "EXPENSE" : "INCOME",
+                    v => v == "EXPENSE" ? TransactionType.EXPENSE : TransactionType.INCOME);
+
             entity.Property(e => e.Amount).HasColumnName("amount").HasColumnType("decimal(12,2)");
             entity.Property(e => e.SignedAmount).HasColumnName("signed_amount").HasColumnType("decimal(12,2)");
             entity.Property(e => e.CumulativeDelta).HasColumnName("cumulative_delta").HasColumnType("decimal(12,2)");
@@ -116,15 +116,12 @@ public class ExpenseTrackerDbContext : DbContext
                 .HasConversion(
                     v => PaymentMethodHelper.ToDatabaseString(v),
                     v => PaymentMethodHelper.FromDatabaseString(v));
-            
+
             entity.Property(e => e.CategoryId).HasColumnName("category_id");
             entity.Property(e => e.TransactionGroupId).HasColumnName("transaction_group_id");
             entity.Property(e => e.IncomeSource).HasColumnName("income_source").HasMaxLength(255);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
-
-            // Computed property - not mapped to database
-            entity.Ignore(e => e.BalanceAfter);
 
             // Foreign key relationships
             entity.HasOne<User>()

@@ -1,5 +1,7 @@
 using ErrorOr;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using ExpenseTrackerAPI.Domain.Constants;
 using ExpenseTrackerAPI.Domain.Entities;
 using ExpenseTrackerAPI.Domain.Errors;
 using ExpenseTrackerAPI.Application.Transactions.Data;
@@ -114,15 +116,15 @@ public class TransactionRepository : ITransactionRepository
                 query = query.Where(t => t.TransactionType == options.TransactionType.Value);
             }
 
-            if (options.DateFromUtc.HasValue)
+            if (options.DateFrom.HasValue)
             {
-                var from = options.DateFromUtc.Value;
+                var from = options.DateFrom.Value;
                 query = query.Where(t => t.Date >= from);
             }
 
-            if (options.DateToUtc.HasValue)
+            if (options.DateTo.HasValue)
             {
-                var to = options.DateToUtc.Value;
+                var to = options.DateTo.Value;
                 query = query.Where(t => t.Date <= to);
             }
 
@@ -168,7 +170,7 @@ public class TransactionRepository : ITransactionRepository
         }
     }
 
-    public async Task<ErrorOr<List<Transaction>>> GetByUserIdAndDateRangeAsync(int userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
+    public async Task<ErrorOr<List<Transaction>>> GetByUserIdAndDateRangeAsync(int userId, DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken)
     {
         try
         {
@@ -200,11 +202,7 @@ public class TransactionRepository : ITransactionRepository
 
             try
             {
-                transaction.CreatedAt = DateTime.UtcNow;
-                transaction.UpdatedAt = DateTime.UtcNow;
-
-                // Step 1: Get previous cumulative_delta (1 query - optimized to select only the value)
-                // Order by Date DESC, CreatedAt DESC to find the last transaction before this one
+                // Step 1: Get previous cumulative_delta
                 var previousCumulativeDelta = await _context.Transactions
                     .Where(t => t.UserId == transaction.UserId)
                     .Where(t => t.Date < transaction.Date ||
@@ -217,12 +215,13 @@ public class TransactionRepository : ITransactionRepository
                 // Step 2: Calculate cumulative_delta for new transaction (default is 0m if no previous transaction)
                 transaction.CumulativeDelta = previousCumulativeDelta + transaction.SignedAmount;
 
-                // Step 3: Insert with correct cumulative_delta (1 query)
+                // Step 3: Insert with correct cumulative_delta
                 _context.Transactions.Add(transaction);
                 await _context.SaveChangesAsync(cancellationToken);
 
-                // Step 4: Bulk update all subsequent transactions (1 query - handles 0 to 10,000+ rows efficiently!)
+                // Step 4: Bulk update all subsequent transactions
                 // Update transactions that come after this one in the ordering (Date > this.Date OR (Date == this.Date AND CreatedAt > this.CreatedAt))
+                // This second condition is necessary since there must be an ordering even on the same date
                 await _context.Transactions
                     .Where(t => t.UserId == transaction.UserId)
                     .Where(t => t.Date > transaction.Date ||
@@ -241,6 +240,17 @@ public class TransactionRepository : ITransactionRepository
                 throw;
             }
         }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresSqlState.ForeignKeyViolation)
+        {
+            var constraint = pgEx.ConstraintName ?? pgEx.Message;
+            if (constraint.Contains("Users", StringComparison.OrdinalIgnoreCase) || constraint.Contains("user_id", StringComparison.OrdinalIgnoreCase))
+                return UserErrors.NotFound;
+            if (constraint.Contains("Category", StringComparison.OrdinalIgnoreCase) || constraint.Contains("category_id", StringComparison.OrdinalIgnoreCase))
+                return CategoryErrors.NotFound;
+            if (constraint.Contains("TransactionGroup", StringComparison.OrdinalIgnoreCase) || constraint.Contains("transaction_group", StringComparison.OrdinalIgnoreCase))
+                return TransactionGroupErrors.NotFound;
+            return Error.Failure("Database.Error", "Referenced entity not found.");
+        }
         catch (Exception ex)
         {
             return Error.Failure("Database.Error", $"Failed to create transaction: {ex.Message}");
@@ -255,7 +265,6 @@ public class TransactionRepository : ITransactionRepository
 
             try
             {
-                // Step 1: Get the old transaction to compare changes
                 var oldTransaction = await _context.Transactions
                     .AsNoTracking()
                     .FirstOrDefaultAsync(t => t.Id == transaction.Id, cancellationToken);
@@ -265,14 +274,21 @@ public class TransactionRepository : ITransactionRepository
                     return TransactionErrors.NotFound;
                 }
 
-                // Step 2: Check if date or signed_amount changed (affects cumulative calculations)
+                // Detach any tracked entity with the same Id to avoid tracking conflicts
+                var trackedEntity = _context.ChangeTracker.Entries<Transaction>()
+                    .FirstOrDefault(e => e.Entity.Id == transaction.Id);
+                if (trackedEntity != null)
+                    trackedEntity.State = EntityState.Detached;
+
+                transaction.UserId = oldTransaction.UserId;
+                transaction.CreatedAt = oldTransaction.CreatedAt;
+                transaction.UpdatedAt = DateTime.UtcNow;
+
                 bool dateChanged = oldTransaction.Date != transaction.Date;
                 bool amountChanged = oldTransaction.SignedAmount != transaction.SignedAmount;
 
                 if (!dateChanged && !amountChanged)
                 {
-                    // Simple update - no cumulative recalculation needed
-                    transaction.UpdatedAt = DateTime.UtcNow;
                     _context.Transactions.Update(transaction);
                     await _context.SaveChangesAsync(cancellationToken);
                     await dbTransaction.CommitAsync(cancellationToken);
@@ -283,18 +299,10 @@ public class TransactionRepository : ITransactionRepository
                 if (!dateChanged && amountChanged)
                 {
                     decimal amountDelta = transaction.SignedAmount - oldTransaction.SignedAmount;
-
-                    // Calculate new cumulative_delta directly from old transaction's cumulative_delta
-                    // oldTransaction.CumulativeDelta = previousCumulativeDelta + oldTransaction.SignedAmount
-                    // Therefore: newCumulativeDelta = previousCumulativeDelta + newSignedAmount
-                    // Which simplifies to: newCumulativeDelta = oldCumulativeDelta - oldSignedAmount + newSignedAmount
-                    // Which simplifies to: newCumulativeDelta = oldCumulativeDelta + amountDelta
                     transaction.CumulativeDelta = oldTransaction.CumulativeDelta + amountDelta;
-                    transaction.UpdatedAt = DateTime.UtcNow;
                     _context.Transactions.Update(transaction);
                     await _context.SaveChangesAsync(cancellationToken);
 
-                    // Bulk update all subsequent transactions (1 query for any number of rows!)
                     await _context.Transactions
                         .Where(t => t.UserId == transaction.UserId)
                         .Where(t => t.Date > transaction.Date ||
@@ -308,12 +316,51 @@ public class TransactionRepository : ITransactionRepository
                     return transaction;
                 }
 
+                var minDate = oldTransaction.Date < transaction.Date ? oldTransaction.Date : transaction.Date;
+                var maxDate = oldTransaction.Date > transaction.Date ? oldTransaction.Date : transaction.Date;
+
+                if(!amountChanged)
+                {
+                    var oldCumulativeDelta = await _context.Transactions
+                        .Where(t => t.UserId == transaction.UserId)
+                        .Where(t => t.Date < minDate)
+                        .OrderByDescending(t => t.Date)
+                        .ThenByDescending(t => t.CreatedAt)
+                        .Select(t => t.CumulativeDelta)
+                        .FirstOrDefaultAsync(cancellationToken);
+
+                    transaction.CumulativeDelta = oldCumulativeDelta + transaction.SignedAmount;
+                    _context.Transactions.Update(transaction);
+                    await _context.SaveChangesAsync(cancellationToken);
+
+                    if(transaction.Date < oldTransaction.Date) {
+                        await _context.Transactions
+                            .Where(t => t.UserId == transaction.UserId)
+                            .Where(t => t.Date >= minDate && t.Date <= maxDate && t.CreatedAt > transaction.CreatedAt)
+                            .ExecuteUpdateAsync(setters => setters
+                                .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta + transaction.SignedAmount)
+                                .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
+                                cancellationToken);
+                    } else if(transaction.Date > oldTransaction.Date) {
+                        await _context.Transactions
+                            .Where(t => t.UserId == transaction.UserId)
+                            .Where(t => t.Date >= minDate && t.Date <= maxDate && t.CreatedAt < transaction.CreatedAt)
+                            .ExecuteUpdateAsync(setters => setters
+                                .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta - transaction.SignedAmount)
+                                .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
+                                cancellationToken);
+                    }
+
+                    await dbTransaction.CommitAsync(cancellationToken);
+
+                    return transaction;
+                }
+
                 // DATE CHANGED: Optimized two-phase update
                 // Phase 1: Transactions in range [minDate, maxDate] get the new transaction amount added
                 // Phase 2: Transactions after maxDate get net delta = (newAmount - oldAmount)
 
-                var minDate = oldTransaction.Date < transaction.Date ? oldTransaction.Date : transaction.Date;
-                var maxDate = oldTransaction.Date > transaction.Date ? oldTransaction.Date : transaction.Date;
+
 
                 // Get cumulative_delta before minDate to calculate the transaction's new cumulative_delta
                 // OPTIMIZATION: If date moved forwards (newDate > oldDate), minDate = oldDate
@@ -340,7 +387,6 @@ public class TransactionRepository : ITransactionRepository
 
                 // Calculate the transaction's cumulative_delta at its new position
                 transaction.CumulativeDelta = previousCumulativeDelta + transaction.SignedAmount;
-                transaction.UpdatedAt = DateTime.UtcNow;
                 _context.Transactions.Update(transaction);
                 await _context.SaveChangesAsync(cancellationToken);
 
@@ -378,6 +424,15 @@ public class TransactionRepository : ITransactionRepository
                 await dbTransaction.RollbackAsync(cancellationToken);
                 throw;
             }
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == PostgresSqlState.ForeignKeyViolation)
+        {
+            var constraint = pgEx.ConstraintName ?? pgEx.Message;
+            if (constraint.Contains("Category", StringComparison.OrdinalIgnoreCase) || constraint.Contains("category_id", StringComparison.OrdinalIgnoreCase))
+                return CategoryErrors.NotFound;
+            if (constraint.Contains("TransactionGroup", StringComparison.OrdinalIgnoreCase) || constraint.Contains("transaction_group", StringComparison.OrdinalIgnoreCase))
+                return TransactionGroupErrors.NotFound;
+            return Error.Failure("Database.Error", "Referenced entity not found.");
         }
         catch (Exception ex)
         {

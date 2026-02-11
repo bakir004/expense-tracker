@@ -8,11 +8,11 @@ public enum TransactionType
     /// <summary>
     /// Money going out (reduces balance)
     /// </summary>
-    Expense,
-    
+    EXPENSE,
+
     /// <summary>
     /// Money coming in (increases balance)
     /// </summary>
-    Income
+    INCOME
 }
 

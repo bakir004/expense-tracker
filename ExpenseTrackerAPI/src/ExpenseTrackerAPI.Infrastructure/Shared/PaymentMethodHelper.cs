@@ -26,14 +26,14 @@ public static class PaymentMethodHelper
     {
         return paymentMethod switch
         {
-            PaymentMethod.Cash => "CASH",
-            PaymentMethod.DebitCard => "DEBIT_CARD",
-            PaymentMethod.CreditCard => "CREDIT_CARD",
-            PaymentMethod.BankTransfer => "BANK_TRANSFER",
-            PaymentMethod.MobilePayment => "MOBILE_PAYMENT",
-            PaymentMethod.PayPal => "PAYPAL",
-            PaymentMethod.Crypto => "CRYPTO",
-            PaymentMethod.Other => "OTHER",
+            PaymentMethod.CASH => "CASH",
+            PaymentMethod.DEBIT_CARD => "DEBIT_CARD",
+            PaymentMethod.CREDIT_CARD => "CREDIT_CARD",
+            PaymentMethod.BANK_TRANSFER => "BANK_TRANSFER",
+            PaymentMethod.MOBILE_PAYMENT => "MOBILE_PAYMENT",
+            PaymentMethod.PAYPAL => "PAYPAL",
+            PaymentMethod.CRYPTO => "CRYPTO",
+            PaymentMethod.OTHER => "OTHER",
             _ => throw new ArgumentOutOfRangeException(nameof(paymentMethod), paymentMethod, "Unknown payment method")
         };
     }
@@ -45,14 +45,14 @@ public static class PaymentMethodHelper
     {
         return value switch
         {
-            "CASH" => PaymentMethod.Cash,
-            "DEBIT_CARD" => PaymentMethod.DebitCard,
-            "CREDIT_CARD" => PaymentMethod.CreditCard,
-            "BANK_TRANSFER" => PaymentMethod.BankTransfer,
-            "MOBILE_PAYMENT" => PaymentMethod.MobilePayment,
-            "PAYPAL" => PaymentMethod.PayPal,
-            "CRYPTO" => PaymentMethod.Crypto,
-            "OTHER" => PaymentMethod.Other,
+            "CASH" => PaymentMethod.CASH,
+            "DEBIT_CARD" => PaymentMethod.DEBIT_CARD,
+            "CREDIT_CARD" => PaymentMethod.CREDIT_CARD,
+            "BANK_TRANSFER" => PaymentMethod.BANK_TRANSFER,
+            "MOBILE_PAYMENT" => PaymentMethod.MOBILE_PAYMENT,
+            "PAYPAL" => PaymentMethod.PAYPAL,
+            "CRYPTO" => PaymentMethod.CRYPTO,
+            "OTHER" => PaymentMethod.OTHER,
             _ => throw new ArgumentException($"Unknown payment method value: {value}", nameof(value))
         };
     }

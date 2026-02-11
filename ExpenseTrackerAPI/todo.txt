@@ -1,8 +1,0 @@
-k6 performance testing
-logovi za bazu za proucavanje round tripova
-
-
-/queries
-/mock idnex - json objekti
-/types
-clean arch

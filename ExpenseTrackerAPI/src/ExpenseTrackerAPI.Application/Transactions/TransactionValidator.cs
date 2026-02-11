@@ -15,7 +15,7 @@ public static class TransactionValidator
     public static ErrorOr<Success> ValidateCreateTransaction(
         TransactionType transactionType,
         decimal amount,
-        DateTime date,
+        DateOnly date,
         string subject,
         int? categoryId)
     {
@@ -34,16 +34,13 @@ public static class TransactionValidator
         }
 
         // Date cannot be too far in the future (allow 1 day for timezone differences)
-        if (date.Date > DateTime.UtcNow.Date.AddDays(1))
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (date > today.AddDays(1))
         {
             errors.Add(TransactionErrors.InvalidDate);
         }
 
-        // Expenses must have a category
-        if (transactionType == TransactionType.Expense && categoryId == null)
-        {
-            errors.Add(TransactionErrors.ExpenseMissingCategory);
-        }
+        // CategoryId is optional for both expense and income
 
         if (errors.Count > 0)
         {
@@ -57,13 +54,13 @@ public static class TransactionValidator
     {
         return typeString.ToUpperInvariant() switch
         {
-            "EXPENSE" => TransactionType.Expense,
-            "INCOME" => TransactionType.Income,
+            "EXPENSE" => TransactionType.EXPENSE,
+            "INCOME" => TransactionType.INCOME,
             _ => TransactionErrors.InvalidTransactionType
         };
     }
 
-    private const string DateFormat = "dd-MM-yyyy";
+    private const string DateFormat = "yyyy-MM-dd";
 
     /// <summary>
     /// Builds and validates <see cref="TransactionQueryOptions"/> from API query parameters.
@@ -84,23 +81,23 @@ public static class TransactionValidator
             transactionType = typeResult.Value;
         }
 
-        DateTime? dateFromUtc = null;
+        DateOnly? dateFrom = null;
         if (!string.IsNullOrWhiteSpace(p.DateFrom))
         {
-            if (!DateTime.TryParseExact(p.DateFrom.Trim(), DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+            if (!DateOnly.TryParseExact(p.DateFrom.Trim(), DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
                 return Error.Validation("TransactionQuery.DateFrom", $"Invalid date format. Expected {DateFormat}.");
-            dateFromUtc = DateTime.SpecifyKind(d, DateTimeKind.Utc);
+            dateFrom = d;
         }
 
-        DateTime? dateToUtc = null;
+        DateOnly? dateTo = null;
         if (!string.IsNullOrWhiteSpace(p.DateTo))
         {
-            if (!DateTime.TryParseExact(p.DateTo.Trim(), DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+            if (!DateOnly.TryParseExact(p.DateTo.Trim(), DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
                 return Error.Validation("TransactionQuery.DateTo", $"Invalid date format. Expected {DateFormat}.");
-            dateToUtc = DateTime.SpecifyKind(d, DateTimeKind.Utc);
+            dateTo = d;
         }
 
-        if (dateFromUtc.HasValue && dateToUtc.HasValue && dateFromUtc > dateToUtc)
+        if (dateFrom.HasValue && dateTo.HasValue && dateFrom > dateTo)
             return Error.Validation("TransactionQuery.DateRange", "'DateFrom' must be before or equal to 'DateTo'.");
 
         IReadOnlyList<PaymentMethod>? paymentMethods = null;
@@ -109,7 +106,7 @@ public static class TransactionValidator
             var list = new List<PaymentMethod>();
             foreach (var i in p.PaymentMethods)
             {
-                if (i < 0 || i > (int)PaymentMethod.Other)
+                if (i < 0 || i > (int)PaymentMethod.OTHER)
                     return Error.Validation("TransactionQuery.PaymentMethods", $"Invalid payment method value: {i}.");
                 list.Add((PaymentMethod)i);
             }
@@ -141,8 +138,8 @@ public static class TransactionValidator
             CategoryIds = p.CategoryIds is { Length: > 0 } ? p.CategoryIds : null,
             PaymentMethods = paymentMethods,
             TransactionType = transactionType,
-            DateFromUtc = dateFromUtc,
-            DateToUtc = dateToUtc,
+            DateFrom = dateFrom,
+            DateTo = dateTo,
             SortBy = sortBy,
             SortDescending = sortDescending
         };

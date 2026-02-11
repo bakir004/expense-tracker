@@ -6,6 +6,7 @@ using ExpenseTrackerAPI.Application.Transactions.Mappings;
 using ExpenseTrackerAPI.Contracts.Transactions;
 using ExpenseTrackerAPI.WebApi;
 using ExpenseTrackerAPI.WebApi.Controllers;
+using ExpenseTrackerAPI.Domain.Entities;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.Transactions;
 
@@ -121,8 +122,8 @@ public class TransactionsController : ApiControllerBase
     /// Get transactions for a user within a date range
     /// </summary>
     /// <param name="userId">The unique identifier of the user</param>
-    /// <param name="from">Start date in dd-MM-yyyy format</param>
-    /// <param name="to">End date in dd-MM-yyyy format</param>
+    /// <param name="from">Start date in yyyy-MM-dd format (e.g. 2024-01-01)</param>
+    /// <param name="to">End date in yyyy-MM-dd format (e.g. 2024-12-31)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of transactions for the user within the date range</returns>
     /// <response code="200">Successfully retrieved transactions (may be empty)</response>
@@ -138,14 +139,14 @@ public class TransactionsController : ApiControllerBase
         [FromQuery] string to,
         CancellationToken cancellationToken)
     {
-        const string dateFormat = "dd-MM-yyyy";
+        const string dateFormat = "yyyy-MM-dd";
 
-        if (!DateTime.TryParseExact(from, dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var startDate))
+        if (!DateOnly.TryParseExact(from, dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var startDate))
         {
             return BadRequest(new { error = $"Invalid 'from' date format. Expected format: {dateFormat}" });
         }
 
-        if (!DateTime.TryParseExact(to, dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var endDate))
+        if (!DateOnly.TryParseExact(to, dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var endDate))
         {
             return BadRequest(new { error = $"Invalid 'to' date format. Expected format: {dateFormat}" });
         }
@@ -155,11 +156,7 @@ public class TransactionsController : ApiControllerBase
             return BadRequest(new { error = "'from' date must be before or equal to 'to' date" });
         }
 
-        // Npgsql requires DateTime with Kind=Utc for timestamp with time zone
-        var startUtc = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
-        var endUtc = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
-
-        var result = await _transactionService.GetByUserIdAndDateRangeAsync(userId, startUtc, endUtc, cancellationToken);
+        var result = await _transactionService.GetByUserIdAndDateRangeAsync(userId, startDate, endDate, cancellationToken);
 
         return result.Match(
             transactions => Ok(transactions.ToResponse()),
@@ -181,20 +178,18 @@ public class TransactionsController : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Create([FromBody] CreateTransactionRequest request, CancellationToken cancellationToken)
     {
-        var typeResult = TransactionValidator.ParseTransactionType(request.TransactionType);
-        if (typeResult.IsError)
-        {
-            return Problem(typeResult.Errors);
-        }
+        var transactionType = Enum.Parse<TransactionType>(request.TransactionType);
+        var date = DateOnly.ParseExact(request.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var paymentMethod = Enum.Parse<PaymentMethod>(request.PaymentMethod);
 
         var result = await _transactionService.CreateAsync(
             request.UserId,
-            typeResult.Value,
+            transactionType,
             request.Amount,
-            request.Date,
+            date,
             request.Subject,
             request.Notes,
-            request.PaymentMethod,
+            paymentMethod,
             request.CategoryId,
             request.TransactionGroupId,
             request.IncomeSource,
@@ -221,20 +216,18 @@ public class TransactionsController : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateTransactionRequest request, CancellationToken cancellationToken)
     {
-        var typeResult = TransactionValidator.ParseTransactionType(request.TransactionType);
-        if (typeResult.IsError)
-        {
-            return Problem(typeResult.Errors);
-        }
+        var transactionType = Enum.Parse<TransactionType>(request.TransactionType);
+        var date = DateOnly.ParseExact(request.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var paymentMethod = Enum.Parse<PaymentMethod>(request.PaymentMethod);
 
         var result = await _transactionService.UpdateAsync(
             id,
-            typeResult.Value,
+            transactionType,
             request.Amount,
-            request.Date,
+            date,
             request.Subject,
             request.Notes,
-            request.PaymentMethod,
+            paymentMethod,
             request.CategoryId,
             request.TransactionGroupId,
             request.IncomeSource,

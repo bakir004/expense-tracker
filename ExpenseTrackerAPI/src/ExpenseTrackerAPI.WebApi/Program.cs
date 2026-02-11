@@ -1,5 +1,7 @@
-﻿using ExpenseTrackerAPI.Application;
+using ExpenseTrackerAPI.Application;
+using ExpenseTrackerAPI.Infrastructure.Shared;
 using ExpenseTrackerAPI.WebApi;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,7 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
     Directory.SetCurrentDirectory(AppContext.BaseDirectory);
     builder.Configuration
         .SetBasePath(AppContext.BaseDirectory);
-    
+
     // Support DATABASE_URL environment variable (common in cloud platforms)
     // This must be done BEFORE any configuration is read
     var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
@@ -33,18 +35,22 @@ var builder = WebApplication.CreateBuilder(args);
     // Create the logger
     Log.Logger = new LoggerConfiguration()
         .ReadFrom.Configuration(builder.Configuration)
-        .Filter.ByExcluding(logEvent => 
+        .Filter.ByExcluding(logEvent =>
             logEvent.Properties.TryGetValue("RequestPath", out var property)
             && property.ToString().StartsWith("\"/health"))
+        .Filter.ByExcluding(logEvent =>
+            logEvent.MessageTemplate.Text.Contains("Failed executing DbCommand", StringComparison.Ordinal)
+            && (logEvent.Exception?.Message?.Contains("__EFMigrationsHistory", StringComparison.Ordinal) == true
+                || logEvent.Properties.Values.Any(p => p?.ToString()?.Contains("__EFMigrationsHistory", StringComparison.Ordinal) == true)))
         .CreateLogger();
-    
+
     // Add logger to logging pipeline
     builder.Logging
         .ClearProviders()
         .AddSerilog(Log.Logger);
-    
+
     builder.Host.UseSerilog();
-    
+
     // CORS: allow the Vite frontend to call this API during development
     builder.Services.AddCors(options =>
     {
@@ -76,7 +82,7 @@ var builder = WebApplication.CreateBuilder(args);
                 Email = "support@expensetracker.com"
             }
         });
-        
+
         c.SwaggerDoc("v2", new Microsoft.OpenApi.Models.OpenApiInfo
         {
             Title = "Expense Tracker API",
@@ -88,7 +94,7 @@ var builder = WebApplication.CreateBuilder(args);
                 Email = "support@expensetracker.com"
             }
         });
-        
+
         // Route endpoints to correct doc based on path
         c.DocInclusionPredicate((docName, apiDesc) =>
         {
@@ -100,7 +106,7 @@ var builder = WebApplication.CreateBuilder(args);
                 _ => false
             };
         });
-        
+
         // Include XML comments
         var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -108,17 +114,17 @@ var builder = WebApplication.CreateBuilder(args);
         {
             c.IncludeXmlComments(xmlPath);
         }
-        
+
         // Include XML comments from referenced projects
         var contractsXml = Path.Combine(AppContext.BaseDirectory, "ExpenseTrackerAPI.Contracts.xml");
         if (File.Exists(contractsXml))
         {
             c.IncludeXmlComments(contractsXml);
         }
-        
+
         // Use full names for better organization
         c.CustomSchemaIds(type => type.FullName);
-    });    
+    });
     builder.Services
         .AddApplication(builder.Configuration)
         .AddInfrastructure(builder.Configuration);
@@ -128,12 +134,20 @@ Log.Logger.Information("Application starting");
 
 var app = builder.Build();
 {
+    // Apply pending EF Core migrations and seed demo data when the database is empty
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ExpenseTrackerDbContext>();
+        dbContext.Database.Migrate();
+        DatabaseSeeder.SeedIfEmptyAsync(dbContext).GetAwaiter().GetResult();
+    }
+
     // Save service provider to static class
     ServicePool.Create(app.Services);
 
     // Add exception handler and request logging
     app.UseExceptionHandler("/error");
-    
+
     app.UseSerilogRequestLogging(options =>
     {
         options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
@@ -141,10 +155,10 @@ var app = builder.Build();
             diagnosticContext.ConfigureAuditLogging(httpContext);
         };
     });
-    
+
     // CORS must be early in the pipeline to handle preflight OPTIONS requests
     app.UseCors();
-    
+
     // Swagger should be before UseRouting to avoid authorization issues
     app.UseSwagger();
     app.UseSwaggerUI(c =>
@@ -160,9 +174,9 @@ var app = builder.Build();
         c.EnableFilter();
         c.ShowExtensions();
     });
-    
+
     app.UseRouting();
-    
+
     app.MapControllers();
 }
 
@@ -191,9 +205,9 @@ static string ConvertDatabaseUrlToConnectionString(string databaseUrl)
         var database = uri.AbsolutePath.TrimStart('/');
         var username = uri.UserInfo.Split(':')[0];
         var password = uri.UserInfo.Split(':').Length > 1 ? uri.UserInfo.Split(':')[1] : "";
-        
+
         var connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={Uri.UnescapeDataString(password)}";
-        
+
         // Add query string parameters (like sslmode)
         if (!string.IsNullOrEmpty(uri.Query))
         {
@@ -210,7 +224,7 @@ static string ConvertDatabaseUrlToConnectionString(string databaseUrl)
                 }
             }
         }
-        
+
         return connectionString;
     }
     catch (Exception ex)

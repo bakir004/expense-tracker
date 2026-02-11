@@ -100,7 +100,7 @@ public class TransactionService : ITransactionService
         return BuildResult(result.Value);
     }
 
-    public async Task<ErrorOr<GetTransactionsResult>> GetByUserIdAndDateRangeAsync(int userId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
+    public async Task<ErrorOr<GetTransactionsResult>> GetByUserIdAndDateRangeAsync(int userId, DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken)
     {
         var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
         if (userResult.IsError)
@@ -121,7 +121,7 @@ public class TransactionService : ITransactionService
         int userId,
         TransactionType transactionType,
         decimal amount,
-        DateTime date,
+        DateOnly date,
         string subject,
         string? notes,
         PaymentMethod paymentMethod,
@@ -130,37 +130,7 @@ public class TransactionService : ITransactionService
         string? incomeSource,
         CancellationToken cancellationToken)
     {
-        var validationResult = TransactionValidator.ValidateCreateTransaction(transactionType, amount, date, subject, categoryId);
-        if (validationResult.IsError)
-        {
-            return validationResult.Errors;
-        }
-
-        var userResult = await _userRepository.GetUserByIdAsync(userId, cancellationToken);
-        if (userResult.IsError)
-        {
-            return UserErrors.NotFound;
-        }
-
-        if (categoryId.HasValue)
-        {
-            var categoryResult = await _categoryRepository.GetByIdAsync(categoryId.Value, cancellationToken);
-            if (categoryResult.IsError)
-            {
-                return CategoryErrors.NotFound;
-            }
-        }
-
-        if (transactionGroupId.HasValue)
-        {
-            var transactionGroupResult = await _transactionGroupRepository.GetByIdAsync(transactionGroupId.Value, cancellationToken);
-            if (transactionGroupResult.IsError)
-            {
-                return TransactionGroupErrors.NotFound;
-            }
-        }
-
-        var signedAmount = transactionType == TransactionType.Expense ? -amount : amount;
+        var signedAmount = transactionType == TransactionType.EXPENSE ? -amount : amount;
 
         var transaction = new Transaction
         {
@@ -174,7 +144,10 @@ public class TransactionService : ITransactionService
             PaymentMethod = paymentMethod,
             CategoryId = categoryId,
             TransactionGroupId = transactionGroupId,
-            IncomeSource = transactionType == TransactionType.Income ? incomeSource : null
+            IncomeSource = transactionType == TransactionType.INCOME ? incomeSource : null,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            CumulativeDelta = 0m // To be determined by the repository
         };
 
         return await _transactionRepository.CreateAsync(transaction, cancellationToken);
@@ -184,7 +157,7 @@ public class TransactionService : ITransactionService
         int id,
         TransactionType transactionType,
         decimal amount,
-        DateTime date,
+        DateOnly date,
         string subject,
         string? notes,
         PaymentMethod paymentMethod,
@@ -193,42 +166,12 @@ public class TransactionService : ITransactionService
         string? incomeSource,
         CancellationToken cancellationToken)
     {
-        var existingResult = await _transactionRepository.GetByIdAsync(id, cancellationToken);
-        if (existingResult.IsError)
-        {
-            return existingResult.Errors;
-        }
-
-        var validationResult = TransactionValidator.ValidateCreateTransaction(transactionType, amount, date, subject, categoryId);
-        if (validationResult.IsError)
-        {
-            return validationResult.Errors;
-        }
-
-        if (categoryId.HasValue)
-        {
-            var categoryResult = await _categoryRepository.GetByIdAsync(categoryId.Value, cancellationToken);
-            if (categoryResult.IsError)
-            {
-                return CategoryErrors.NotFound;
-            }
-        }
-
-        if (transactionGroupId.HasValue)
-        {
-            var transactionGroupResult = await _transactionGroupRepository.GetByIdAsync(transactionGroupId.Value, cancellationToken);
-            if (transactionGroupResult.IsError)
-            {
-                return TransactionGroupErrors.NotFound;
-            }
-        }
-
-        var signedAmount = transactionType == TransactionType.Expense ? -amount : amount;
+        var signedAmount = transactionType == TransactionType.EXPENSE ? -amount : amount;
 
         var transaction = new Transaction
         {
             Id = id,
-            UserId = existingResult.Value.UserId,
+            UserId = 0, // will be overwritten later by repository
             TransactionType = transactionType,
             Amount = amount,
             SignedAmount = signedAmount,
@@ -238,7 +181,9 @@ public class TransactionService : ITransactionService
             PaymentMethod = paymentMethod,
             CategoryId = categoryId,
             TransactionGroupId = transactionGroupId,
-            IncomeSource = transactionType == TransactionType.Income ? incomeSource : null
+            IncomeSource = transactionType == TransactionType.INCOME ? incomeSource : null,
+            CreatedAt = DateTime.UtcNow, // will be overwritten later by repository
+            UpdatedAt = DateTime.UtcNow,
         };
 
         return await _transactionRepository.UpdateAsync(transaction, cancellationToken);
@@ -252,11 +197,11 @@ public class TransactionService : ITransactionService
     private static GetTransactionsResult BuildResult(List<Transaction> transactions)
     {
         var totalIncome = transactions
-            .Where(t => t.TransactionType == TransactionType.Income)
+            .Where(t => t.TransactionType == TransactionType.INCOME)
             .Sum(t => t.Amount);
 
         var totalExpenses = transactions
-            .Where(t => t.TransactionType == TransactionType.Expense)
+            .Where(t => t.TransactionType == TransactionType.EXPENSE)
             .Sum(t => t.Amount);
 
         return new GetTransactionsResult
@@ -265,8 +210,8 @@ public class TransactionService : ITransactionService
             TotalIncome = totalIncome,
             TotalExpenses = totalExpenses,
             NetChange = totalIncome - totalExpenses,
-            IncomeCount = transactions.Count(t => t.TransactionType == TransactionType.Income),
-            ExpenseCount = transactions.Count(t => t.TransactionType == TransactionType.Expense)
+            IncomeCount = transactions.Count(t => t.TransactionType == TransactionType.INCOME),
+            ExpenseCount = transactions.Count(t => t.TransactionType == TransactionType.EXPENSE)
         };
     }
 }
