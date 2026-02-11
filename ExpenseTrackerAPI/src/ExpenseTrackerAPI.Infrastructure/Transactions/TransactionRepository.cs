@@ -424,24 +424,29 @@ public class TransactionRepository : ITransactionRepository
 
             try
             {
-                // Single query: Delete transaction AND update all subsequent transactions in one statement
-                // Uses CTE (Common Table Expression) to capture deleted row data, then update subsequent rows
-                var rowsAffected = await _context.Database.ExecuteSqlInterpolatedAsync(
-                    $@"WITH deleted AS (
-                        DELETE FROM ""Transaction""
-                        WHERE id = {id}
-                        RETURNING user_id, date, created_at, signed_amount
-                      )
-                      UPDATE ""Transaction"" t
-                      SET cumulative_delta = t.cumulative_delta - d.signed_amount,
-                          updated_at = CURRENT_TIMESTAMP
-                      FROM deleted d
-                      WHERE t.user_id = d.user_id
-                        AND (t.date > d.date OR (t.date = d.date AND t.created_at > d.created_at))"
-                    );
+                var transaction = await _context.Transactions
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
-                // If no rows were deleted, transaction didn't exist
-                if (rowsAffected == 0)
+                if (transaction == null)
+                {
+                    return TransactionErrors.NotFound;
+                }
+
+                await _context.Transactions
+                    .Where(t => t.UserId == transaction.UserId)
+                    .Where(t => t.Date > transaction.Date ||
+                               (t.Date == transaction.Date && t.CreatedAt > transaction.CreatedAt))
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta - transaction.SignedAmount)
+                        .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
+                        cancellationToken);
+
+                var deletedCount = await _context.Transactions
+                    .Where(t => t.Id == id)
+                    .ExecuteDeleteAsync(cancellationToken);
+
+                if (deletedCount == 0)
                 {
                     return TransactionErrors.NotFound;
                 }
