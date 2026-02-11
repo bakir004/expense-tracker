@@ -124,42 +124,27 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            // Complex query with LATERAL join - using raw SQL for precision
-            var connection = _context.Database.GetDbConnection();
-            await using var command = connection.CreateCommand();
-            command.CommandText = @"
-                SELECT
-                    u.initial_balance,
-                    COALESCE(t.cumulative_delta, 0) AS cumulative_delta
-                FROM ""Users"" u
-                LEFT JOIN LATERAL (
-                    SELECT cumulative_delta
-                    FROM ""Transaction""
-                    WHERE user_id = u.id
-                    ORDER BY date DESC, id DESC
-                    LIMIT 1
-                ) t ON true
-                WHERE u.id = @user_id";
+            var user = await _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new { u.InitialBalance })
+                .FirstOrDefaultAsync(cancellationToken);
 
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "@user_id";
-            parameter.Value = userId;
-            command.Parameters.Add(parameter);
-
-            if (connection.State != System.Data.ConnectionState.Open)
-            {
-                await connection.OpenAsync(cancellationToken);
-            }
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-
-            if (!await reader.ReadAsync(cancellationToken))
+            if (user == null)
             {
                 return UserErrors.NotFound;
             }
 
-            var initialBalance = reader.GetDecimal(0);
-            var cumulativeDelta = reader.GetDecimal(1);
+            var initialBalance = user.InitialBalance;
+
+            var cumulativeDelta = await _context.Transactions
+                .AsNoTracking()
+                .Where(t => t.UserId == userId)
+                .OrderByDescending(t => t.Date)
+                .ThenByDescending(t => t.CreatedAt)
+                .Select(t => t.CumulativeDelta)
+                .FirstOrDefaultAsync(cancellationToken);
+
             var currentBalance = initialBalance + cumulativeDelta;
 
             return (initialBalance, cumulativeDelta, currentBalance);
