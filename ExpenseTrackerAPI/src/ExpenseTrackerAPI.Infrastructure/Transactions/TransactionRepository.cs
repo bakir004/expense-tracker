@@ -316,102 +316,78 @@ public class TransactionRepository : ITransactionRepository
                     return transaction;
                 }
 
+                /*
+                We need to get the previous cumulative delta to continue the chain of cumulative deltae
+
+                If we imagine the graph of cumulative deltae, with the x-axis as time and y-axis as cumulative delta
+                and labelling the previous date as P and new date as N, it would look like this:
+                         ___________
+                        |
+                ________|
+
+                --------P----N------>
+                This movement would make the graph like this:
+                              ______
+                             |
+                _____________|
+
+                --------P----N------>
+                This means that for moving a transaction into the future, it would require subtracting the signed amount from
+                transactions inbetween P and N. For moving into the past, we just add the signed amount to the same interval.
+
+                The catch is that this sequence of steps given first calculates the cumulative delta for the new transaction,
+                and then updates the rest. But, for moving a transaction into the future, it should only calculate the
+                new transaction's cumulative delta after the others updated, so it links to the correct version of the previous
+                transaction. This can be easily achieved by just correcting the amount if the move is into the future.
+                */
+
                 var minDate = oldTransaction.Date < transaction.Date ? oldTransaction.Date : transaction.Date;
                 var maxDate = oldTransaction.Date > transaction.Date ? oldTransaction.Date : transaction.Date;
 
-                if(!amountChanged)
-                {
-                    var oldCumulativeDelta = await _context.Transactions
-                        .Where(t => t.UserId == transaction.UserId)
-                        .Where(t => t.Date < minDate)
-                        .OrderByDescending(t => t.Date)
-                        .ThenByDescending(t => t.CreatedAt)
-                        .Select(t => t.CumulativeDelta)
-                        .FirstOrDefaultAsync(cancellationToken);
+                var previousCumulativeDelta = await _context.Transactions
+                    .Where(t => t.UserId == transaction.UserId)
+                    .Where(t => t.Date < transaction.Date || (t.Date == transaction.Date && t.CreatedAt < transaction.CreatedAt))
+                    .OrderByDescending(t => t.Date)
+                    .ThenByDescending(t => t.CreatedAt)
+                    .Select(t => t.CumulativeDelta)
+                    .FirstOrDefaultAsync(cancellationToken);
 
-                    transaction.CumulativeDelta = oldCumulativeDelta + transaction.SignedAmount;
-                    _context.Transactions.Update(transaction);
-                    await _context.SaveChangesAsync(cancellationToken);
+                // The correction amount will be zero if only the date changed
+                var correctionAmount = transaction.SignedAmount - oldTransaction.SignedAmount;
 
-                    if(transaction.Date < oldTransaction.Date) {
-                        await _context.Transactions
-                            .Where(t => t.UserId == transaction.UserId)
-                            .Where(t => t.Date >= minDate && t.Date <= maxDate && t.CreatedAt > transaction.CreatedAt)
-                            .ExecuteUpdateAsync(setters => setters
-                                .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta + transaction.SignedAmount)
-                                .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
-                                cancellationToken);
-                    } else if(transaction.Date > oldTransaction.Date) {
-                        await _context.Transactions
-                            .Where(t => t.UserId == transaction.UserId)
-                            .Where(t => t.Date >= minDate && t.Date <= maxDate && t.CreatedAt < transaction.CreatedAt)
-                            .ExecuteUpdateAsync(setters => setters
-                                .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta - transaction.SignedAmount)
-                                .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
-                                cancellationToken);
-                    }
-
-                    await dbTransaction.CommitAsync(cancellationToken);
-
-                    return transaction;
+                if(transaction.Date < oldTransaction.Date) {
+                    // If the transaction is being moved into the past, we need to add the signed amount to the cumulative delta, then update the rest
+                    transaction.CumulativeDelta = previousCumulativeDelta + transaction.SignedAmount;
+                } else {
+                    // However, since we are first updating the new transaction and then the rest, this will update the new transaction
+                    // based on stale data. We counteract this effect by not adding the signed amount.
+                    transaction.CumulativeDelta = previousCumulativeDelta + correctionAmount;
                 }
-
-                // DATE CHANGED: Optimized two-phase update
-                // Phase 1: Transactions in range [minDate, maxDate] get the new transaction amount added
-                // Phase 2: Transactions after maxDate get net delta = (newAmount - oldAmount)
-
-
-
-                // Get cumulative_delta before minDate to calculate the transaction's new cumulative_delta
-                // OPTIMIZATION: If date moved forwards (newDate > oldDate), minDate = oldDate
-                // We can infer previousCumulativeDelta from oldTransaction without a query
-                decimal previousCumulativeDelta;
-                if (transaction.Date > oldTransaction.Date)
-                {
-                    // Date moved forwards: minDate = oldDate
-                    // oldTransaction.CumulativeDelta = previousCumulativeDelta + oldTransaction.SignedAmount
-                    // Therefore: previousCumulativeDelta = oldTransaction.CumulativeDelta - oldTransaction.SignedAmount
-                    previousCumulativeDelta = oldTransaction.CumulativeDelta - oldTransaction.SignedAmount;
-                }
-                else
-                {
-                    // Date moved backwards: minDate = newDate, need to query for cumulative_delta before newDate
-                    previousCumulativeDelta = await _context.Transactions
-                        .Where(t => t.UserId == transaction.UserId)
-                        .Where(t => t.Date < minDate)
-                        .OrderByDescending(t => t.Date)
-                        .ThenByDescending(t => t.CreatedAt)
-                        .Select(t => t.CumulativeDelta)
-                        .FirstOrDefaultAsync(cancellationToken);
-                }
-
-                // Calculate the transaction's cumulative_delta at its new position
-                transaction.CumulativeDelta = previousCumulativeDelta + transaction.SignedAmount;
                 _context.Transactions.Update(transaction);
                 await _context.SaveChangesAsync(cancellationToken);
 
-                // Phase 1: Add the new transaction amount to all other transactions in range [minDate, maxDate]
-                // These transactions now have the moved transaction before them in the order
+                // If only date changed, this will add the signed amount if moving into the past,
+                // and subtract if moving into the future
+                var deltaAmount = transaction.Date < oldTransaction.Date
+                    ? transaction.SignedAmount
+                    : -oldTransaction.SignedAmount;
+
                 await _context.Transactions
                     .Where(t => t.UserId == transaction.UserId)
-                    .Where(t => t.Date >= minDate && t.Date <= maxDate && t.Id != transaction.Id)
+                    .Where(t => t.Date > minDate && t.Date < maxDate
+                        || (t.Date == minDate && t.CreatedAt > transaction.CreatedAt)
+                        || (t.Date == maxDate && t.CreatedAt < transaction.CreatedAt))
                     .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta + transaction.SignedAmount)
+                        .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta + deltaAmount)
                         .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
                         cancellationToken);
 
-                // Phase 2: Transactions after maxDate need to:
-                // - Remove the old amount (transaction was at oldDate, now it's gone from there)
-                // - Add the new amount (transaction is now at newDate, affecting them)
-                // Net effect: (newAmount - oldAmount)
-                decimal netDelta = transaction.SignedAmount - oldTransaction.SignedAmount;
-
-                if (netDelta != 0)
-                {
+                if(amountChanged) {
                     await _context.Transactions
-                        .Where(t => t.UserId == transaction.UserId && t.Date > maxDate)
+                        .Where(t => t.UserId == transaction.UserId)
+                        .Where(t => t.Date > maxDate || (t.Date == maxDate && t.CreatedAt > transaction.CreatedAt))
                         .ExecuteUpdateAsync(setters => setters
-                            .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta + netDelta)
+                            .SetProperty(t => t.CumulativeDelta, t => t.CumulativeDelta + correctionAmount)
                             .SetProperty(t => t.UpdatedAt, DateTime.UtcNow),
                             cancellationToken);
                 }
