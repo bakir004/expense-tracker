@@ -74,6 +74,7 @@ public class TransactionRepository : ITransactionRepository
         try
         {
             var transactions = await _context.Transactions
+                .AsNoTracking()
                 .Where(t => t.UserId == userId)
                 .OrderByDescending(t => t.Date)
                 .ThenByDescending(t => t.CreatedAt)

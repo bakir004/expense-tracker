@@ -4,8 +4,6 @@ using ExpenseTrackerAPI.Application.Transactions;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 using ExpenseTrackerAPI.Application.Transactions.Mappings;
 using ExpenseTrackerAPI.Contracts.Transactions;
-using ExpenseTrackerAPI.WebApi;
-using ExpenseTrackerAPI.WebApi.Controllers;
 using ExpenseTrackerAPI.Domain.Entities;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.Transactions;
@@ -143,17 +141,17 @@ public class TransactionsController : ApiControllerBase
 
         if (!DateOnly.TryParseExact(from, dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var startDate))
         {
-            return BadRequest(new { error = $"Invalid 'from' date format. Expected format: {dateFormat}" });
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: $"Invalid 'from' date format. Expected format: {dateFormat}");
         }
 
         if (!DateOnly.TryParseExact(to, dateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var endDate))
         {
-            return BadRequest(new { error = $"Invalid 'to' date format. Expected format: {dateFormat}" });
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: $"Invalid 'to' date format. Expected format: {dateFormat}");
         }
 
         if (startDate > endDate)
         {
-            return BadRequest(new { error = "'from' date must be before or equal to 'to' date" });
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: "'from' date must be before or equal to 'to' date");
         }
 
         var result = await _transactionService.GetByUserIdAndDateRangeAsync(userId, startDate, endDate, cancellationToken);

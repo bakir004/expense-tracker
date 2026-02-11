@@ -16,7 +16,7 @@ docker compose -f ExpenseTrackerAPI/docker/compose/docker-compose.yml up -d
 
 This will spin up a database and the backend API on port 8080.
 
-On startup, the database will be populated with the necessary tables and seeded with some dummy data. The database initialization script is at `ExpenseTrackerAPI/scripts/database.sql`.
+On startup, the API applies Entity Framework Core migrations automatically, so the database schema is created or updated without any manual SQL. No init script is required.
 
 To see what the API has to offer, Swagger is enabled at route `/swagger`.
 
@@ -41,6 +41,8 @@ dotnet test ExpenseTrackerAPI.sln
 
 ## Database Setup
 
+The database schema is created and updated by **EF Core migrations** when the API starts. Ensure the API can connect to PostgreSQL; migrations run automatically on startup.
+
 ### Using Neon PostgreSQL (Cloud)
 
 1. Set the `DATABASE_URL` environment variable:
@@ -49,18 +51,17 @@ dotnet test ExpenseTrackerAPI.sln
    export DATABASE_URL="postgresql://user:password@host:port/database?sslmode=require"
    ```
 
-2. Initialize the database schema (for local PostgreSQL via Docker):
-
-   ```bash
-   # Linux/Mac – start Postgres with init script
-   ./ExpenseTrackerAPI/scripts/start-db.sh
-   ```
-
-3. Run the application - it will automatically use the `DATABASE_URL` environment variable.
+2. Run the application; it will apply pending migrations and use `DATABASE_URL`.
 
 ### Using Local PostgreSQL
 
-For local development, update `appsettings.development.json` with your local database connection string, or set the `DATABASE_URL` environment variable.
+For local development, set the connection string in `appsettings.json` (or `appsettings.Development.json`) under `Database:ConnectionString`, or set the `DATABASE_URL` environment variable. You can start a local Postgres with:
+
+```bash
+./ExpenseTrackerAPI/scripts/start-db.sh
+```
+
+(Start-db.sh may mount an optional init script; the API will still apply migrations and own the schema.)
 
 ## Documentation
 

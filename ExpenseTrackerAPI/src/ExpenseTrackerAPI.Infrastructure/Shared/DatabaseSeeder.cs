@@ -86,6 +86,36 @@ public static class DatabaseSeeder
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Deletes all transactions and re-inserts seed transactions. Use in tests so each test starts with known data.
+    /// Assumes users 1–3, categories 1–12, and transaction groups 1–3 exist.
+    /// </summary>
+    public static async Task SeedTransactionsAsync(ExpenseTrackerDbContext context, CancellationToken cancellationToken = default)
+    {
+        await context.Transactions.ExecuteDeleteAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+        int Cat(int i) => i + 1;
+        int UserId(int i) => i + 1;
+        int GroupId(int i) => i + 1;
+        var transactions = new List<Transaction>
+        {
+            CreateTransaction(UserId(0), TransactionType.INCOME, 3500m, 3500m, 3500m, today.AddDays(-30), "Monthly salary", null, PaymentMethod.BANK_TRANSFER, Cat(8), "ABC Corporation", null, now),
+            CreateTransaction(UserId(0), TransactionType.EXPENSE, 50m, -50m, 3450m, today.AddDays(-30), "Grocery shopping", "Weekly groceries at Whole Foods", PaymentMethod.DEBIT_CARD, Cat(0), null, null, now),
+            CreateTransaction(UserId(0), TransactionType.EXPENSE, 60m, -60m, 3390m, today.AddDays(-29), "Gas station fill-up", null, PaymentMethod.CREDIT_CARD, Cat(1), null, null, now),
+            CreateTransaction(UserId(0), TransactionType.EXPENSE, 1200m, -1200m, 2190m, today.AddDays(-28), "Monthly rent payment", null, PaymentMethod.BANK_TRANSFER, Cat(2), null, null, now),
+            CreateTransaction(UserId(0), TransactionType.INCOME, 500m, 500m, 2690m, today.AddDays(-26), "Freelance project", null, PaymentMethod.PAYPAL, Cat(10), "Client Project", null, now),
+            CreateTransaction(UserId(0), TransactionType.EXPENSE, 350m, -350m, 2340m, today.AddDays(-24), "Flight tickets", "Round trip to Paris", PaymentMethod.CREDIT_CARD, Cat(1), null, GroupId(0), now),
+            CreateTransaction(UserId(0), TransactionType.INCOME, 1000m, 1000m, 3340m, today.AddDays(-21), "Bonus payment", null, PaymentMethod.BANK_TRANSFER, Cat(8), "ABC Corporation", null, now),
+            CreateTransaction(UserId(1), TransactionType.INCOME, 4200m, 4200m, 4200m, today.AddDays(-30), "Monthly salary", null, PaymentMethod.BANK_TRANSFER, Cat(8), "XYZ Tech Inc", null, now),
+            CreateTransaction(UserId(1), TransactionType.EXPENSE, 150m, -150m, 4050m, today.AddDays(-26), "Doctor visit copay", null, PaymentMethod.DEBIT_CARD, Cat(4), null, null, now),
+            CreateTransaction(UserId(1), TransactionType.INCOME, 150m, 150m, 4200m, today.AddDays(-23), "Stock dividend", null, PaymentMethod.BANK_TRANSFER, Cat(9), "Investment Portfolio", null, now),
+            CreateTransaction(UserId(1), TransactionType.EXPENSE, 500m, -500m, 3700m, today.AddDays(-21), "Wedding venue deposit", "Initial deposit for the reception venue", PaymentMethod.BANK_TRANSFER, Cat(3), null, GroupId(2), now)
+        };
+        context.Transactions.AddRange(transactions);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     private static Transaction CreateTransaction(
         int userId,
         TransactionType type,
