@@ -39,4 +39,7 @@ public static class UserErrors
 
     public static Error ConcurrencyError =>
         Error.Validation("User.ConcurrencyError", "User was modified by another process.");
+
+    public static Error DeletionConfirmation =>
+        Error.Validation("User.DeletionConfirmation", "Deletion must be confirmed to proceed.");
 }

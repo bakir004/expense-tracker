@@ -25,10 +25,8 @@ public static class DependencyInjectionExtensions
     /// </summary>
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
-        // User services
         services.AddScoped<IUserService, UserService>();
 
-        // Transaction services
         services.AddScoped<ITransactionService, TransactionService>();
 
         return services;
@@ -39,10 +37,8 @@ public static class DependencyInjectionExtensions
     /// </summary>
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services)
     {
-        // Authentication services
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
-        // Repository services
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
 

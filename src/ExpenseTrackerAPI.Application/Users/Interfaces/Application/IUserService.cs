@@ -32,4 +32,13 @@ public interface IUserService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Updated user response or error</returns>
     Task<ErrorOr<UpdateUserResponse>> UpdateAsync(int userId, UpdateUserRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Delete user account (hard delete).
+    /// </summary>
+    /// <param name="userId">ID of the user to delete</param>
+    /// <param name="request">Delete request with password verification and confirmation</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Delete confirmation response or error</returns>
+    Task<ErrorOr<DeleteUserResponse>> DeleteAsync(int userId, DeleteUserRequest request, CancellationToken cancellationToken);
 }

@@ -3,6 +3,7 @@ using ErrorOr;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
+using ExpenseTrackerAPI.WebApi.Extensions;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers;
 
@@ -85,5 +86,64 @@ public abstract class ApiControllerBase : ControllerBase
         }
 
         return ValidationProblem(modelStateDict);
+    }
+
+    /// <summary>
+    /// Gets the authenticated user's ID from the current HTTP context.
+    /// </summary>
+    /// <returns>User ID if found and valid, otherwise null</returns>
+    protected int? GetUserId()
+    {
+        return HttpContext.GetUserId();
+    }
+
+    /// <summary>
+    /// Gets the authenticated user's ID from the current HTTP context, throwing an exception if not found.
+    /// </summary>
+    /// <returns>User ID</returns>
+    /// <exception cref="UnauthorizedAccessException">Thrown when user ID is not found or invalid</exception>
+    protected int GetRequiredUserId()
+    {
+        return HttpContext.GetRequiredUserId();
+    }
+
+    /// <summary>
+    /// Gets the authenticated user's email from the current HTTP context.
+    /// </summary>
+    /// <returns>User email if found, otherwise null</returns>
+    protected string? GetUserEmail()
+    {
+        return HttpContext.GetUserEmail();
+    }
+
+    /// <summary>
+    /// Gets the authenticated user's name from the current HTTP context.
+    /// </summary>
+    /// <returns>User name if found, otherwise null</returns>
+    protected string? GetUserName()
+    {
+        return HttpContext.GetUserName();
+    }
+
+    /// <summary>
+    /// Checks if the current user has a valid authentication context.
+    /// </summary>
+    /// <returns>True if user is authenticated and has a valid user ID</returns>
+    protected bool HasValidUserContext()
+    {
+        return HttpContext.HasValidUserContext();
+    }
+
+    /// <summary>
+    /// Creates an Unauthorized result if the user context is invalid.
+    /// </summary>
+    /// <returns>Unauthorized result or null if user context is valid</returns>
+    protected IActionResult? CheckUserContext()
+    {
+        if (!HasValidUserContext())
+        {
+            return Unauthorized();
+        }
+        return null;
     }
 }

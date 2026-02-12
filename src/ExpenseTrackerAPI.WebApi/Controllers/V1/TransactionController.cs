@@ -3,7 +3,6 @@ using ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 using ExpenseTrackerAPI.Contracts.Transactions;
 using ExpenseTrackerAPI.WebApi.Controllers;
 using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
 using Asp.Versioning;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
@@ -54,14 +53,10 @@ public class TransactionController : ApiControllerBase
         [FromQuery] int pageSize = 50,
         CancellationToken cancellationToken = default)
     {
-        // Get user ID from JWT claims
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
-        {
-            _logger.LogWarning("Invalid or missing user ID in token claims");
-            return Unauthorized();
-        }
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
 
+        var userId = GetRequiredUserId();
         _logger.LogInformation("Getting transactions for user {UserId}, page {PageNumber}, size {PageSize}",
             userId, pageNumber, pageSize);
 

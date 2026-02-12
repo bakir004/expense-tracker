@@ -158,6 +158,44 @@ public class UserService : IUserService
         }
     }
 
+    public async Task<ErrorOr<DeleteUserResponse>> DeleteAsync(int userId, DeleteUserRequest request, CancellationToken cancellationToken)
+    {
+        if (userId <= 0)
+            return UserErrors.InvalidUserId;
+
+        if (!request.ConfirmDeletion)
+            return UserErrors.DeletionConfirmation;
+
+        try
+        {
+            var userResult = await _userRepository.GetByIdAsync(userId, cancellationToken);
+            if (userResult.IsError)
+                return userResult.Errors;
+
+            var user = userResult.Value;
+
+            if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            {
+                return UserErrors.InvalidCredentials;
+            }
+
+            var deleteResult = await _userRepository.DeleteAsync(userId, cancellationToken);
+            if (deleteResult.IsError)
+                return deleteResult.Errors;
+
+            return new DeleteUserResponse(
+                Id: user.Id,
+                Name: user.Name,
+                Email: user.Email,
+                Message: "User account has been permanently deleted."
+            );
+        }
+        catch (Exception ex)
+        {
+            return Error.Failure("User.Delete.UnexpectedError", $"Delete operation failed: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Validate password complexity requirements.
     /// </summary>

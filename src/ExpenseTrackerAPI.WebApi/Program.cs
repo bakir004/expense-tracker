@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ExpenseTrackerAPI.Infrastructure.Persistence;
 using ExpenseTrackerAPI.Infrastructure.Shared;
 using ExpenseTrackerAPI.WebApi.Extensions;
+using ExpenseTrackerAPI.WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -142,6 +143,9 @@ app.UseHttpsRedirection();
 // Add authentication and authorization middleware
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Add user context middleware (must be after UseAuthentication)
+app.UseUserContext();
 
 app.MapControllers();
 

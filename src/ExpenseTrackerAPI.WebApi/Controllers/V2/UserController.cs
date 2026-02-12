@@ -3,7 +3,6 @@ using ExpenseTrackerAPI.Application.Users.Interfaces.Application;
 using ExpenseTrackerAPI.Contracts.Users;
 using ExpenseTrackerAPI.WebApi.Controllers;
 using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
 using Asp.Versioning;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.V2;
@@ -54,14 +53,10 @@ public class UserController : ApiControllerBase
         [FromBody] UpdateUserRequest request,
         CancellationToken cancellationToken = default)
     {
-        // Get user ID from JWT claims
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
-        {
-            _logger.LogWarning("V2 - Invalid or missing user ID in token claims");
-            return Unauthorized();
-        }
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
 
+        var userId = GetRequiredUserId();
         _logger.LogInformation("V2 - Updating profile for user {UserId}", userId);
 
         var result = await _userService.UpdateAsync(userId, request, cancellationToken);
@@ -98,6 +93,70 @@ public class UserController : ApiControllerBase
         );
 
         _logger.LogInformation("V2 - Successfully updated profile for user {UserId} with enhanced metadata", userId);
+
+        return Ok(enhancedResponse);
+    }
+
+    /// <summary>
+    /// Delete the authenticated user's account with enhanced security logging (permanent deletion).
+    /// </summary>
+    /// <param name="request">Delete request with current password verification and confirmation</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Enhanced delete confirmation response with security metadata</returns>
+    /// <response code="200">User account deleted successfully</response>
+    /// <response code="400">Invalid request data or validation errors</response>
+    /// <response code="401">User not authenticated or invalid current password</response>
+    /// <response code="500">Internal server error</response>
+    [HttpDelete("profile")]
+    [ProducesResponseType(typeof(EnhancedDeleteUserResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteProfile(
+        [FromBody] DeleteUserRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
+
+        var userId = GetRequiredUserId();
+        _logger.LogInformation("V2 - Attempting to delete account for user {UserId}", userId);
+
+        var result = await _userService.DeleteAsync(userId, request, cancellationToken);
+
+        if (result.IsError)
+        {
+            _logger.LogWarning("V2 - Failed to delete account for user {UserId}: {Errors}",
+                userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return Problem(result.Errors);
+        }
+
+        var baseResponse = result.Value;
+
+        // Enhanced V2 response with additional security metadata
+        var enhancedResponse = new EnhancedDeleteUserResponse(
+            Id: baseResponse.Id,
+            Name: baseResponse.Name,
+            Email: baseResponse.Email,
+            Message: baseResponse.Message,
+            ApiVersion: "2.0",
+            DeleteTimestamp: DateTime.UtcNow,
+            SecurityInfo: new DeleteSecurityInfo(
+                PasswordVerified: true,
+                ConfirmationReceived: request.ConfirmDeletion,
+                DeleteSource: "WebAPI_V2",
+                UserAgent: HttpContext.Request.Headers["User-Agent"].ToString(),
+                IpAddress: HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown"
+            ),
+            AuditTrail: new DeleteAuditTrail(
+                DeletedBy: userId,
+                DeleteReason: "User-initiated account deletion",
+                DataRetentionPolicy: "Immediate hard delete - no recovery possible",
+                ComplianceNotes: "GDPR Article 17 - Right to erasure"
+            )
+        );
+
+        _logger.LogInformation("V2 - Successfully deleted account for user {UserId} with enhanced audit trail", userId);
 
         return Ok(enhancedResponse);
     }
@@ -164,3 +223,35 @@ public record UpdateValidationSummary(
     string[] FieldsUpdated,
     string[] SecurityChecksPerformed,
     string UpdateSource);
+
+/// <summary>
+/// Enhanced response contract for V2 user deletion with additional security metadata.
+/// </summary>
+public record EnhancedDeleteUserResponse(
+    int Id,
+    string Name,
+    string Email,
+    string Message,
+    string ApiVersion,
+    DateTime DeleteTimestamp,
+    DeleteSecurityInfo SecurityInfo,
+    DeleteAuditTrail AuditTrail);
+
+/// <summary>
+/// Security information about the delete operation.
+/// </summary>
+public record DeleteSecurityInfo(
+    bool PasswordVerified,
+    bool ConfirmationReceived,
+    string DeleteSource,
+    string UserAgent,
+    string IpAddress);
+
+/// <summary>
+/// Audit trail information for the delete operation.
+/// </summary>
+public record DeleteAuditTrail(
+    int DeletedBy,
+    string DeleteReason,
+    string DataRetentionPolicy,
+    string ComplianceNotes);

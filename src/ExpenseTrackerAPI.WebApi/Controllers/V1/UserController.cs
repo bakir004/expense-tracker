@@ -3,7 +3,7 @@ using ExpenseTrackerAPI.Application.Users.Interfaces.Application;
 using ExpenseTrackerAPI.Contracts.Users;
 using ExpenseTrackerAPI.WebApi.Controllers;
 using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
+
 using Asp.Versioning;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
@@ -52,17 +52,49 @@ public class UserController : ApiControllerBase
         [FromBody] UpdateUserRequest request,
         CancellationToken cancellationToken = default)
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (userIdClaim is null || !int.TryParse(userIdClaim, out var userId))
-        {
-            return Unauthorized();
-        }
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
 
+        var userId = GetRequiredUserId();
         var result = await _userService.UpdateAsync(userId, request, cancellationToken);
 
         if (result.IsError)
         {
             _logger.LogWarning("Failed to update profile for user {UserId}: {Errors}",
+                userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return Problem(result.Errors);
+        }
+
+        var response = result.Value;
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Delete the authenticated user's account (permanent deletion).
+    /// </summary>
+    /// <param name="request">Delete request with current password verification and confirmation</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Delete confirmation response</returns>
+    /// <response code="200">User account deleted successfully</response>
+    /// <response code="400">Invalid request data or validation errors</response>
+    /// <response code="401">User not authenticated or invalid current password</response>
+    [HttpDelete("profile")]
+    [ProducesResponseType(typeof(DeleteUserResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DeleteProfile(
+        [FromBody] DeleteUserRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
+
+        var userId = GetRequiredUserId();
+        var result = await _userService.DeleteAsync(userId, request, cancellationToken);
+
+        if (result.IsError)
+        {
+            _logger.LogWarning("Failed to delete account for user {UserId}: {Errors}",
                 userId, string.Join(", ", result.Errors.Select(e => e.Description)));
             return Problem(result.Errors);
         }
