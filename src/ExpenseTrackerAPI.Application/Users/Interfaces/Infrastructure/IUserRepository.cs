@@ -25,7 +25,7 @@ public interface IUserRepository
     Task<ErrorOr<User>> GetByEmailAsync(string email, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Check if a user exists with the given email
+    /// Check if a user exists with the given email address
     /// </summary>
     Task<ErrorOr<bool>> ExistsByEmailAsync(string email, CancellationToken cancellationToken);
 

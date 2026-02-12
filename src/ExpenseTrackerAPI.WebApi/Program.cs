@@ -272,11 +272,19 @@ public class ConfigureSwaggerOptions : Microsoft.Extensions.Options.IConfigureOp
 {
     private readonly Asp.Versioning.ApiExplorer.IApiVersionDescriptionProvider _provider;
 
+    /// <summary>
+    /// Initializes a new instance of the ConfigureSwaggerOptions class.
+    /// </summary>
+    /// <param name="provider">API version description provider</param>
     public ConfigureSwaggerOptions(Asp.Versioning.ApiExplorer.IApiVersionDescriptionProvider provider)
     {
         _provider = provider;
     }
 
+    /// <summary>
+    /// Configures Swagger generation options for API versioning.
+    /// </summary>
+    /// <param name="options">Swagger generation options to configure</param>
     public void Configure(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions options)
     {
         // Generate a Swagger document for each API version

@@ -27,16 +27,6 @@ public class UserService : IUserService
 
     public async Task<ErrorOr<RegisterResponse>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken)
     {
-        if (!HasValidPasswordComplexity(request.Password))
-            return UserErrors.WeakPassword;
-
-        var existsResult = await _userRepository.ExistsByEmailAsync(request.Email, cancellationToken);
-        if (existsResult.IsError)
-            return existsResult.Errors;
-
-        if (existsResult.Value)
-            return UserErrors.DuplicateEmail;
-
         try
         {
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, BCrypt.Net.BCrypt.GenerateSalt());
@@ -60,10 +50,6 @@ public class UserService : IUserService
                 InitialBalance: createdUser.InitialBalance,
                 CreatedAt: createdUser.CreatedAt);
         }
-        catch (ArgumentException)
-        {
-            return UserErrors.InvalidEmail;
-        }
         catch (Exception ex)
         {
             return Error.Failure("User.Register.UnexpectedError", $"Registration failed: {ex.Message}");
@@ -77,19 +63,16 @@ public class UserService : IUserService
             var userResult = await _userRepository.GetByEmailAsync(request.Email, cancellationToken);
             if (userResult.IsError)
             {
-                // Don't reveal whether email exists or not for security
                 return UserErrors.InvalidCredentials;
             }
 
             var user = userResult.Value;
 
-            // Verify password using BCrypt
             if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 return UserErrors.InvalidCredentials;
             }
 
-            // Generate JWT token
             var token = _jwtTokenGenerator.GenerateToken(user.Id, user.Email, user.Name);
             var expiresAt = DateTime.UtcNow.AddHours(_jwtTokenGenerator.TokenExpirationHours);
 
@@ -104,6 +87,74 @@ public class UserService : IUserService
         catch (Exception ex)
         {
             return Error.Failure("User.Login.UnexpectedError", $"Login failed: {ex.Message}");
+        }
+    }
+
+    public async Task<ErrorOr<UpdateUserResponse>> UpdateAsync(int userId, UpdateUserRequest request, CancellationToken cancellationToken)
+    {
+        if (userId <= 0)
+            return UserErrors.InvalidUserId;
+
+        try
+        {
+            var userResult = await _userRepository.GetByIdAsync(userId, cancellationToken);
+            if (userResult.IsError)
+                return userResult.Errors;
+
+            var user = userResult.Value;
+
+            if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            {
+                return UserErrors.InvalidCredentials;
+            }
+
+            if (!string.Equals(user.Email, request.Email.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                var existsResult = await _userRepository.ExistsByEmailAsync(request.Email, cancellationToken);
+                if (existsResult.IsError)
+                    return existsResult.Errors;
+
+                if (existsResult.Value)
+                    return UserErrors.DuplicateEmail;
+            }
+
+            string newPasswordHash = user.PasswordHash;
+            if (!string.IsNullOrWhiteSpace(request.NewPassword))
+            {
+                if (!HasValidPasswordComplexity(request.NewPassword))
+                    return UserErrors.WeakPassword;
+
+                newPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword, BCrypt.Net.BCrypt.GenerateSalt());
+            }
+
+            user.UpdateProfile(request.Name, request.Email);
+            user.UpdateInitialBalance(request.InitialBalance);
+
+            if (newPasswordHash != user.PasswordHash)
+            {
+                user.UpdatePassword(newPasswordHash);
+            }
+
+            var updateResult = await _userRepository.UpdateAsync(user, cancellationToken);
+            if (updateResult.IsError)
+                return updateResult.Errors;
+
+            var updatedUser = updateResult.Value;
+
+            return new UpdateUserResponse(
+                Id: updatedUser.Id,
+                Name: updatedUser.Name,
+                Email: updatedUser.Email,
+                InitialBalance: updatedUser.InitialBalance,
+                UpdatedAt: updatedUser.UpdatedAt);
+        }
+        catch (ArgumentException)
+        {
+            return UserErrors.InvalidEmail;
+        }
+        catch (Exception ex)
+        {
+            return Error.Failure("User.Update.UnexpectedError", $"Update failed: {ex.Message}");
         }
     }
 

@@ -6,19 +6,35 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers;
 
+/// <summary>
+/// Base controller class providing common functionality for API controllers.
+/// </summary>
 [ApiController]
 public abstract class ApiControllerBase : ControllerBase
 {
+    /// <summary>
+    /// Default JSON serializer options for consistent API responses.
+    /// </summary>
     public static readonly JsonSerializerOptions DefaultJsonSerializerOptions = new()
     {
         PropertyNameCaseInsensitive = true,
     };
 
+    /// <summary>
+    /// Creates a problem response with the specified status code.
+    /// </summary>
+    /// <param name="statusCode">HTTP status code</param>
+    /// <returns>Problem details response</returns>
     protected IActionResult ProblemCode(int statusCode)
     {
         return Problem(statusCode: statusCode);
     }
 
+    /// <summary>
+    /// Creates a problem response from a list of errors, handling validation errors specially.
+    /// </summary>
+    /// <param name="errors">List of errors to convert to problem response</param>
+    /// <returns>Problem details or validation problem response</returns>
     protected IActionResult Problem(List<Error> errors)
     {
         if (errors.Count is 0)
@@ -36,6 +52,11 @@ public abstract class ApiControllerBase : ControllerBase
         return Problem(errors[0]);
     }
 
+    /// <summary>
+    /// Creates a problem response from a single error with appropriate HTTP status code.
+    /// </summary>
+    /// <param name="error">Error to convert to problem response</param>
+    /// <returns>Problem details response</returns>
     protected IActionResult Problem(Error error)
     {
         var statusCode = error.Type switch

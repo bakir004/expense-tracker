@@ -2,6 +2,7 @@ using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using ExpenseTrackerAPI.Application.Users.Interfaces.Infrastructure;
 using ExpenseTrackerAPI.Domain.Entities;
+using ExpenseTrackerAPI.Domain.Errors;
 using ExpenseTrackerAPI.Infrastructure.Persistence;
 
 namespace ExpenseTrackerAPI.Infrastructure.Users;
@@ -43,7 +44,7 @@ public class UserRepository : IUserRepository
                 .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 
             if (user is null)
-                return Error.NotFound("User.GetById.NotFound", $"User with ID {id} was not found");
+                return UserErrors.NotFound;
 
             return user;
         }
@@ -62,7 +63,7 @@ public class UserRepository : IUserRepository
                 .FirstOrDefaultAsync(u => u.Email == normalizedEmail, cancellationToken);
 
             if (user is null)
-                return Error.NotFound("User.GetByEmail.NotFound", $"User with email '{email}' was not found");
+                return UserErrors.NotFound;
 
             return user;
         }
@@ -78,6 +79,7 @@ public class UserRepository : IUserRepository
         {
             var normalizedEmail = email.Trim().ToLowerInvariant();
             var exists = await _context.Users
+                .AsNoTracking()
                 .AnyAsync(u => u.Email == normalizedEmail, cancellationToken);
 
             return exists;
@@ -99,7 +101,7 @@ public class UserRepository : IUserRepository
         }
         catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("duplicate key") == true)
         {
-            return Error.Conflict("User.Create.EmailExists", $"User with email '{user.Email}' already exists");
+            return UserErrors.DuplicateEmail;
         }
         catch (Exception ex)
         {
@@ -111,24 +113,21 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            var existingUser = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == user.Id, cancellationToken);
-
-            if (existingUser is null)
-                return Error.NotFound("User.Update.NotFound", $"User with ID {user.Id} was not found");
-
-            _context.Entry(existingUser).CurrentValues.SetValues(user);
+            _context.Users.Update(user);
             await _context.SaveChangesAsync(cancellationToken);
 
-            return existingUser;
+            return user;
         }
         catch (DbUpdateConcurrencyException)
         {
-            return Error.Conflict("User.Update.ConcurrencyConflict", "User was modified by another process");
+            // This can happen if the user doesn't exist or was modified by another process
+            // Check if user exists to provide appropriate error
+            var exists = await _context.Users.AsNoTracking().AnyAsync(u => u.Id == user.Id, cancellationToken);
+            return exists ? UserErrors.ConcurrencyError : UserErrors.NotFound;
         }
         catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("duplicate key") == true)
         {
-            return Error.Conflict("User.Update.EmailExists", $"User with email '{user.Email}' already exists");
+            return UserErrors.DuplicateEmail;
         }
         catch (Exception ex)
         {
@@ -140,14 +139,12 @@ public class UserRepository : IUserRepository
     {
         try
         {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+            var rowsAffected = await _context.Users
+                .Where(u => u.Id == id)
+                .ExecuteDeleteAsync(cancellationToken);
 
-            if (user is null)
-                return Error.NotFound("User.Delete.NotFound", $"User with ID {id} was not found");
-
-            _context.Users.Remove(user);
-            await _context.SaveChangesAsync(cancellationToken);
+            if (rowsAffected == 0)
+                return UserErrors.NotFound;
 
             return Result.Deleted;
         }

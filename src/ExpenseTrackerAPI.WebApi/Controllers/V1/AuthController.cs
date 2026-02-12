@@ -16,6 +16,11 @@ public class AuthController : ApiControllerBase
     private readonly IUserService _userService;
     private readonly ILogger<AuthController> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the AuthController class.
+    /// </summary>
+    /// <param name="userService">User service for authentication operations</param>
+    /// <param name="logger">Logger instance</param>
     public AuthController(IUserService userService, ILogger<AuthController> logger)
     {
         _userService = userService ?? throw new ArgumentNullException(nameof(userService));

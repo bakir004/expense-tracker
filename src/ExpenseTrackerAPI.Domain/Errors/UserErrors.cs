@@ -36,4 +36,7 @@ public static class UserErrors
 
     public static Error InvalidUserId =>
         Error.Validation("User.InvalidUserId", "User ID must be a positive integer.");
+
+    public static Error ConcurrencyError =>
+        Error.Validation("User.ConcurrencyError", "User was modified by another process.");
 }

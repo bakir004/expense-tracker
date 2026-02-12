@@ -23,4 +23,13 @@ public interface IUserService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Login response with token or error</returns>
     Task<ErrorOr<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Update user profile information including name, email, password, and initial balance.
+    /// </summary>
+    /// <param name="userId">ID of the user to update</param>
+    /// <param name="request">Update details including current password for verification</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Updated user response or error</returns>
+    Task<ErrorOr<UpdateUserResponse>> UpdateAsync(int userId, UpdateUserRequest request, CancellationToken cancellationToken);
 }
