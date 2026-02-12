@@ -6,4 +6,15 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../ExpenseTrackerAPI.Domain/ExpenseTrackerAPI.Domain.csproj" />
+    <ProjectReference Include="../ExpenseTrackerAPI.Contracts/ExpenseTrackerAPI.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="ErrorOr" Version="2.0.1" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.15.0" />
+  </ItemGroup>
+
 </Project>

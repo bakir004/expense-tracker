@@ -1,6 +1,7 @@
 using ExpenseTrackerAPI.Domain.Entities;
 using ExpenseTrackerAPI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using BCrypt.Net;
 
 namespace ExpenseTrackerAPI.Infrastructure.Shared;
 
@@ -10,9 +11,9 @@ namespace ExpenseTrackerAPI.Infrastructure.Shared;
 public static class DatabaseSeeder
 {
     /// <summary>
-    /// BCrypt hash for password "password123" (same as legacy database.sql seed).
+    /// Generate BCrypt hash for seed password "Password123!" - meets complexity requirements.
     /// </summary>
-    private const string SeedPasswordHash = "$2a$11$yQRQSx3N6m00FZPwo/uQiOhMyxf/pKAtSiijU6EoXKQtrGv5WvNF.";
+    private static string GenerateSeedPasswordHash() => BCrypt.Net.BCrypt.HashPassword("Password123!");
 
     public static async Task SeedIfEmptyAsync(ApplicationDbContext context, CancellationToken cancellationToken = default)
     {
@@ -22,12 +23,13 @@ public static class DatabaseSeeder
         var now = DateTime.UtcNow;
         var today = DateOnly.FromDateTime(now);
 
-        // Users (password: password123)
+        // Users (password: Password123!)
+        var seedPasswordHash = GenerateSeedPasswordHash();
         var users = new[]
         {
-            new User { Name = "John Doe", Email = "john.doe@email.com", PasswordHash = SeedPasswordHash, InitialBalance = 0, CreatedAt = now, UpdatedAt = now },
-            new User { Name = "Jane Smith", Email = "jane.smith@email.com", PasswordHash = SeedPasswordHash, InitialBalance = 0, CreatedAt = now, UpdatedAt = now },
-            new User { Name = "Mike Wilson", Email = "mike.wilson@email.com", PasswordHash = SeedPasswordHash, InitialBalance = 0, CreatedAt = now, UpdatedAt = now }
+            new User("John Doe", "john.doe@email.com", seedPasswordHash, 0),
+            new User("Jane Smith", "jane.smith@email.com", seedPasswordHash, 0),
+            new User("Mike Wilson", "mike.wilson@email.com", seedPasswordHash, 0)
         };
         context.Users.AddRange(users);
         await context.SaveChangesAsync(cancellationToken);

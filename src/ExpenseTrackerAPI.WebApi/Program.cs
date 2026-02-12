@@ -2,6 +2,7 @@ using Serilog;
 using Microsoft.EntityFrameworkCore;
 using ExpenseTrackerAPI.Infrastructure.Persistence;
 using ExpenseTrackerAPI.Infrastructure.Shared;
+using ExpenseTrackerAPI.WebApi.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +20,92 @@ ConfigureJwtSettings(builder.Services, builder.Configuration, builder.Environmen
 
 // Add services to the container
 builder.Services.AddControllers();
+
+// Configure routing options for lowercase URLs
+builder.Services.Configure<RouteOptions>(options =>
+{
+    options.LowercaseUrls = true;
+    options.LowercaseQueryStrings = true;
+});
+
+// Add RFC 9110 compliant Problem Details
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = (context) =>
+    {
+        context.ProblemDetails.Instance = context.HttpContext.Request.Path;
+        context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+        context.ProblemDetails.Extensions["timestamp"] = DateTimeOffset.UtcNow;
+
+        // Add RFC 9110 compliance type URIs
+        if (context.ProblemDetails.Status.HasValue)
+        {
+            context.ProblemDetails.Type = context.ProblemDetails.Status switch
+            {
+                400 => "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+                401 => "https://tools.ietf.org/html/rfc9110#section-15.5.2",
+                403 => "https://tools.ietf.org/html/rfc9110#section-15.5.4",
+                404 => "https://tools.ietf.org/html/rfc9110#section-15.5.5",
+                409 => "https://tools.ietf.org/html/rfc9110#section-15.5.10",
+                422 => "https://tools.ietf.org/html/rfc9110#section-15.5.21",
+                500 => "https://tools.ietf.org/html/rfc9110#section-15.6.1",
+                _ => "https://tools.ietf.org/html/rfc9110"
+            };
+        }
+    };
+});
+
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+// Add API versioning using our extension method
+DependencyInjectionExtensions.AddApiVersioning(builder.Services);
+
+// Add Swagger with versioning support
+builder.Services.AddSwaggerGen(c =>
+{
+    // Add JWT Authentication to Swagger
+    c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
+        Name = "Authorization",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+
+    // Include XML comments for better documentation
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        c.IncludeXmlComments(xmlPath);
+    }
+});
+
+// Configure Swagger for API versioning
+builder.Services.ConfigureOptions<ConfigureSwaggerOptions>();
+
+// Add application and infrastructure services
+builder.Services.AddApplicationServices();
+builder.Services.AddInfrastructureServices();
+
+// Add JWT authentication
+builder.Services.AddJwtAuthentication(builder.Configuration);
 
 var app = builder.Build();
 
@@ -31,11 +116,33 @@ app.UseSerilogRequestLogging();
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        var provider = app.Services.GetRequiredService<Asp.Versioning.ApiExplorer.IApiVersionDescriptionProvider>();
+
+        // Create a Swagger endpoint for each API version
+        foreach (var description in provider.ApiVersionDescriptions.Reverse())
+        {
+            c.SwaggerEndpoint(
+                $"/swagger/{description.GroupName}/swagger.json",
+                $"ExpenseTracker API {description.GroupName.ToUpperInvariant()}");
+        }
+
+        c.RoutePrefix = "swagger";
+        c.DisplayRequestDuration();
+        c.EnableDeepLinking();
+        c.EnableValidator();
+        c.ShowExtensions();
+        c.EnableFilter();
+    });
 }
 
 app.UseHttpsRedirection();
+
+// Add authentication and authorization middleware
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 try
@@ -90,15 +197,15 @@ static void ConfigureJwtSettings(IServiceCollection services, IConfiguration con
         var jwtExpiryHours = Environment.GetEnvironmentVariable("JWT_EXPIRY_HOURS") ?? "24";
 
         // Override configuration values
-        configuration["JwtSettings:SecretKey"] = jwtSecret;
-        configuration["JwtSettings:Issuer"] = jwtIssuer;
-        configuration["JwtSettings:Audience"] = jwtAudience;
-        configuration["JwtSettings:ExpiryInHours"] = jwtExpiryHours;
+        configuration["Jwt:SecretKey"] = jwtSecret;
+        configuration["Jwt:Issuer"] = jwtIssuer;
+        configuration["Jwt:Audience"] = jwtAudience;
+        configuration["Jwt:ExpirationHours"] = jwtExpiryHours;
     }
 
     // JWT settings will be configured later when authentication is added
     // For now, just validate that settings exist
-    var secretKey = configuration["JwtSettings:SecretKey"];
+    var secretKey = configuration["Jwt:SecretKey"];
     if (string.IsNullOrEmpty(secretKey))
     {
         throw new InvalidOperationException("JWT SecretKey is not configured");
@@ -155,5 +262,49 @@ static async Task InitializeDatabaseAsync(IServiceProvider services)
     {
         Log.Error(ex, "Database initialization failed");
         throw; // Re-throw to prevent app startup with broken database
+    }
+}
+
+/// <summary>
+/// Configures Swagger options for API versioning
+/// </summary>
+public class ConfigureSwaggerOptions : Microsoft.Extensions.Options.IConfigureOptions<Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions>
+{
+    private readonly Asp.Versioning.ApiExplorer.IApiVersionDescriptionProvider _provider;
+
+    public ConfigureSwaggerOptions(Asp.Versioning.ApiExplorer.IApiVersionDescriptionProvider provider)
+    {
+        _provider = provider;
+    }
+
+    public void Configure(Swashbuckle.AspNetCore.SwaggerGen.SwaggerGenOptions options)
+    {
+        // Generate a Swagger document for each API version
+        foreach (var description in _provider.ApiVersionDescriptions)
+        {
+            options.SwaggerDoc(description.GroupName, CreateVersionInfo(description));
+        }
+    }
+
+    private static Microsoft.OpenApi.Models.OpenApiInfo CreateVersionInfo(Asp.Versioning.ApiExplorer.ApiVersionDescription description)
+    {
+        var info = new Microsoft.OpenApi.Models.OpenApiInfo()
+        {
+            Title = "ExpenseTracker API",
+            Version = description.ApiVersion.ToString(),
+            Description = "API for managing personal expenses and income tracking",
+            Contact = new Microsoft.OpenApi.Models.OpenApiContact
+            {
+                Name = "ExpenseTracker Support",
+                Email = "support@expensetracker.com"
+            }
+        };
+
+        if (description.IsDeprecated)
+        {
+            info.Description += " - DEPRECATED";
+        }
+
+        return info;
     }
 }

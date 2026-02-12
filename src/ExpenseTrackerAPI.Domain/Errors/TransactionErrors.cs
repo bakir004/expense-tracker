@@ -31,10 +31,6 @@ public static class TransactionErrors
         code: "userId",
         description: "User ID must be a positive integer.");
 
-    public static Error AmountTooLarge => Error.Validation(
-        code: "amount",
-        description: "Transaction amount cannot exceed $1,000,000.");
-
     public static Error InvalidDate => Error.Validation(
         code: "date",
         description: "Transaction date is outside the allowed range.");
@@ -66,4 +62,12 @@ public static class TransactionErrors
     public static Error ConcurrencyConflict => Error.Conflict(
         code: "concurrency",
         description: "Transaction was modified by another process. Please refresh and try again.");
+
+    public static Error InvalidPageNumber => Error.Validation(
+        code: "pageNumber",
+        description: "Page number must be a positive integer.");
+
+    public static Error InvalidPageSize => Error.Validation(
+        code: "pageSize",
+        description: "Page size must be between 1 and 100.");
 }
