@@ -1,6 +1,63 @@
-@ExpenseTrackerAPI.WebApi_HostAddress = http://localhost:5116
+@baseUrl = http://localhost:5000
 
-GET {{ExpenseTrackerAPI.WebApi_HostAddress}}/weatherforecast/
+### Get all expenses
+GET {{baseUrl}}/api/expenses
 Accept: application/json
 
-###
+### Get all expenses with pagination
+GET {{baseUrl}}/api/expenses?page=1&pageSize=5
+Accept: application/json
+
+### Get all expenses filtered by category
+GET {{baseUrl}}/api/expenses?category=Food
+Accept: application/json
+
+### Get specific expense by ID
+GET {{baseUrl}}/api/expenses/1
+Accept: application/json
+
+### Get expense that doesn't exist (returns 404)
+GET {{baseUrl}}/api/exenses/9999
+Accept: application/json
+
+### Create a new expense
+POST {{baseUrl}}/api/expenses
+Content-Type: application/json
+
+{
+  "amount": 25.50,
+  "category": "Food",
+  "description": "Lunch at restaurant"
+}
+
+### Create expense with validation error (amount <= 0)
+POST {{baseUrl}}/api/expenses
+Content-Type: application/json
+
+{
+  "amount": -10.00,
+  "category": "Food",
+  "description": "Invalid expense"
+}
+
+### Create expense with missing category
+POST {{baseUrl}}/api/expenses
+Content-Type: application/json
+
+{
+  "amount": 50.00,
+  "category": "",
+  "description": "Missing category"
+}
+
+### Delete an expense
+DELETE {{baseUrl}}/api/expenses/1
+Accept: application/json
+
+### Delete expense that doesn't exist
+DELETE {{baseUrl}}/api/expenses/9999
+Accept: application/json
+
+### Health check (if you add one later)
+GET {{baseUrl}}/health
+Accept: application/json
