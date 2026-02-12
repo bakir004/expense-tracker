@@ -15,7 +15,7 @@ public class User
 
     /// <summary>
     /// The user's starting balance when they began tracking.
-    /// Actual balance = InitialBalance + last transaction's CumulativeDelta
+    /// Actual balance = InitialBalance + his last transaction's CumulativeDelta
     /// </summary>
     public decimal InitialBalance { get; set; }
 

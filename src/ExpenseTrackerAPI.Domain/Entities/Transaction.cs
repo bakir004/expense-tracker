@@ -21,9 +21,9 @@ public class Transaction
     /// <param name="subject">Brief description of the transaction</param>
     /// <param name="paymentMethod">How the transaction was paid</param>
     /// <param name="notes">Optional additional notes</param>
-    /// <param name="categoryId">Category ID (required for expenses, optional for income)</param>
+    /// <param name="categoryId">Category ID (optional for both expenses and income)</param>
     /// <param name="transactionGroupId">Optional transaction group ID</param>
-    /// <param name="incomeSource">Source of income (only for income transactions)</param>
+
     public Transaction(
         int userId,
         TransactionType transactionType,
@@ -33,15 +33,14 @@ public class Transaction
         PaymentMethod paymentMethod,
         string? notes = null,
         int? categoryId = null,
-        int? transactionGroupId = null
-        )
+        int? transactionGroupId = null)
     {
         ValidateBusinessRules(userId, transactionType, amount, date, subject, categoryId);
 
         UserId = userId;
         TransactionType = transactionType;
-        Amount = Math.Abs(amount);
-        SignedAmount = transactionType == TransactionType.EXPENSE ? -Math.Abs(amount) : Math.Abs(amount);
+        Amount = amount;
+        SignedAmount = transactionType == TransactionType.EXPENSE ? -amount : amount;
         Date = date;
         Subject = subject.Trim();
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
@@ -75,8 +74,7 @@ public class Transaction
         decimal amount,
         DateOnly date,
         string subject,
-        int? categoryId
-        )
+        int? categoryId)
     {
         if (userId <= 0)
         {
@@ -161,7 +159,7 @@ public class Transaction
     public decimal CumulativeDelta { get; set; }
 
     /// <summary>
-    /// Category of the transaction.
+    /// Category of the transaction. Optional for both expenses and income.
     /// </summary>
     public int? CategoryId { get; set; }
 
