@@ -75,70 +75,48 @@ public static class DatabaseSeeder
         {
             // User 1 transactions
             var t1 = new Transaction(UserId(0), TransactionType.INCOME, 3500m, today.AddDays(-30), "Monthly salary", PaymentMethod.BANK_TRANSFER, null, Cat(8), null);
-            t1.CumulativeDelta = 3500m;
-            t1.CreatedAt = now;
-            t1.UpdatedAt = now;
+            t1.UpdateCumulativeDelta(3500m);
             transactions.Add(t1);
 
             var t2 = new Transaction(UserId(0), TransactionType.EXPENSE, 50m, today.AddDays(-30), "Grocery shopping", PaymentMethod.DEBIT_CARD, "Weekly groceries at Whole Foods", Cat(0), null);
-            t2.CumulativeDelta = 3450m;
-            t2.CreatedAt = now;
-            t2.UpdatedAt = now;
+            t2.UpdateCumulativeDelta(3450m);
             transactions.Add(t2);
 
             var t3 = new Transaction(UserId(0), TransactionType.EXPENSE, 60m, today.AddDays(-29), "Gas station fill-up", PaymentMethod.CREDIT_CARD, null, Cat(1), null);
-            t3.CumulativeDelta = 3390m;
-            t3.CreatedAt = now;
-            t3.UpdatedAt = now;
+            t3.UpdateCumulativeDelta(3390m);
             transactions.Add(t3);
 
             var t4 = new Transaction(UserId(0), TransactionType.EXPENSE, 1200m, today.AddDays(-28), "Monthly rent payment", PaymentMethod.BANK_TRANSFER, null, Cat(2), null);
-            t4.CumulativeDelta = 2190m;
-            t4.CreatedAt = now;
-            t4.UpdatedAt = now;
+            t4.UpdateCumulativeDelta(2190m);
             transactions.Add(t4);
 
             var t5 = new Transaction(UserId(0), TransactionType.INCOME, 500m, today.AddDays(-26), "Freelance project", PaymentMethod.PAYPAL, null, Cat(10), null);
-            t5.CumulativeDelta = 2690m;
-            t5.CreatedAt = now;
-            t5.UpdatedAt = now;
+            t5.UpdateCumulativeDelta(2690m);
             transactions.Add(t5);
 
             var t6 = new Transaction(UserId(0), TransactionType.EXPENSE, 350m, today.AddDays(-24), "Flight tickets", PaymentMethod.CREDIT_CARD, "Round trip to Paris", Cat(1), GroupId(0));
-            t6.CumulativeDelta = 2340m;
-            t6.CreatedAt = now;
-            t6.UpdatedAt = now;
+            t6.UpdateCumulativeDelta(2340m);
             transactions.Add(t6);
 
             var t7 = new Transaction(UserId(0), TransactionType.INCOME, 1000m, today.AddDays(-21), "Bonus payment", PaymentMethod.BANK_TRANSFER, null, Cat(8), null);
-            t7.CumulativeDelta = 3340m;
-            t7.CreatedAt = now;
-            t7.UpdatedAt = now;
+            t7.UpdateCumulativeDelta(3340m);
             transactions.Add(t7);
 
             // User 2 transactions
             var t8 = new Transaction(UserId(1), TransactionType.INCOME, 4200m, today.AddDays(-30), "Monthly salary", PaymentMethod.BANK_TRANSFER, null, Cat(8), null);
-            t8.CumulativeDelta = 4200m;
-            t8.CreatedAt = now;
-            t8.UpdatedAt = now;
+            t8.UpdateCumulativeDelta(4200m);
             transactions.Add(t8);
 
             var t9 = new Transaction(UserId(1), TransactionType.EXPENSE, 150m, today.AddDays(-26), "Doctor visit copay", PaymentMethod.DEBIT_CARD, null, Cat(4), null);
-            t9.CumulativeDelta = 4050m;
-            t9.CreatedAt = now;
-            t9.UpdatedAt = now;
+            t9.UpdateCumulativeDelta(4050m);
             transactions.Add(t9);
 
             var t10 = new Transaction(UserId(1), TransactionType.INCOME, 150m, today.AddDays(-23), "Stock dividend", PaymentMethod.BANK_TRANSFER, null, Cat(9), null);
-            t10.CumulativeDelta = 4200m;
-            t10.CreatedAt = now;
-            t10.UpdatedAt = now;
+            t10.UpdateCumulativeDelta(4200m);
             transactions.Add(t10);
 
             var t11 = new Transaction(UserId(1), TransactionType.EXPENSE, 500m, today.AddDays(-21), "Wedding venue deposit", PaymentMethod.BANK_TRANSFER, "Initial deposit for the reception venue", Cat(3), GroupId(2));
-            t11.CumulativeDelta = 3700m;
-            t11.CreatedAt = now;
-            t11.UpdatedAt = now;
+            t11.UpdateCumulativeDelta(3700m);
             transactions.Add(t11);
 
             context.Transactions.AddRange(transactions);
@@ -180,37 +158,37 @@ public static class DatabaseSeeder
         {
             // Recreate the same transactions as above but using existing IDs
             var t1 = new Transaction(UserId(0), TransactionType.INCOME, 3500m, today.AddDays(-30), "Monthly salary", PaymentMethod.BANK_TRANSFER, null, Cat(8), null);
-            t1.CumulativeDelta = 3500m; t1.CreatedAt = now; t1.UpdatedAt = now; transactions.Add(t1);
+            t1.UpdateCumulativeDelta(3500m); transactions.Add(t1);
 
             var t2 = new Transaction(UserId(0), TransactionType.EXPENSE, 50m, today.AddDays(-30), "Grocery shopping", PaymentMethod.DEBIT_CARD, "Weekly groceries at Whole Foods", Cat(0), null);
-            t2.CumulativeDelta = 3450m; t2.CreatedAt = now; t2.UpdatedAt = now; transactions.Add(t2);
+            t2.UpdateCumulativeDelta(3450m); transactions.Add(t2);
 
             var t3 = new Transaction(UserId(0), TransactionType.EXPENSE, 60m, today.AddDays(-29), "Gas station fill-up", PaymentMethod.CREDIT_CARD, null, Cat(1), null);
-            t3.CumulativeDelta = 3390m; t3.CreatedAt = now; t3.UpdatedAt = now; transactions.Add(t3);
+            t3.UpdateCumulativeDelta(3390m); transactions.Add(t3);
 
             var t4 = new Transaction(UserId(0), TransactionType.EXPENSE, 1200m, today.AddDays(-28), "Monthly rent payment", PaymentMethod.BANK_TRANSFER, null, Cat(2), null);
-            t4.CumulativeDelta = 2190m; t4.CreatedAt = now; t4.UpdatedAt = now; transactions.Add(t4);
+            t4.UpdateCumulativeDelta(2190m); transactions.Add(t4);
 
             var t5 = new Transaction(UserId(0), TransactionType.INCOME, 500m, today.AddDays(-26), "Freelance project", PaymentMethod.PAYPAL, null, Cat(10), null);
-            t5.CumulativeDelta = 2690m; t5.CreatedAt = now; t5.UpdatedAt = now; transactions.Add(t5);
+            t5.UpdateCumulativeDelta(2690m); transactions.Add(t5);
 
             var t6 = new Transaction(UserId(0), TransactionType.EXPENSE, 350m, today.AddDays(-24), "Flight tickets", PaymentMethod.CREDIT_CARD, "Round trip to Paris", Cat(1), GroupId(0));
-            t6.CumulativeDelta = 2340m; t6.CreatedAt = now; t6.UpdatedAt = now; transactions.Add(t6);
+            t6.UpdateCumulativeDelta(2340m); transactions.Add(t6);
 
             var t7 = new Transaction(UserId(0), TransactionType.INCOME, 1000m, today.AddDays(-21), "Bonus payment", PaymentMethod.BANK_TRANSFER, null, Cat(8), null);
-            t7.CumulativeDelta = 3340m; t7.CreatedAt = now; t7.UpdatedAt = now; transactions.Add(t7);
+            t7.UpdateCumulativeDelta(3340m); transactions.Add(t7);
 
             var t8 = new Transaction(UserId(1), TransactionType.INCOME, 4200m, today.AddDays(-30), "Monthly salary", PaymentMethod.BANK_TRANSFER, null, Cat(8), null);
-            t8.CumulativeDelta = 4200m; t8.CreatedAt = now; t8.UpdatedAt = now; transactions.Add(t8);
+            t8.UpdateCumulativeDelta(4200m); transactions.Add(t8);
 
             var t9 = new Transaction(UserId(1), TransactionType.EXPENSE, 150m, today.AddDays(-26), "Doctor visit copay", PaymentMethod.DEBIT_CARD, null, Cat(4), null);
-            t9.CumulativeDelta = 4050m; t9.CreatedAt = now; t9.UpdatedAt = now; transactions.Add(t9);
+            t9.UpdateCumulativeDelta(4050m); transactions.Add(t9);
 
             var t10 = new Transaction(UserId(1), TransactionType.INCOME, 150m, today.AddDays(-23), "Stock dividend", PaymentMethod.BANK_TRANSFER, null, Cat(9), null);
-            t10.CumulativeDelta = 4200m; t10.CreatedAt = now; t10.UpdatedAt = now; transactions.Add(t10);
+            t10.UpdateCumulativeDelta(4200m); transactions.Add(t10);
 
             var t11 = new Transaction(UserId(1), TransactionType.EXPENSE, 500m, today.AddDays(-21), "Wedding venue deposit", PaymentMethod.BANK_TRANSFER, "Initial deposit for the reception venue", Cat(3), GroupId(2));
-            t11.CumulativeDelta = 3700m; t11.CreatedAt = now; t11.UpdatedAt = now; transactions.Add(t11);
+            t11.UpdateCumulativeDelta(3700m); transactions.Add(t11);
 
             context.Transactions.AddRange(transactions);
             await context.SaveChangesAsync(cancellationToken);

@@ -115,60 +115,60 @@ public class Transaction
         }
     }
 
-    public int Id { get; set; }
+    public int Id { get; }
 
-    public int UserId { get; set; }
+    public int UserId { get; }
 
     /// <summary>
     /// The type of transaction: Expense or Income
     /// </summary>
-    public TransactionType TransactionType { get; set; }
+    public TransactionType TransactionType { get; }
 
     /// <summary>
     /// The absolute amount (always positive)
     /// </summary>
-    public decimal Amount { get; set; }
+    public decimal Amount { get; }
 
     /// <summary>
     /// The signed amount: negative for expenses, positive for income
     /// </summary>
-    public decimal SignedAmount { get; set; }
+    public decimal SignedAmount { get; }
 
     /// <summary>
     /// The date of the transaction (date only, no time component).
     /// </summary>
-    public DateOnly Date { get; set; }
+    public DateOnly Date { get; }
 
     /// <summary>
     /// Brief description of what/why this transaction occurred.
     /// Examples: "Grocery shopping", "Monthly salary", "Flight tickets"
     /// </summary>
-    public string Subject { get; set; } = string.Empty;
+    public string Subject { get; } = string.Empty;
 
     /// <summary>
     /// Optional longer description with additional details.
     /// </summary>
-    public string? Notes { get; set; }
+    public string? Notes { get; }
 
-    public PaymentMethod PaymentMethod { get; set; }
+    public PaymentMethod PaymentMethod { get; }
 
     /// <summary>
     /// Running sum of all signed_amounts up to and including this transaction.
     /// Actual balance = User.InitialBalance + CumulativeDelta
     /// </summary>
-    public decimal CumulativeDelta { get; set; }
+    public decimal CumulativeDelta { get; private set; }
 
     /// <summary>
     /// Category of the transaction. Optional for both expenses and income.
     /// </summary>
-    public int? CategoryId { get; set; }
+    public int? CategoryId { get; }
 
     /// <summary>
     /// Transaction group for grouping related transactions (e.g., vacation, project, wedding).
     /// Applicable for both expenses and income.
     /// </summary>
-    public int? TransactionGroupId { get; set; }
+    public int? TransactionGroupId { get; }
 
-    public DateTime CreatedAt { get; set; }
-    public DateTime UpdatedAt { get; set; }
+    public DateTime CreatedAt { get; }
+    public DateTime UpdatedAt { get; private set; }
 }
