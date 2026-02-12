@@ -1,9 +1,9 @@
 using ExpenseTrackerAPI.Domain.Entities;
 
-namespace ExpenseTrackerAPI.Application.Transactions.Data;
+namespace ExpenseTrackerAPI.Contracts.Transactions;
 
 /// <summary>
-/// Parsed and validated options for filtering and sorting transactions (used by Application/Infrastructure).
+/// Parsed and validated options for filtering and sorting transactions (incoming from API query).
 /// </summary>
 public class TransactionQueryOptions
 {
@@ -13,6 +13,7 @@ public class TransactionQueryOptions
     public TransactionType? TransactionType { get; init; }
     public DateOnly? DateFrom { get; init; }
     public DateOnly? DateTo { get; init; }
-    public string? SortBy { get; init; }  // "subject" | "paymentMethod" | "category" | "amount"
-    public bool SortDescending { get; init; } = true;  // date and secondary sort direction
+    /// <summary>One of: subject, paymentmethod, category, amount</summary>
+    public string? SortBy { get; init; }
+    public bool SortDescending { get; init; } = true;
 }

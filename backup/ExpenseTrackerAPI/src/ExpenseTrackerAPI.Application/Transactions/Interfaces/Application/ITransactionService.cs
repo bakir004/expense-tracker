@@ -1,6 +1,7 @@
 using ErrorOr;
-using ExpenseTrackerAPI.Domain.Entities;
 using ExpenseTrackerAPI.Application.Transactions.Data;
+using ExpenseTrackerAPI.Contracts.Transactions;
+using ExpenseTrackerAPI.Domain.Entities;
 
 namespace ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 
