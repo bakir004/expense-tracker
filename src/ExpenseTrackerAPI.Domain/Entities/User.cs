@@ -3,11 +3,11 @@ using System.Text.RegularExpressions;
 namespace ExpenseTrackerAPI.Domain.Entities;
 
 /// <summary>
-/// Represents a user in the expense tracker system.
+/// Represents a user in the expense tracking system.
 /// </summary>
 public partial class User
 {
-    [GeneratedRegex(@"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^[a-zA-Z0-9]([a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$", RegexOptions.IgnoreCase)]
     private static partial Regex EmailRegex();
 
     public int Id { get; private set; }
@@ -46,10 +46,14 @@ public partial class User
     /// <exception cref="ArgumentException">Thrown when validation fails</exception>
     public User(string name, string email, string passwordHash, decimal initialBalance = 0)
     {
-        ValidateBusinessRules(name, email, passwordHash);
+        // Normalize inputs before validation
+        var normalizedName = name?.Trim() ?? string.Empty;
+        var normalizedEmail = email?.Trim().ToLowerInvariant() ?? string.Empty;
 
-        Name = name.Trim();
-        Email = email.Trim().ToLowerInvariant();
+        ValidateBusinessRules(normalizedName, normalizedEmail, passwordHash);
+
+        Name = normalizedName;
+        Email = normalizedEmail;
         PasswordHash = passwordHash;
         InitialBalance = initialBalance;
         CreatedAt = DateTime.UtcNow;
@@ -63,10 +67,14 @@ public partial class User
     /// <param name="email">New email address</param>
     public void UpdateProfile(string name, string email)
     {
-        ValidateBusinessRules(name, email, PasswordHash);
+        // Normalize inputs before validation
+        var normalizedName = name?.Trim() ?? string.Empty;
+        var normalizedEmail = email?.Trim().ToLowerInvariant() ?? string.Empty;
 
-        Name = name.Trim();
-        Email = email.Trim().ToLowerInvariant();
+        ValidateBusinessRules(normalizedName, normalizedEmail, PasswordHash);
+
+        Name = normalizedName;
+        Email = normalizedEmail;
         UpdatedAt = DateTime.UtcNow;
     }
 
@@ -109,7 +117,7 @@ public partial class User
         if (email.Length > 254) // RFC 5321 limit
             throw new ArgumentException("Email cannot exceed 254 characters", nameof(email));
 
-        if (!EmailRegex().IsMatch(email))
+        if (!EmailRegex().IsMatch(email) || email.Contains(".."))
             throw new ArgumentException("Email format is invalid", nameof(email));
 
         // Password hash validation

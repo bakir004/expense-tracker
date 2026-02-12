@@ -163,6 +163,9 @@ public class UserService : IUserService
         if (userId <= 0)
             return UserErrors.InvalidUserId;
 
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+            return UserErrors.PasswordRequired;
+
         if (!request.ConfirmDeletion)
             return UserErrors.DeletionConfirmation;
 
