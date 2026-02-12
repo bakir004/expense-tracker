@@ -1,6 +1,5 @@
 **/bin/*
 **/obj/*
-**/Properties/launchSettings.json
 .vs/
 .idea/
 *.user
