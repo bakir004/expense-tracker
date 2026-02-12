@@ -26,5 +26,44 @@ public static class TransactionErrors
     public static Error InvalidSubject => Error.Validation(
         code: "subject",
         description: "Transaction subject is required and cannot be empty.");
-}
 
+    public static Error InvalidUserId => Error.Validation(
+        code: "userId",
+        description: "User ID must be a positive integer.");
+
+    public static Error AmountTooLarge => Error.Validation(
+        code: "amount",
+        description: "Transaction amount cannot exceed $1,000,000.");
+
+    public static Error InvalidDate => Error.Validation(
+        code: "date",
+        description: "Transaction date is outside the allowed range.");
+
+    public static Error SubjectTooLong => Error.Validation(
+        code: "subject",
+        description: "Transaction subject cannot exceed 255 characters.");
+
+    public static Error ExpenseWithIncomeSource => Error.Validation(
+        code: "incomeSource",
+        description: "Expense transactions cannot have an income source.");
+
+    public static Error IncomeWithBothCategoryAndSource => Error.Validation(
+        code: "categoryId_incomeSource",
+        description: "Income transactions cannot have both a category and an income source.");
+
+    public static Error InvalidCategoryId => Error.Validation(
+        code: "categoryId",
+        description: "Category ID must be a positive integer when provided.");
+
+    public static Error IncomeSourceTooLong => Error.Validation(
+        code: "incomeSource",
+        description: "Income source cannot exceed 100 characters.");
+
+    public static Error Unauthorized => Error.Validation(
+        code: "unauthorized",
+        description: "You are not authorized to access this transaction.");
+
+    public static Error ConcurrencyConflict => Error.Conflict(
+        code: "concurrency",
+        description: "Transaction was modified by another process. Please refresh and try again.");
+}

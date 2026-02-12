@@ -11,5 +11,5 @@ public class Category
 
     public string? Description { get; set; }
 
-    public string? Icon { get; set; }
+    public string Icon { get; set; } = string.Empty;
 }
