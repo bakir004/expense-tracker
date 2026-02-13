@@ -329,6 +329,7 @@ public class UserTransactionWorkflowTests : BaseE2ETest
 
         var createResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, createRequest);
         var created = await createResponse.Content.ReadFromJsonAsync<TransactionResponse>();
+        created.Should().NotBeNull();
 
         // Act - Update with invalid transaction type
         var updateRequest = new UpdateTransactionRequest
@@ -341,7 +342,7 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         };
 
         var response = await Client.PutAsJsonAsync(
-            TestConstants.Routes.Transaction(created.Id),
+            TestConstants.Routes.Transaction(created!.Id),
             updateRequest);
 
         // Assert
@@ -482,6 +483,7 @@ public class UserTransactionWorkflowTests : BaseE2ETest
 
         var createResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, createRequest);
         var created = await createResponse.Content.ReadFromJsonAsync<TransactionResponse>();
+        created.Should().NotBeNull();
 
         // Act - Update to income
         var updateRequest = new UpdateTransactionRequest
@@ -494,7 +496,7 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         };
 
         var updateResponse = await Client.PutAsJsonAsync(
-            TestConstants.Routes.Transaction(created.Id),
+            TestConstants.Routes.Transaction(created!.Id),
             updateRequest);
 
         // Assert
