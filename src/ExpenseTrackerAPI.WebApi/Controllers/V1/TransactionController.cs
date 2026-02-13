@@ -4,6 +4,7 @@ using ExpenseTrackerAPI.Contracts.Transactions;
 using ExpenseTrackerAPI.WebApi.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Asp.Versioning;
+using ExpenseTrackerAPI.Domain.Entities;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
 
@@ -30,6 +31,102 @@ public class TransactionController : ApiControllerBase
     {
         _transactionService = transactionService ?? throw new ArgumentNullException(nameof(transactionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Get transactions for the authenticated user with optional filtering, sorting, and pagination.
+    /// </summary>
+    /// <param name="transactionType">Filter by type: EXPENSE or INCOME</param>
+    /// <param name="minAmount">Filter by minimum amount (inclusive)</param>
+    /// <param name="maxAmount">Filter by maximum amount (inclusive)</param>
+    /// <param name="dateFrom">Filter by start date (yyyy-MM-dd format, inclusive)</param>
+    /// <param name="dateTo">Filter by end date (yyyy-MM-dd format, inclusive)</param>
+    /// <param name="subjectContains">Filter by subject containing text (case-insensitive)</param>
+    /// <param name="notesContains">Filter by notes containing text (case-insensitive)</param>
+    /// <param name="paymentMethods">Filter by payment methods (comma-separated: CASH,DEBIT_CARD,CREDIT_CARD,BANK_TRANSFER,MOBILE_PAYMENT,PAYPAL,CRYPTO,OTHER)</param>
+    /// <param name="categoryIds">Filter by category IDs (comma-separated)</param>
+    /// <param name="uncategorized">Filter for uncategorized transactions only</param>
+    /// <param name="transactionGroupIds">Filter by transaction group IDs (comma-separated)</param>
+    /// <param name="ungrouped">Filter for ungrouped transactions only</param>
+    /// <param name="sortBy">Sort field: date, amount, subject, paymentMethod, createdAt, updatedAt (default: date)</param>
+    /// <param name="sortDirection">Sort direction: asc or desc (default: desc)</param>
+    /// <param name="page">Page number, 1-based (default: 1)</param>
+    /// <param name="pageSize">Items per page, max 100 (default: 20)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Paginated list of transactions matching the filter criteria</returns>
+    /// <response code="200">Transactions retrieved successfully</response>
+    /// <response code="400">Invalid filter parameters</response>
+    /// <response code="401">User not authenticated</response>
+    [HttpGet]
+    [ProducesResponseType(typeof(TransactionFilterResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetTransactions(
+        [FromQuery] string? transactionType = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] decimal? maxAmount = null,
+        [FromQuery] string? dateFrom = null,
+        [FromQuery] string? dateTo = null,
+        [FromQuery] string? subjectContains = null,
+        [FromQuery] string? notesContains = null,
+        [FromQuery] string? paymentMethods = null,
+        [FromQuery] string? categoryIds = null,
+        [FromQuery] bool? uncategorized = null,
+        [FromQuery] string? transactionGroupIds = null,
+        [FromQuery] bool? ungrouped = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDirection = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int? pageSize = null,
+        CancellationToken cancellationToken = default)
+    {
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
+
+        var userId = GetRequiredUserId();
+
+        // Build filter request from query parameters
+        var filterRequest = new TransactionFilterRequest
+        {
+            TransactionType = transactionType,
+            MinAmount = minAmount,
+            MaxAmount = maxAmount,
+            DateFrom = dateFrom,
+            DateTo = dateTo,
+            SubjectContains = subjectContains,
+            NotesContains = notesContains,
+            PaymentMethods = ParseCommaSeparatedArray(paymentMethods),
+            CategoryIds = ParseCommaSeparatedIntArray(categoryIds),
+            Uncategorized = uncategorized,
+            TransactionGroupIds = ParseCommaSeparatedIntArray(transactionGroupIds),
+            Ungrouped = ungrouped,
+            SortBy = sortBy,
+            SortDirection = sortDirection,
+            Page = page,
+            PageSize = pageSize
+        };
+
+        // Parse and validate the filter request
+        var parseResult = TransactionFilterParser.Parse(filterRequest);
+        if (parseResult.IsError)
+        {
+            _logger.LogWarning("Invalid filter parameters for user {UserId}: {Errors}",
+                userId, string.Join(", ", parseResult.Errors.Select(e => e.Description)));
+            return Problem(parseResult.Errors);
+        }
+
+        var filter = parseResult.Value;
+
+        var result = await _transactionService.GetByUserIdWithFilterAsync(userId, filter, cancellationToken);
+
+        if (result.IsError)
+        {
+            _logger.LogWarning("Failed to get transactions for user {UserId}: {Errors}",
+                userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return Problem(result.Errors);
+        }
+
+        return Ok(result.Value);
     }
 
     /// <summary>
@@ -219,5 +316,38 @@ public class TransactionController : ApiControllerBase
         }
 
         return NoContent();
+    }
+
+    /// <summary>
+    /// Parses a comma-separated string into a string array.
+    /// </summary>
+    private static string[]? ParseCommaSeparatedArray(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        return value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
+    /// <summary>
+    /// Parses a comma-separated string of integers into an int array.
+    /// </summary>
+    private static int[]? ParseCommaSeparatedIntArray(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var parts = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var result = new List<int>();
+
+        foreach (var part in parts)
+        {
+            if (int.TryParse(part, out var intValue))
+            {
+                result.Add(intValue);
+            }
+        }
+
+        return result.Count > 0 ? result.ToArray() : null;
     }
 }

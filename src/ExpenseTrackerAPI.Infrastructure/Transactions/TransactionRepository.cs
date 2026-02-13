@@ -7,6 +7,7 @@ using ExpenseTrackerAPI.Domain.Errors;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Infrastructure;
 using ExpenseTrackerAPI.Infrastructure.Persistence;
 using ExpenseTrackerAPI.Contracts.Transactions;
+using System.Linq.Expressions;
 
 namespace ExpenseTrackerAPI.Infrastructure.Transactions;
 
@@ -325,5 +326,155 @@ public class TransactionRepository : ITransactionRepository
         {
             return Error.Failure("Database.Error", $"Failed to delete transaction: {ex.Message}");
         }
+    }
+
+    public async Task<ErrorOr<List<Transaction>>> GetByUserIdWithFilterAsync(
+        int userId,
+        TransactionFilter filter,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var query = _context.Transactions
+                .AsNoTracking()
+                .Where(t => t.UserId == userId);
+
+            // Apply filters
+            query = ApplyFilters(query, filter);
+
+            // Apply sorting
+            query = ApplySorting(query, filter);
+
+            // Apply pagination
+            var transactions = await query
+                .Skip(filter.Skip)
+                .Take(filter.PageSize)
+                .ToListAsync(cancellationToken);
+
+            return transactions;
+        }
+        catch (Exception ex)
+        {
+            return Error.Failure("Database.Error", $"Failed to retrieve transactions: {ex.Message}");
+        }
+    }
+
+    private static IQueryable<Transaction> ApplyFilters(IQueryable<Transaction> query, TransactionFilter filter)
+    {
+        // Filter by transaction type
+        if (filter.TransactionType.HasValue)
+        {
+            query = query.Where(t => t.TransactionType == filter.TransactionType.Value);
+        }
+
+        // Filter by amount range
+        if (filter.MinAmount.HasValue)
+        {
+            query = query.Where(t => t.Amount >= filter.MinAmount.Value);
+        }
+
+        if (filter.MaxAmount.HasValue)
+        {
+            query = query.Where(t => t.Amount <= filter.MaxAmount.Value);
+        }
+
+        // Filter by date range
+        if (filter.DateFrom.HasValue)
+        {
+            query = query.Where(t => t.Date >= filter.DateFrom.Value);
+        }
+
+        if (filter.DateTo.HasValue)
+        {
+            query = query.Where(t => t.Date <= filter.DateTo.Value);
+        }
+
+        // Filter by subject (case-insensitive contains)
+        if (!string.IsNullOrWhiteSpace(filter.SubjectContains))
+        {
+            var searchTerm = filter.SubjectContains.ToLower();
+            query = query.Where(t => t.Subject.ToLower().Contains(searchTerm));
+        }
+
+        // Filter by notes (case-insensitive contains)
+        if (!string.IsNullOrWhiteSpace(filter.NotesContains))
+        {
+            var searchTerm = filter.NotesContains.ToLower();
+            query = query.Where(t => t.Notes != null && t.Notes.ToLower().Contains(searchTerm));
+        }
+
+        // Filter by payment methods (OR logic)
+        if (filter.PaymentMethods is { Count: > 0 })
+        {
+            query = query.Where(t => filter.PaymentMethods.Contains(t.PaymentMethod));
+        }
+
+        // Filter by category IDs (OR logic)
+        if (filter.CategoryIds is { Count: > 0 })
+        {
+            query = query.Where(t => t.CategoryId.HasValue && filter.CategoryIds.Contains(t.CategoryId.Value));
+        }
+
+        // Filter for uncategorized transactions
+        if (filter.Uncategorized)
+        {
+            query = query.Where(t => t.CategoryId == null);
+        }
+
+        // Filter by transaction group IDs (OR logic)
+        if (filter.TransactionGroupIds is { Count: > 0 })
+        {
+            query = query.Where(t => t.TransactionGroupId.HasValue && filter.TransactionGroupIds.Contains(t.TransactionGroupId.Value));
+        }
+
+        // Filter for ungrouped transactions
+        if (filter.Ungrouped)
+        {
+            query = query.Where(t => t.TransactionGroupId == null);
+        }
+
+        return query;
+    }
+
+    private static IQueryable<Transaction> ApplySorting(IQueryable<Transaction> query, TransactionFilter filter)
+    {
+        // Primary sort by the specified field
+        query = filter.SortBy switch
+        {
+            TransactionSortField.Amount => filter.SortDescending
+                ? query.OrderByDescending(t => t.Amount)
+                : query.OrderBy(t => t.Amount),
+
+            TransactionSortField.Subject => filter.SortDescending
+                ? query.OrderByDescending(t => t.Subject)
+                : query.OrderBy(t => t.Subject),
+
+            TransactionSortField.PaymentMethod => filter.SortDescending
+                ? query.OrderByDescending(t => t.PaymentMethod)
+                : query.OrderBy(t => t.PaymentMethod),
+
+            TransactionSortField.CreatedAt => filter.SortDescending
+                ? query.OrderByDescending(t => t.CreatedAt)
+                : query.OrderBy(t => t.CreatedAt),
+
+            TransactionSortField.UpdatedAt => filter.SortDescending
+                ? query.OrderByDescending(t => t.UpdatedAt)
+                : query.OrderBy(t => t.UpdatedAt),
+
+            // Default: sort by Date, then CreatedAt
+            _ => filter.SortDescending
+                ? query.OrderByDescending(t => t.Date).ThenByDescending(t => t.CreatedAt)
+                : query.OrderBy(t => t.Date).ThenBy(t => t.CreatedAt)
+        };
+
+        // Add secondary sort by Id for stable pagination (except for Date which already has CreatedAt)
+        if (filter.SortBy != TransactionSortField.Date)
+        {
+            query = filter.SortDescending
+                ? ((IOrderedQueryable<Transaction>)query).ThenByDescending(t => t.Id)
+                : ((IOrderedQueryable<Transaction>)query).ThenBy(t => t.Id);
+        }
+
+        return query;
     }
 }

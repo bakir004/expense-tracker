@@ -45,4 +45,16 @@ public interface ITransactionService
     /// Delete a transaction
     /// </summary>
     Task<ErrorOr<Deleted>> DeleteAsync(int id, int userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Get transactions for a user with optional filters, sorting, and pagination.
+    /// </summary>
+    /// <param name="userId">The user ID to filter transactions by</param>
+    /// <param name="filter">Filter, sort, and pagination options</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Paginated filter response with transactions and pagination metadata</returns>
+    Task<ErrorOr<TransactionFilterResponse>> GetByUserIdWithFilterAsync(
+        int userId,
+        TransactionFilter filter,
+        CancellationToken cancellationToken);
 }

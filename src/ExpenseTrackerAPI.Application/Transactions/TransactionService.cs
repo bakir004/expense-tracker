@@ -4,6 +4,7 @@ using ExpenseTrackerAPI.Domain.Errors;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Infrastructure;
 using ExpenseTrackerAPI.Application.Users.Interfaces.Infrastructure;
+using ExpenseTrackerAPI.Contracts.Transactions;
 
 namespace ExpenseTrackerAPI.Application.Transactions;
 
@@ -122,5 +123,32 @@ public class TransactionService : ITransactionService
             return TransactionErrors.NotFound;
 
         return await _transactionRepository.DeleteAsync(id, cancellationToken);
+    }
+
+    public async Task<ErrorOr<TransactionFilterResponse>> GetByUserIdWithFilterAsync(
+        int userId,
+        TransactionFilter filter,
+        CancellationToken cancellationToken)
+    {
+        // Verify user exists
+        var userResult = await _userRepository.GetByIdAsync(userId, cancellationToken);
+        if (userResult.IsError)
+        {
+            return UserErrors.NotFound;
+        }
+
+        var result = await _transactionRepository.GetByUserIdWithFilterAsync(userId, filter, cancellationToken);
+
+        if (result.IsError)
+        {
+            return result.Errors;
+        }
+
+        var transactions = result.Value;
+
+        return new TransactionFilterResponse
+        {
+            Transactions = transactions.Select(t => t.ToResponse()).ToList()
+        };
     }
 }
