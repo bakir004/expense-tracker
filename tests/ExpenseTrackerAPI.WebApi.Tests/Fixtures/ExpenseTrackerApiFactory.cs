@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Testcontainers.PostgreSql;
 
-namespace ExpenseTrackerAPI.WebApi.Tests;
+namespace ExpenseTrackerAPI.WebApi.Tests.Fixtures;
 
 public class ExpenseTrackerApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {

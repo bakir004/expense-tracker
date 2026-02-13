@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using ExpenseTrackerAPI.Domain.Entities;
 
 namespace ExpenseTrackerAPI.Contracts.Transactions;
 
@@ -9,7 +8,7 @@ public class CreateTransactionRequest
     /// Type of transaction: "EXPENSE" or "INCOME"
     /// </summary>
     [Required(ErrorMessage = "Transaction type is required.")]
-    public TransactionType TransactionType { get; set; }
+    public string TransactionType { get; set; } = string.Empty;
 
     /// <summary>
     /// The amount (always positive)
@@ -38,8 +37,11 @@ public class CreateTransactionRequest
     [MaxLength(2000)]
     public string? Notes { get; set; }
 
+    /// <summary>
+    /// Payment method: "CASH", "DEBIT_CARD", "CREDIT_CARD", "BANK_TRANSFER", "MOBILE_PAYMENT", "PAYPAL", "CRYPTO", or "OTHER"
+    /// </summary>
     [Required(ErrorMessage = "Payment method is required.")]
-    public PaymentMethod PaymentMethod { get; set; }
+    public string PaymentMethod { get; set; } = string.Empty;
 
     /// <summary>
     /// Optional category ID

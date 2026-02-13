@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace ExpenseTrackerAPI.WebApi.Tests;
+namespace ExpenseTrackerAPI.WebApi.Tests.Fixtures;
 
 public static class TestAuthDefaults
 {

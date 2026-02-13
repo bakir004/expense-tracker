@@ -95,14 +95,25 @@ public class TransactionController : ApiControllerBase
 
         var userId = GetRequiredUserId();
 
+        // Parse and validate string values to enums
+        var parseResult = TransactionRequestParser.ParseCreateRequest(request);
+        if (parseResult.IsError)
+        {
+            _logger.LogWarning("Invalid transaction request for user {UserId}: {Errors}",
+                userId, string.Join(", ", parseResult.Errors.Select(e => e.Description)));
+            return Problem(parseResult.Errors);
+        }
+
+        var (transactionType, paymentMethod) = parseResult.Value;
+
         var result = await _transactionService.CreateAsync(
             userId: userId,
-            transactionType: request.TransactionType,
+            transactionType: transactionType,
             amount: request.Amount,
             date: request.Date,
             subject: request.Subject,
             notes: request.Notes,
-            paymentMethod: request.PaymentMethod,
+            paymentMethod: paymentMethod,
             categoryId: request.CategoryId,
             transactionGroupId: request.TransactionGroupId,
             cancellationToken: cancellationToken);
@@ -144,15 +155,26 @@ public class TransactionController : ApiControllerBase
 
         var userId = GetRequiredUserId();
 
+        // Parse and validate string values to enums
+        var parseResult = TransactionRequestParser.ParseUpdateRequest(request);
+        if (parseResult.IsError)
+        {
+            _logger.LogWarning("Invalid transaction update request for user {UserId}: {Errors}",
+                userId, string.Join(", ", parseResult.Errors.Select(e => e.Description)));
+            return Problem(parseResult.Errors);
+        }
+
+        var (transactionType, paymentMethod) = parseResult.Value;
+
         var result = await _transactionService.UpdateAsync(
             id: id,
             userId: userId,
-            transactionType: request.TransactionType,
+            transactionType: transactionType,
             amount: request.Amount,
             date: request.Date,
             subject: request.Subject,
             notes: request.Notes,
-            paymentMethod: request.PaymentMethod,
+            paymentMethod: paymentMethod,
             categoryId: request.CategoryId,
             transactionGroupId: request.TransactionGroupId,
             cancellationToken: cancellationToken);
@@ -177,19 +199,16 @@ public class TransactionController : ApiControllerBase
     /// <response code="204">Transaction deleted successfully</response>
     /// <response code="401">User not authenticated</response>
     /// <response code="404">Transaction not found</response>
-    /// <response code="500">Internal server error</response>
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> DeleteTransaction(int id, CancellationToken cancellationToken = default)
     {
         var unauthorizedResult = CheckUserContext();
         if (unauthorizedResult != null) return unauthorizedResult;
 
         var userId = GetRequiredUserId();
-        _logger.LogInformation("Deleting transaction {TransactionId} for user {UserId}", id, userId);
 
         // First verify the transaction exists and belongs to the user
         var existingResult = await _transactionService.GetByIdAsync(id, cancellationToken);
@@ -215,8 +234,6 @@ public class TransactionController : ApiControllerBase
                 id, userId, string.Join(", ", result.Errors.Select(e => e.Description)));
             return Problem(result.Errors);
         }
-
-        _logger.LogInformation("Successfully deleted transaction {TransactionId} for user {UserId}", id, userId);
 
         return NoContent();
     }

@@ -1,4 +1,6 @@
-namespace ExpenseTrackerAPI.WebApi.Tests;
+using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.Common;
 
 public abstract class BaseApiTest : IClassFixture<ExpenseTrackerApiFactory>
 {
