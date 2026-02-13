@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ExpenseTrackerAPI.Application.Users.Interfaces.Application;
 using ExpenseTrackerAPI.Contracts.Users;
-using ErrorOr;
 using Asp.Versioning;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.V1;

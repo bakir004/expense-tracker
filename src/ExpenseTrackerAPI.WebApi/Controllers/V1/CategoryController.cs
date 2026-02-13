@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ExpenseTrackerAPI.Application.Categories.Interfaces.Application;
 using ExpenseTrackerAPI.Contracts.Categories;
-using ExpenseTrackerAPI.WebApi.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Asp.Versioning;
 
@@ -39,7 +38,6 @@ public class CategoryController : ApiControllerBase
     /// <returns>List of all categories</returns>
     /// <response code="200">Categories retrieved successfully</response>
     /// <response code="401">User not authenticated</response>
-    /// <response code="500">Internal server error</response>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<CategoryResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
