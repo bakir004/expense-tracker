@@ -5,9 +5,13 @@ using ExpenseTrackerAPI.Application.Users;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Infrastructure;
 using ExpenseTrackerAPI.Application.Transactions;
+using ExpenseTrackerAPI.Application.Categories.Interfaces.Application;
+using ExpenseTrackerAPI.Application.Categories.Interfaces.Infrastructure;
+using ExpenseTrackerAPI.Application.Categories;
 using ExpenseTrackerAPI.Infrastructure.Authentication;
 using ExpenseTrackerAPI.Infrastructure.Users;
 using ExpenseTrackerAPI.Infrastructure.Transactions;
+using ExpenseTrackerAPI.Infrastructure.Categories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -26,8 +30,8 @@ public static class DependencyInjectionExtensions
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<IUserService, UserService>();
-
         services.AddScoped<ITransactionService, TransactionService>();
+        services.AddScoped<ICategoryService, CategoryService>();
 
         return services;
     }
@@ -41,6 +45,7 @@ public static class DependencyInjectionExtensions
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
 
         return services;
     }
