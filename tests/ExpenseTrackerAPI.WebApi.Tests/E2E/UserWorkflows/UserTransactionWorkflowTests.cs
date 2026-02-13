@@ -60,7 +60,6 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         // === UPDATE ===
         var updateRequest = new UpdateTransactionRequest
         {
-            Id = transactionId,
             TransactionType = "EXPENSE",
             Amount = TestConstants.Transactions.UpdatedAmount,
             Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)),
@@ -81,7 +80,7 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         updatedTransaction.Should().NotBeNull();
         updatedTransaction!.Subject.Should().Be(TestConstants.Transactions.UpdatedSubject);
         updatedTransaction.Amount.Should().Be(TestConstants.Transactions.UpdatedAmount);
-        updatedTransaction.PaymentMethod.Should().Be(PaymentMethod.DEBIT_CARD);
+        updatedTransaction.PaymentMethod.Should().Be("DEBIT_CARD");
 
         // Verify update persisted
         var verifyResponse = await Client.GetAsync(TestConstants.Routes.Transaction(transactionId));
@@ -123,7 +122,7 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var transaction = await response.Content.ReadFromJsonAsync<TransactionResponse>();
         transaction.Should().NotBeNull();
-        transaction!.TransactionType.Should().Be(TransactionType.INCOME);
+        transaction!.TransactionType.Should().Be("INCOME");
         transaction.Amount.Should().Be(5000.00m);
     }
 
@@ -159,7 +158,7 @@ public class UserTransactionWorkflowTests : BaseE2ETest
             response.StatusCode.Should().Be(HttpStatusCode.Created,
                 $"Expected Created for payment method {paymentMethodString}");
             var transaction = await response.Content.ReadFromJsonAsync<TransactionResponse>();
-            transaction!.PaymentMethod.Should().Be(expectedEnum);
+            transaction!.PaymentMethod.Should().Be(paymentMethodString);
         }
     }
 
@@ -262,8 +261,8 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var transaction = await response.Content.ReadFromJsonAsync<TransactionResponse>();
-        transaction!.TransactionType.Should().Be(TransactionType.EXPENSE);
-        transaction.PaymentMethod.Should().Be(PaymentMethod.CREDIT_CARD);
+        transaction!.TransactionType.Should().Be("EXPENSE");
+        transaction.PaymentMethod.Should().Be("CREDIT_CARD");
     }
 
     [Fact]
@@ -299,7 +298,6 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         var nonExistentId = 999999;
         var request = new UpdateTransactionRequest
         {
-            Id = nonExistentId,
             TransactionType = "EXPENSE",
             Amount = 100.00m,
             Date = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -335,7 +333,6 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         // Act - Update with invalid transaction type
         var updateRequest = new UpdateTransactionRequest
         {
-            Id = created!.Id,
             TransactionType = "INVALID_TYPE",
             Amount = 100.00m,
             Date = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -489,7 +486,6 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         // Act - Update to income
         var updateRequest = new UpdateTransactionRequest
         {
-            Id = created!.Id,
             TransactionType = "INCOME", // Changed from EXPENSE to INCOME
             Amount = 100.00m,
             Date = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -504,7 +500,7 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         // Assert
         updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var updated = await updateResponse.Content.ReadFromJsonAsync<TransactionResponse>();
-        updated!.TransactionType.Should().Be(TransactionType.INCOME);
+        updated!.TransactionType.Should().Be("INCOME");
         updated.Subject.Should().Be("Now Income");
     }
 
@@ -527,7 +523,7 @@ public class UserTransactionWorkflowTests : BaseE2ETest
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var transaction = await response.Content.ReadFromJsonAsync<TransactionResponse>();
-        transaction!.TransactionType.Should().Be(TransactionType.EXPENSE);
-        transaction.PaymentMethod.Should().Be(PaymentMethod.CREDIT_CARD);
+        transaction!.TransactionType.Should().Be("EXPENSE");
+        transaction.PaymentMethod.Should().Be("CREDIT_CARD");
     }
 }

@@ -44,5 +44,5 @@ public interface ITransactionService
     /// <summary>
     /// Delete a transaction
     /// </summary>
-    Task<ErrorOr<Deleted>> DeleteAsync(int id, CancellationToken cancellationToken);
+    Task<ErrorOr<Deleted>> DeleteAsync(int id, int userId, CancellationToken cancellationToken);
 }

@@ -1,5 +1,3 @@
-using ExpenseTrackerAPI.Domain.Entities;
-
 namespace ExpenseTrackerAPI.Contracts.Transactions;
 
 /// <summary>
@@ -8,13 +6,13 @@ namespace ExpenseTrackerAPI.Contracts.Transactions;
 public record TransactionResponse(
     int Id,
     int UserId,
-    TransactionType TransactionType,
+    string TransactionType,
     decimal Amount,
     decimal SignedAmount,
     DateOnly Date,
     string Subject,
     string? Notes,
-    PaymentMethod PaymentMethod,
+    string PaymentMethod,
     decimal CumulativeDelta,
     int? CategoryId,
     int? TransactionGroupId,

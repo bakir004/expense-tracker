@@ -4,7 +4,6 @@ using ExpenseTrackerAPI.Contracts.Transactions;
 using ExpenseTrackerAPI.WebApi.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Asp.Versioning;
-using ExpenseTrackerAPI.Domain.Entities;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
 
@@ -44,7 +43,7 @@ public class TransactionController : ApiControllerBase
     /// <response code="404">Transaction not found</response>
     /// <response code="500">Internal server error</response>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(Transaction), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(TransactionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetTransaction(int id, CancellationToken cancellationToken = default)
@@ -68,7 +67,7 @@ public class TransactionController : ApiControllerBase
         }
 
         var transaction = result.Value;
-        return Ok(transaction);
+        return Ok(transaction.ToResponse());
     }
 
     /// <summary>
@@ -82,7 +81,7 @@ public class TransactionController : ApiControllerBase
     /// <response code="401">User not authenticated</response>
     /// <response code="404">Referenced entity not found (user, category, etc.)</response>
     [HttpPost]
-    [ProducesResponseType(typeof(Transaction), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(TransactionResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -126,7 +125,7 @@ public class TransactionController : ApiControllerBase
         }
 
         var transaction = result.Value;
-        return CreatedAtAction(nameof(GetTransaction), new { id = transaction.Id, version = "1.0" }, transaction);
+        return CreatedAtAction(nameof(GetTransaction), new { id = transaction.Id, version = "1.0" }, transaction.ToResponse());
     }
 
     /// <summary>
@@ -141,7 +140,7 @@ public class TransactionController : ApiControllerBase
     /// <response code="401">User not authenticated</response>
     /// <response code="404">Transaction not found or referenced entity not found</response>
     [HttpPut("{id:int}")]
-    [ProducesResponseType(typeof(Transaction), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(TransactionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -187,7 +186,7 @@ public class TransactionController : ApiControllerBase
         }
 
         var transaction = result.Value;
-        return Ok(transaction);
+        return Ok(transaction.ToResponse());
     }
 
     /// <summary>
@@ -210,23 +209,7 @@ public class TransactionController : ApiControllerBase
 
         var userId = GetRequiredUserId();
 
-        // First verify the transaction exists and belongs to the user
-        var existingResult = await _transactionService.GetByIdAsync(id, cancellationToken);
-        if (existingResult.IsError)
-        {
-            _logger.LogWarning("Transaction {TransactionId} not found for user {UserId}: {Errors}",
-                id, userId, string.Join(", ", existingResult.Errors.Select(e => e.Description)));
-            return Problem(existingResult.Errors);
-        }
-
-        if (existingResult.Value.UserId != userId)
-        {
-            _logger.LogWarning("User {UserId} attempted to delete transaction {TransactionId} belonging to user {OwnerId}",
-                userId, id, existingResult.Value.UserId);
-            return NotFound();
-        }
-
-        var result = await _transactionService.DeleteAsync(id, cancellationToken);
+        var result = await _transactionService.DeleteAsync(id, userId, cancellationToken);
 
         if (result.IsError)
         {

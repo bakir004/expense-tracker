@@ -85,6 +85,9 @@ public class TransactionService : ITransactionService
 
             var existingTransaction = oldTransaction.Value;
 
+            if (userId != existingTransaction.UserId)
+                return TransactionErrors.Unauthorized;
+
             var updatedTransaction = new Transaction(
                 userId: existingTransaction.UserId,
                 transactionType: transactionType,
@@ -106,8 +109,18 @@ public class TransactionService : ITransactionService
         }
     }
 
-    public async Task<ErrorOr<Deleted>> DeleteAsync(int id, CancellationToken cancellationToken)
+    public async Task<ErrorOr<Deleted>> DeleteAsync(int id, int userId, CancellationToken cancellationToken)
     {
+        var existingTransaction = await _transactionRepository.GetByIdAsync(id, cancellationToken);
+
+        if (existingTransaction.IsError)
+            return existingTransaction.Errors;
+
+        var transactionOwnerId = existingTransaction.Value.UserId;
+
+        if (transactionOwnerId != userId)
+            return TransactionErrors.NotFound;
+
         return await _transactionRepository.DeleteAsync(id, cancellationToken);
     }
 }

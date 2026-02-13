@@ -45,7 +45,7 @@ public class TransactionApiTests : BaseApiTest
 
         savedTransaction.Should().NotBeNull();
         savedTransaction!.Amount.Should().Be(100.50m);
-        savedTransaction.TransactionType.Should().Be(TransactionType.EXPENSE);
+        savedTransaction.TransactionType.Should().Be(TransactionType.EXPENSE); // Domain entity still uses enum
         savedTransaction.Subject.Should().Be("Utility Bill");
     }
 
@@ -69,7 +69,7 @@ public class TransactionApiTests : BaseApiTest
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var transaction = await response.Content.ReadFromJsonAsync<TransactionResponse>();
         transaction.Should().NotBeNull();
-        transaction!.TransactionType.Should().Be(TransactionType.EXPENSE);
+        transaction!.TransactionType.Should().Be("EXPENSE");
     }
 
     [Fact]

@@ -5,12 +5,6 @@ namespace ExpenseTrackerAPI.Contracts.Transactions;
 public class UpdateTransactionRequest
 {
     /// <summary>
-    /// Transaction ID to update
-    /// </summary>
-    [Range(1, int.MaxValue, ErrorMessage = "Transaction ID must be positive.")]
-    public int Id { get; set; }
-
-    /// <summary>
     /// Type of transaction: "EXPENSE" or "INCOME"
     /// </summary>
     [Required(ErrorMessage = "Transaction type is required.")]

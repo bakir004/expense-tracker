@@ -49,7 +49,7 @@ public class CompleteUserJourneyTests : BaseApiTest
 
         var incomeTransaction = await incomeResponse.Content.ReadFromJsonAsync<TransactionResponse>();
         incomeTransaction.Should().NotBeNull();
-        incomeTransaction!.TransactionType.Should().Be(TransactionType.INCOME);
+        incomeTransaction!.TransactionType.Should().Be("INCOME");
 
         // === STEP 2: CREATE MULTIPLE EXPENSE TRANSACTIONS ===
         var expenses = new[]
@@ -106,7 +106,6 @@ public class CompleteUserJourneyTests : BaseApiTest
         // === STEP 4: UPDATE A TRANSACTION ===
         var updateRequest = new UpdateTransactionRequest
         {
-            Id = createdExpenseIds[2], // Coffee Shop
             TransactionType = "EXPENSE",
             Amount = 15.50m, // Increased amount
             Date = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -253,7 +252,6 @@ public class CompleteUserJourneyTests : BaseApiTest
         var restaurantId = expenseIds[3]; // Restaurant Dinner
         var adjustRequest = new UpdateTransactionRequest
         {
-            Id = restaurantId,
             TransactionType = "EXPENSE",
             Amount = 72.50m, // Corrected amount
             Date = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -379,7 +377,6 @@ public class CompleteUserJourneyTests : BaseApiTest
         // Can update it
         var updateRequest = new UpdateTransactionRequest
         {
-            Id = created.Id,
             TransactionType = "EXPENSE",
             Amount = 150.00m,
             Date = DateOnly.FromDateTime(DateTime.UtcNow),
@@ -466,7 +463,6 @@ public class CompleteUserJourneyTests : BaseApiTest
         {
             var updateRequest = new UpdateTransactionRequest
             {
-                Id = id,
                 TransactionType = "EXPENSE",
                 Amount = 100.00m + (i * 10),
                 Date = DateOnly.FromDateTime(DateTime.UtcNow),
