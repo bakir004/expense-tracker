@@ -1,85 +1,112 @@
 using ErrorOr;
+using ExpenseTrackerAPI.Domain.Entities;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Infrastructure;
-using ExpenseTrackerAPI.Contracts.Transactions;
-using ExpenseTrackerAPI.Domain.Errors;
+using ExpenseTrackerAPI.Application.Users.Interfaces.Infrastructure;
 
 namespace ExpenseTrackerAPI.Application.Transactions;
 
 /// <summary>
-/// Service implementation for transaction business operations.
+/// Application service for transaction operations.
+/// Orchestrates domain logic and coordinates with the repository.
 /// </summary>
 public class TransactionService : ITransactionService
 {
     private readonly ITransactionRepository _transactionRepository;
+    private readonly IUserRepository _userRepository;
 
-    public TransactionService(ITransactionRepository transactionRepository)
+    public TransactionService(
+        ITransactionRepository transactionRepository,
+        IUserRepository userRepository)
     {
         _transactionRepository = transactionRepository ?? throw new ArgumentNullException(nameof(transactionRepository));
+        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
     }
 
-    public async Task<ErrorOr<GetAllTransactionsResponse>> GetAllTransactionsAsync(
-        int userId,
-        int pageNumber = 1,
-        int pageSize = 50,
-        CancellationToken cancellationToken = default)
+    public async Task<ErrorOr<Transaction>> GetByIdAsync(int id, CancellationToken cancellationToken)
     {
-        // Validate input parameters
-        if (userId <= 0)
-            return UserErrors.InvalidUserId;
+        return await _transactionRepository.GetByIdAsync(id, cancellationToken);
+    }
 
-        if (pageNumber <= 0)
-            return TransactionErrors.InvalidPageNumber;
-
-        if (pageSize <= 0 || pageSize > 100)
-            return TransactionErrors.InvalidPageSize;
-
+    public async Task<ErrorOr<Transaction>> CreateAsync(
+        int userId,
+        TransactionType transactionType,
+        decimal amount,
+        DateOnly date,
+        string subject,
+        string? notes,
+        PaymentMethod paymentMethod,
+        int? categoryId,
+        int? transactionGroupId,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            var result = await _transactionRepository.GetAllByUserIdAsync(userId, pageNumber, pageSize, cancellationToken);
+            var transaction = new Transaction(
+                userId: userId,
+                transactionType: transactionType,
+                amount: amount,
+                date: date,
+                subject: subject,
+                paymentMethod: paymentMethod,
+                notes: notes,
+                categoryId: categoryId,
+                transactionGroupId: transactionGroupId);
 
-            if (result.IsError)
-                return result.Errors;
-
-            var (transactions, totalCount) = result.Value;
-
-            // Map domain entities to response DTOs
-            var transactionResponses = transactions.Select(t => new TransactionResponse(
-                Id: t.Id,
-                UserId: t.UserId,
-                TransactionType: t.TransactionType,
-                Amount: t.Amount,
-                SignedAmount: t.SignedAmount,
-                Date: t.Date,
-                Subject: t.Subject,
-                Notes: t.Notes,
-                PaymentMethod: t.PaymentMethod,
-                CumulativeDelta: t.CumulativeDelta,
-                CategoryId: t.CategoryId,
-                TransactionGroupId: t.TransactionGroupId,
-                CreatedAt: t.CreatedAt,
-                UpdatedAt: t.UpdatedAt
-            ));
-
-            // Calculate pagination metadata
-            var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
-            var hasNextPage = pageNumber < totalPages;
-            var hasPreviousPage = pageNumber > 1;
-
-            var response = new GetAllTransactionsResponse(
-                Transactions: transactionResponses,
-                TotalCount: totalCount,
-                PageNumber: pageNumber,
-                PageSize: pageSize,
-                HasNextPage: hasNextPage,
-                HasPreviousPage: hasPreviousPage
-            );
-
-            return response;
+            return await _transactionRepository.CreateAsync(transaction, cancellationToken);
         }
-        catch (Exception ex)
+        catch (ArgumentException ex)
         {
-            return Error.Failure("Transaction.GetAll.UnexpectedError", $"Failed to retrieve transactions: {ex.Message}");
+            return Error.Validation("Transaction.Create.ValidationError", ex.Message);
         }
+    }
+
+    public async Task<ErrorOr<Transaction>> UpdateAsync(
+        int id,
+        int userId,
+        TransactionType transactionType,
+        decimal amount,
+        DateOnly date,
+        string subject,
+        string? notes,
+        PaymentMethod paymentMethod,
+        int? categoryId,
+        int? transactionGroupId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var oldTransaction = await _transactionRepository.GetByIdAsync(id, cancellationToken);
+            if (oldTransaction.IsError)
+            {
+                return oldTransaction.Errors;
+            }
+
+            var existingTransaction = oldTransaction.Value;
+
+            var updatedTransaction = new Transaction(
+                userId: existingTransaction.UserId,
+                transactionType: transactionType,
+                amount: amount,
+                date: date,
+                subject: subject,
+                paymentMethod: paymentMethod,
+                notes: notes,
+                categoryId: categoryId,
+                transactionGroupId: transactionGroupId);
+
+            updatedTransaction.UpdateId(id);
+
+            return await _transactionRepository.UpdateAsync(existingTransaction, updatedTransaction, cancellationToken);
+        }
+        catch (ArgumentException ex)
+        {
+            return Error.Validation("Transaction.Update.ValidationError", ex.Message);
+        }
+    }
+
+    public async Task<ErrorOr<Deleted>> DeleteAsync(int id, CancellationToken cancellationToken)
+    {
+        return await _transactionRepository.DeleteAsync(id, cancellationToken);
     }
 }

@@ -1,5 +1,6 @@
 using ErrorOr;
 using ExpenseTrackerAPI.Contracts.Transactions;
+using ExpenseTrackerAPI.Domain.Entities;
 
 namespace ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 
@@ -8,17 +9,40 @@ namespace ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 /// </summary>
 public interface ITransactionService
 {
+    Task<ErrorOr<Transaction>> GetByIdAsync(int id, CancellationToken cancellationToken);
     /// <summary>
-    /// Gets all transactions for a specific user with pagination.
+    /// Create a new transaction
     /// </summary>
-    /// <param name="userId">The user ID to get transactions for</param>
-    /// <param name="pageNumber">Page number (1-based)</param>
-    /// <param name="pageSize">Number of items per page</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Paginated list of transactions</returns>
-    Task<ErrorOr<GetAllTransactionsResponse>> GetAllTransactionsAsync(
+    Task<ErrorOr<Transaction>> CreateAsync(
         int userId,
-        int pageNumber = 1,
-        int pageSize = 50,
-        CancellationToken cancellationToken = default);
+        TransactionType transactionType,
+        decimal amount,
+        DateOnly date,
+        string subject,
+        string? notes,
+        PaymentMethod paymentMethod,
+        int? categoryId,
+        int? transactionGroupId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Update an existing transaction
+    /// </summary>
+    Task<ErrorOr<Transaction>> UpdateAsync(
+        int id,
+        int userId,
+        TransactionType transactionType,
+        decimal amount,
+        DateOnly date,
+        string subject,
+        string? notes,
+        PaymentMethod paymentMethod,
+        int? categoryId,
+        int? transactionGroupId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Delete a transaction
+    /// </summary>
+    Task<ErrorOr<Deleted>> DeleteAsync(int id, CancellationToken cancellationToken);
 }

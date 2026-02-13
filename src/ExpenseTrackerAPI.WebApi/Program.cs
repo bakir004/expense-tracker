@@ -7,29 +7,23 @@ using ExpenseTrackerAPI.WebApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add Serilog
 builder.Host.UseSerilog((context, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration));
 
-// Configure Database Connection
 var connectionString = GetConnectionString(builder.Configuration, builder.Environment);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// Configure JWT Settings
 ConfigureJwtSettings(builder.Services, builder.Configuration, builder.Environment);
 
-// Add services to the container
 builder.Services.AddControllers();
 
-// Configure routing options for lowercase URLs
 builder.Services.Configure<RouteOptions>(options =>
 {
     options.LowercaseUrls = true;
     options.LowercaseQueryStrings = true;
 });
 
-// Add RFC 9110 compliant Problem Details
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = (context) =>
@@ -58,13 +52,10 @@ builder.Services.AddProblemDetails(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 
-// Add API versioning using our extension method
 DependencyInjectionExtensions.AddApiVersioning(builder.Services);
 
-// Add Swagger with versioning support
 builder.Services.AddSwaggerGen(c =>
 {
-    // Add JWT Authentication to Swagger
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
@@ -89,7 +80,6 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 
-    // Include XML comments for better documentation
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
@@ -98,22 +88,17 @@ builder.Services.AddSwaggerGen(c =>
     }
 });
 
-// Configure Swagger for API versioning
 builder.Services.ConfigureOptions<ConfigureSwaggerOptions>();
 
-// Add application and infrastructure services
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices();
 
-// Add JWT authentication
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
 var app = builder.Build();
 
-// Add request logging
 app.UseSerilogRequestLogging();
 
-// Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -121,7 +106,6 @@ if (app.Environment.IsDevelopment())
     {
         var provider = app.Services.GetRequiredService<Asp.Versioning.ApiExplorer.IApiVersionDescriptionProvider>();
 
-        // Create a Swagger endpoint for each API version
         foreach (var description in provider.ApiVersionDescriptions.Reverse())
         {
             c.SwaggerEndpoint(
@@ -140,11 +124,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Add authentication and authorization middleware
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Add user context middleware (must be after UseAuthentication)
 app.UseUserContext();
 
 app.MapControllers();
@@ -153,7 +135,6 @@ try
 {
     Log.Information("Starting ExpenseTracker API");
 
-    // Auto-migrate and seed database on startup
     await InitializeDatabaseAsync(app.Services);
 
     app.Run();
@@ -171,7 +152,6 @@ static string GetConnectionString(IConfiguration configuration, IWebHostEnvironm
 {
     if (environment.IsProduction())
     {
-        // In production, use environment variables
         var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
         var database = Environment.GetEnvironmentVariable("DB_NAME") ?? "expense_tracker_db";
         var username = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
@@ -183,7 +163,6 @@ static string GetConnectionString(IConfiguration configuration, IWebHostEnvironm
     }
     else
     {
-        // In development/local, use appsettings.json
         return configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("DefaultConnection not found in configuration");
     }
@@ -193,22 +172,18 @@ static void ConfigureJwtSettings(IServiceCollection services, IConfiguration con
 {
     if (environment.IsProduction())
     {
-        // In production, override JWT settings with environment variables
         var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
             ?? throw new InvalidOperationException("JWT_SECRET_KEY environment variable is required in production");
         var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "ExpenseTrackerAPI";
         var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "ExpenseTrackerAPI";
         var jwtExpiryHours = Environment.GetEnvironmentVariable("JWT_EXPIRY_HOURS") ?? "24";
 
-        // Override configuration values
         configuration["Jwt:SecretKey"] = jwtSecret;
         configuration["Jwt:Issuer"] = jwtIssuer;
         configuration["Jwt:Audience"] = jwtAudience;
         configuration["Jwt:ExpirationHours"] = jwtExpiryHours;
     }
 
-    // JWT settings will be configured later when authentication is added
-    // For now, just validate that settings exist
     var secretKey = configuration["Jwt:SecretKey"];
     if (string.IsNullOrEmpty(secretKey))
     {
@@ -225,7 +200,6 @@ static async Task InitializeDatabaseAsync(IServiceProvider services)
     {
         Log.Information("Checking database connectivity...");
 
-        // Test database connection
         var canConnect = await dbContext.Database.CanConnectAsync();
         if (!canConnect)
         {
@@ -235,7 +209,6 @@ static async Task InitializeDatabaseAsync(IServiceProvider services)
 
         Log.Information("Database connection successful");
 
-        // Apply pending migrations automatically
         var pendingMigrations = await dbContext.Database.GetPendingMigrationsAsync();
         if (pendingMigrations.Any())
         {
@@ -248,7 +221,6 @@ static async Task InitializeDatabaseAsync(IServiceProvider services)
             Log.Information("Database is up to date - no pending migrations");
         }
 
-        // Seed database if empty
         if (!await dbContext.Users.AnyAsync())
         {
             Log.Information("Database is empty - seeding with initial data...");
@@ -320,3 +292,10 @@ public class ConfigureSwaggerOptions : Microsoft.Extensions.Options.IConfigureOp
         return info;
     }
 }
+
+
+/// <summary>
+/// The main entry point for the ExpenseTracker API application.
+/// </summary>
+/// This class is intentionally left empty as the top-level statements in Program.cs handle the application setup and execution.
+public partial class Program { }

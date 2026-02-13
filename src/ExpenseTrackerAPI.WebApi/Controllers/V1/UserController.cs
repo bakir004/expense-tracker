@@ -12,7 +12,7 @@ namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
 /// User management endpoints for API version 1.0.
 /// </summary>
 [ApiController]
-[Route("api/v{version:apiVersion}/[controller]")]
+[Route("api/v{version:apiVersion}/users")]
 [ApiVersion("1.0")]
 [Authorize]
 public class UserController : ApiControllerBase

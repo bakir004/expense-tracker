@@ -16,14 +16,12 @@ public class UserServiceTests
 {
     private readonly Mock<IUserRepository> _mockUserRepository;
     private readonly Mock<IJwtTokenGenerator> _mockJwtTokenGenerator;
-    private readonly Mock<ILogger<UserService>> _mockLogger;
     private readonly UserService _userService;
 
     public UserServiceTests()
     {
         _mockUserRepository = new Mock<IUserRepository>();
         _mockJwtTokenGenerator = new Mock<IJwtTokenGenerator>();
-        _mockLogger = new Mock<ILogger<UserService>>();
         _userService = new UserService(_mockUserRepository.Object, _mockJwtTokenGenerator.Object);
     }
 

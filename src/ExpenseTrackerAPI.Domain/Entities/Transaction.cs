@@ -23,6 +23,8 @@ public class Transaction
     /// <param name="notes">Optional additional notes</param>
     /// <param name="categoryId">Category ID (optional for both expenses and income)</param>
     /// <param name="transactionGroupId">Optional transaction group ID</param>
+    /// <param name="createdAt">Optional creation timestamp (defaults to current UTC time)</param>
+    /// <param name="updatedAt">Optional update timestamp (defaults to current UTC time)</param>
 
     public Transaction(
         int userId,
@@ -33,7 +35,9 @@ public class Transaction
         PaymentMethod paymentMethod,
         string? notes = null,
         int? categoryId = null,
-        int? transactionGroupId = null)
+        int? transactionGroupId = null,
+        DateTime? createdAt = null,
+        DateTime? updatedAt = null)
     {
         ValidateBusinessRules(userId, transactionType, amount, date, subject, categoryId);
 
@@ -49,8 +53,8 @@ public class Transaction
         TransactionGroupId = transactionGroupId;
 
         var now = DateTime.UtcNow;
-        CreatedAt = now;
-        UpdatedAt = now;
+        CreatedAt = createdAt ?? now;
+        UpdatedAt = updatedAt ?? now;
 
         CumulativeDelta = 0;
     }
@@ -62,6 +66,11 @@ public class Transaction
     {
         CumulativeDelta = cumulativeDelta;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    public void UpdateId(int id)
+    {
+        Id = id;
     }
 
     /// <summary>
@@ -115,7 +124,7 @@ public class Transaction
         }
     }
 
-    public int Id { get; }
+    public int Id { get; private set; }
 
     public int UserId { get; }
 
