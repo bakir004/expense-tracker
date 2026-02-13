@@ -5,13 +5,13 @@ using ExpenseTrackerAPI.WebApi.Tests.Common;
 using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
 using FluentAssertions;
 
-namespace ExpenseTrackerAPI.WebApi.Tests.Integration.Auth;
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.Auth;
 
 /// <summary>
-/// Integration tests for authentication API endpoints.
+/// E2E tests for authentication API endpoints.
 /// Tests registration, login, and health check endpoints.
 /// </summary>
-public class AuthApiTests : BaseApiTest
+public class AuthApiTests : BaseE2ETest
 {
     public AuthApiTests(ExpenseTrackerApiFactory factory) : base(factory) { }
 

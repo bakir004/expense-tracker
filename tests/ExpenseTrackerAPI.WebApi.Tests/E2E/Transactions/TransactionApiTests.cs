@@ -9,9 +9,13 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace ExpenseTrackerAPI.WebApi.Tests.Integration.Transactions;
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.Transactions;
 
-public class TransactionApiTests : BaseApiTest
+/// <summary>
+/// E2E tests for transaction API endpoints.
+/// Tests transaction creation, validation, and database persistence.
+/// </summary>
+public class TransactionApiTests : BaseE2ETest
 {
     public TransactionApiTests(ExpenseTrackerApiFactory factory) : base(factory) { }
 

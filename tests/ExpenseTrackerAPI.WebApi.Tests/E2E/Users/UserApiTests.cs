@@ -8,17 +8,16 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace ExpenseTrackerAPI.WebApi.Tests.Integration.Users;
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.Users;
 
 /// <summary>
-/// Integration tests for user profile management API endpoints.
+/// E2E tests for user profile management API endpoints.
 /// Tests profile update and deletion endpoints.
 ///
 /// NOTE: These tests use the TestAuthHandler which authenticates all requests as user ID 1
 /// (the first seeded user "John Doe" with email "john.doe@email.com").
-/// Tests that require different user contexts are in the E2E folder.
 /// </summary>
-public class UserApiTests : BaseApiTest
+public class UserApiTests : BaseE2ETest
 {
     public UserApiTests(ExpenseTrackerApiFactory factory) : base(factory) { }
 
@@ -301,7 +300,7 @@ public class UserApiTests : BaseApiTest
     }
 
     // Note: We don't test successful deletion of the seeded user as it would affect other tests
-    // E2E tests cover the full deletion flow with freshly registered users
+    // E2E tests in UserWorkflows cover the full deletion flow with freshly registered users
 
     #endregion
 

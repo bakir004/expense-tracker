@@ -21,7 +21,7 @@ namespace ExpenseTrackerAPI.WebApi.Tests.E2E.UserWorkflows;
 /// but subsequent authenticated requests will be processed as user ID 1.
 /// For true multi-user isolation testing, a separate test factory without TestAuthHandler would be needed.
 /// </summary>
-public class CompleteUserJourneyTests : BaseApiTest
+public class CompleteUserJourneyTests : BaseE2ETest
 {
     public CompleteUserJourneyTests(ExpenseTrackerApiFactory factory) : base(factory) { }
 
