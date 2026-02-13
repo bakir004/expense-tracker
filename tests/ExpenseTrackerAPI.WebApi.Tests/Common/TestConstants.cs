@@ -24,6 +24,13 @@ public static class TestConstants
 
         // User endpoints
         public const string UserProfile = $"{BaseUrl}/users/profile";
+
+        // Transaction Group endpoints
+        public const string TransactionGroups = $"{BaseUrl}/transaction-groups";
+        public static string TransactionGroup(int id) => $"{TransactionGroups}/{id}";
+
+        // Category endpoints
+        public const string Categories = $"{BaseUrl}/categories";
     }
 
     /// <summary>
