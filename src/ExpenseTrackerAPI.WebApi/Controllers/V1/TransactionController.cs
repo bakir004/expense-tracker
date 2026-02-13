@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 using ExpenseTrackerAPI.Contracts.Transactions;
-using ExpenseTrackerAPI.WebApi.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Asp.Versioning;
-using ExpenseTrackerAPI.Domain.Entities;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
 

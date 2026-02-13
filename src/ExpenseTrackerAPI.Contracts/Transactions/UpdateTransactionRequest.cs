@@ -53,10 +53,4 @@ public class UpdateTransactionRequest
     /// </summary>
     [Range(1, int.MaxValue, ErrorMessage = "Transaction group ID must be positive when provided.")]
     public int? TransactionGroupId { get; set; }
-
-    /// <summary>
-    /// Optional: source of income (e.g., "ABC Corporation")
-    /// </summary>
-    [MaxLength(255)]
-    public string? IncomeSource { get; set; }
 }
