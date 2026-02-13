@@ -127,6 +127,14 @@ public class TransactionRepository : ITransactionRepository
 
                 try
                 {
+                    // Detach the old transaction if it's being tracked to avoid conflicts
+                    var trackedEntity = _context.ChangeTracker.Entries<Transaction>()
+                        .FirstOrDefault(e => e.Entity.Id == oldTransaction.Id);
+                    if (trackedEntity != null)
+                    {
+                        _context.Entry(trackedEntity.Entity).State = EntityState.Detached;
+                    }
+
                     bool dateChanged = oldTransaction.Date != transaction.Date;
                     bool amountChanged = oldTransaction.SignedAmount != transaction.SignedAmount;
 
