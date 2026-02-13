@@ -8,15 +8,15 @@ namespace ExpenseTrackerAPI.Domain.Errors;
 public static class TransactionGroupErrors
 {
     public static Error NotFound =>
-        Error.NotFound("transactionGroup", "Transaction group not found.");
+        Error.NotFound("TransactionGroup", "Transaction group not found.");
 
     public static Error InvalidName =>
-        Error.Validation("name", "Transaction group name is required and must be between 1 and 255 characters.");
+        Error.Validation("Name", "Transaction group name is required and must be between 1 and 255 characters.");
 
     public static Error InvalidUserId =>
-        Error.Validation("userId", "User ID is required and must be greater than 0.");
+        Error.Validation("UserId", "User ID is required and must be greater than 0.");
 
     public static Error UserNotFound =>
-        Error.Failure("userId", "The specified user does not exist.");
+        Error.Failure("UserId", "The specified user does not exist.");
 }
 

@@ -52,7 +52,7 @@ public class UserService : IUserService
         }
         catch (Exception ex)
         {
-            return Error.Failure("User.Register.UnexpectedError", $"Registration failed: {ex.Message}");
+            return UserErrors.RegistrationFailed(ex.Message);
         }
     }
 
@@ -86,7 +86,7 @@ public class UserService : IUserService
         }
         catch (Exception ex)
         {
-            return Error.Failure("User.Login.UnexpectedError", $"Login failed: {ex.Message}");
+            return UserErrors.LoginFailed(ex.Message);
         }
     }
 
@@ -154,7 +154,7 @@ public class UserService : IUserService
         }
         catch (Exception ex)
         {
-            return Error.Failure("User.Update.UnexpectedError", $"Update failed: {ex.Message}");
+            return UserErrors.UpdateFailed(ex.Message);
         }
     }
 
@@ -195,7 +195,7 @@ public class UserService : IUserService
         }
         catch (Exception ex)
         {
-            return Error.Failure("User.Delete.UnexpectedError", $"Delete operation failed: {ex.Message}");
+            return UserErrors.DeleteFailed(ex.Message);
         }
     }
 

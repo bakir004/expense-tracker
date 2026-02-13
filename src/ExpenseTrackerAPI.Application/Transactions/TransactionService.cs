@@ -1,5 +1,6 @@
 using ErrorOr;
 using ExpenseTrackerAPI.Domain.Entities;
+using ExpenseTrackerAPI.Domain.Errors;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Infrastructure;
 using ExpenseTrackerAPI.Application.Users.Interfaces.Infrastructure;
@@ -57,7 +58,7 @@ public class TransactionService : ITransactionService
         }
         catch (ArgumentException ex)
         {
-            return Error.Validation("Transaction.Create.ValidationError", ex.Message);
+            return TransactionErrors.ValidationError(ex.Message);
         }
     }
 
@@ -101,7 +102,7 @@ public class TransactionService : ITransactionService
         }
         catch (ArgumentException ex)
         {
-            return Error.Validation("Transaction.Update.ValidationError", ex.Message);
+            return TransactionErrors.ValidationError(ex.Message);
         }
     }
 

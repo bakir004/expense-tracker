@@ -1,5 +1,6 @@
 using ErrorOr;
 using ExpenseTrackerAPI.Domain.Entities;
+using ExpenseTrackerAPI.Domain.Errors;
 
 namespace ExpenseTrackerAPI.Contracts.Transactions;
 
@@ -35,9 +36,7 @@ public static class TransactionRequestParser
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return Error.Validation(
-                "TransactionType.Required",
-                "Transaction type is required.");
+            return TransactionErrors.TransactionTypeRequired;
         }
 
         var trimmedValue = value.Trim();
@@ -46,9 +45,7 @@ public static class TransactionRequestParser
             return transactionType;
         }
 
-        return Error.Validation(
-            "TransactionType.Invalid",
-            $"Invalid transaction type '{value}'. Valid values are: EXPENSE, INCOME.");
+        return TransactionErrors.InvalidTransactionType;
     }
 
     /// <summary>
@@ -60,9 +57,7 @@ public static class TransactionRequestParser
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return Error.Validation(
-                "PaymentMethod.Required",
-                "Payment method is required.");
+            return TransactionErrors.PaymentMethodRequired;
         }
 
         var trimmedValue = value.Trim();
@@ -71,10 +66,7 @@ public static class TransactionRequestParser
             return paymentMethod;
         }
 
-        var validValues = string.Join(", ", PaymentMethodMap.Keys);
-        return Error.Validation(
-            "PaymentMethod.Invalid",
-            $"Invalid payment method '{value}'. Valid values are: {validValues}.");
+        return TransactionErrors.InvalidPaymentMethod;
     }
 
     /// <summary>

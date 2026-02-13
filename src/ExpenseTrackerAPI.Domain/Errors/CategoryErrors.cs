@@ -8,11 +8,11 @@ namespace ExpenseTrackerAPI.Domain.Errors;
 public static class CategoryErrors
 {
     public static Error NotFound =>
-        Error.NotFound("category", "Category not found.");
+        Error.NotFound("Category", "Category not found.");
 
     public static Error DuplicateName =>
-        Error.Conflict("name", "A category with this name already exists.");
+        Error.Conflict("Name", "A category with this name already exists.");
 
     public static Error InvalidName =>
-        Error.Validation("name", "Category name is required and must be between 1 and 255 characters.");
+        Error.Validation("Name", "Category name is required and must be between 1 and 255 characters.");
 }

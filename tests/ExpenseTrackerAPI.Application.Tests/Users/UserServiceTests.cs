@@ -189,7 +189,7 @@ public class UserServiceTests
         // Assert
         result.IsError.Should().BeTrue();
         result.FirstError.Type.Should().Be(ErrorType.Failure);
-        result.FirstError.Code.Should().Be("User.Register.UnexpectedError");
+        result.FirstError.Code.Should().Be("Registration");
         result.FirstError.Description.Should().Contain("Email format is invalid");
     }
 
@@ -708,7 +708,7 @@ public class UserServiceTests
         // Assert
         result.IsError.Should().BeTrue();
         result.FirstError.Type.Should().Be(ErrorType.Failure);
-        result.FirstError.Code.Should().Be("User.Register.UnexpectedError");
+        result.FirstError.Code.Should().Be("Registration");
         result.FirstError.Description.Should().Contain("Database connection failed");
     }
 
@@ -727,7 +727,7 @@ public class UserServiceTests
         // Assert
         result.IsError.Should().BeTrue();
         result.FirstError.Type.Should().Be(ErrorType.Failure);
-        result.FirstError.Code.Should().Be("User.Login.UnexpectedError");
+        result.FirstError.Code.Should().Be("Login");
         result.FirstError.Description.Should().Contain("Database timeout");
     }
 
