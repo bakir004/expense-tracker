@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/E2E/Auth/AuthApiTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Net;
+using System.Net.Http.Json;
+using ExpenseTrackerAPI.Contracts.Users;
+using ExpenseTrackerAPI.WebApi.Tests.Common;
+using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+using FluentAssertions;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.Auth;
+
+/// &lt;summary&gt;
+/// E2E tests for authentication API endpoints.
+/// Tests registration, login, and health check endpoints.
+/// &lt;/summary&gt;
+public class AuthApiTests : BaseE2ETest
+{
+    public AuthApiTests(ExpenseTrackerApiFactory factory) : base(factory) { }
+
+    #region Registration Tests
+
+    [Fact]
+    public async Task Register_WithValidData_ShouldReturnSuccess()
+    {
+        // Arrange
+        var uniqueEmail = $&quot;auth.test.{Guid.NewGuid():N}@test.local&quot;;
+        var request = new RegisterRequest(
+            &quot;Auth Test User&quot;,
+            uniqueEmail,
+            TestConstants.TestUsers.NewUserPassword,
+            500.00m);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync&lt;RegisterResponse&gt;();
+        result.Should().NotBeNull();
+        result!.Email.Should().Be(uniqueEmail);
+        result.Name.Should().Be(&quot;Auth Test User&quot;);
+        result.InitialBalance.Should().Be(500.00m);
+        result.Id.Should().BeGreaterThan(0);
+        result.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public async Task Register_WithZeroInitialBalance_ShouldSucceed()
+    {
+        // Arrange
+        var uniqueEmail = $&quot;zero.balance.{Guid.NewGuid():N}@test.local&quot;;
+        var request = new RegisterRequest(
+            &quot;Zero Balance User&quot;,
+            uniqueEmail,
+            TestConstants.TestUsers.NewUserPassword,
+            0m);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync&lt;RegisterResponse&gt;();
+        result!.InitialBalance.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task Register_WithNullInitialBalance_ShouldDefaultToZero()
+    {
+        // Arrange
+        var uniqueEmail = $&quot;null.balance.{Guid.NewGuid():N}@test.local&quot;;
+        var request = new RegisterRequest(
+            &quot;Null Balance User&quot;,
+            uniqueEmail,
+            TestConstants.TestUsers.NewUserPassword,
+            null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync&lt;RegisterResponse&gt;();
+        result!.InitialBalance.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task Register_WithDuplicateEmail_ShouldReturnConflict()
+    {
+        // Arrange - Use seeded user email
+        var request = new RegisterRequest(
+            &quot;Duplicate User&quot;,
+            TestConstants.TestUsers.SeededUser1Email,
+            TestConstants.TestUsers.NewUserPassword,
+            null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Theory]
+    [InlineData(&quot;&quot;, &quot;valid@email.com&quot;, &quot;Password123!&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;&quot;, &quot;Password123!&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;invalid-email&quot;, &quot;Password123!&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;valid@email.com&quot;, &quot;&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;valid@email.com&quot;, &quot;short&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;valid@email.com&quot;, &quot;nouppercase123!&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;valid@email.com&quot;, &quot;NOLOWERCASE123!&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;valid@email.com&quot;, &quot;NoDigitsHere!&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;valid@email.com&quot;, &quot;NoSpecialChar123&quot;)]
+    public async Task Register_WithInvalidData_ShouldReturnBadRequest(
+        string name, string email, string password)
+    {
+        // Arrange
+        var request = new RegisterRequest(name, email, password, null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Register_WithMaxLengthName_ShouldSucceed()
+    {
+        // Arrange
+        var maxLengthName = new string(&#39;A&#39;, 100);
+        var uniqueEmail = $&quot;maxname.{Guid.NewGuid():N}@test.local&quot;;
+        var request = new RegisterRequest(
+            maxLengthName,
+            uniqueEmail,
+            TestConstants.TestUsers.NewUserPassword,
+            null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync&lt;RegisterResponse&gt;();
+        result!.Name.Should().Be(maxLengthName);
+    }
+
+    [Fact]
+    public async Task Register_WithExceedingMaxLengthName_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var tooLongName = new string(&#39;A&#39;, 101);
+        var uniqueEmail = $&quot;toolongname.{Guid.NewGuid():N}@test.local&quot;;
+        var request = new RegisterRequest(
+            tooLongName,
+            uniqueEmail,
+            TestConstants.TestUsers.NewUserPassword,
+            null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    #endregion
+
+    #region Login Tests
+
+    [Fact]
+    public async Task Login_WithValidCredentials_ShouldReturnTokenAndUserInfo()
+    {
+        // Arrange - Use seeded user
+        var request = new LoginRequest(
+            TestConstants.TestUsers.SeededUser1Email,
+            TestConstants.TestUsers.SeededUserPassword);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync&lt;LoginResponse&gt;();
+        result.Should().NotBeNull();
+        result!.Email.Should().Be(TestConstants.TestUsers.SeededUser1Email);
+        result.Name.Should().Be(TestConstants.TestUsers.SeededUser1Name);
+        result.Token.Should().NotBeNullOrEmpty();
+        result.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
+        result.Id.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task Login_WithInvalidPassword_ShouldReturnUnauthorized()
+    {
+        // Arrange
+        var request = new LoginRequest(
+            TestConstants.TestUsers.SeededUser1Email,
+            &quot;WrongP@ssword123!&quot;);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Login_WithNonExistentEmail_ShouldReturnUnauthorized()
+    {
+        // Arrange
+        var request = new LoginRequest(
+            &quot;nonexistent@email.com&quot;,
+            TestConstants.TestUsers.SeededUserPassword);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Theory]
+    [InlineData(&quot;&quot;, &quot;Password123!&quot;)]
+    [InlineData(&quot;invalid-email&quot;, &quot;Password123!&quot;)]
+    [InlineData(&quot;valid@email.com&quot;, &quot;&quot;)]
+    public async Task Login_WithInvalidData_ShouldReturnBadRequest(string email, string password)
+    {
+        // Arrange
+        var request = new LoginRequest(email, password);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Login_AfterRegistration_ShouldSucceed()
+    {
+        // Arrange - Register new user
+        var uniqueEmail = $&quot;login.after.reg.{Guid.NewGuid():N}@test.local&quot;;
+        var password = TestConstants.TestUsers.NewUserPassword;
+        var registerRequest = new RegisterRequest(&quot;Login Test User&quot;, uniqueEmail, password, null);
+
+        var registerResponse = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, registerRequest);
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Act - Login with new credentials
+        var loginRequest = new LoginRequest(uniqueEmail, password);
+        var loginResponse = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, loginRequest);
+
+        // Assert
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await loginResponse.Content.ReadFromJsonAsync&lt;LoginResponse&gt;();
+        result!.Email.Should().Be(uniqueEmail);
+        result.Token.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task Login_MultipleTimes_ShouldGenerateNewTokens()
+    {
+        // Arrange
+        var request = new LoginRequest(
+            TestConstants.TestUsers.SeededUser1Email,
+            TestConstants.TestUsers.SeededUserPassword);
+
+        // Act - Login twice
+        var response1 = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+        var result1 = await response1.Content.ReadFromJsonAsync&lt;LoginResponse&gt;();
+
+        // Small delay to ensure different token generation
+        await Task.Delay(100);
+
+        var response2 = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+        var result2 = await response2.Content.ReadFromJsonAsync&lt;LoginResponse&gt;();
+
+        // Assert
+        response1.StatusCode.Should().Be(HttpStatusCode.OK);
+        response2.StatusCode.Should().Be(HttpStatusCode.OK);
+        result1!.Token.Should().NotBeNullOrEmpty();
+        result2!.Token.Should().NotBeNullOrEmpty();
+        // Tokens should be different (different generation time)
+        result1.Token.Should().NotBe(result2.Token);
+    }
+
+    #endregion
+
+    #region Health Check Tests
+
+    [Fact]
+    public async Task Health_ShouldReturnHealthyStatus()
+    {
+        // Act
+        var response = await Client.GetAsync(TestConstants.Routes.AuthHealth);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain(&quot;Healthy&quot;);
+    }
+
+    [Fact]
+    public async Task Health_ShouldBeAccessibleWithoutAuthentication()
+    {
+        // Arrange - Create client without auth header
+        var unauthClient = Factory.CreateClient();
+
+        // Act
+        var response = await unauthClient.GetAsync(TestConstants.Routes.AuthHealth);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    #endregion
+
+    #region Edge Cases
+
+    [Fact]
+    public async Task Register_WithCaseSensitiveEmail_ShouldTreatAsUnique()
+    {
+        // Arrange - Register with lowercase
+        var baseEmail = $&quot;case.test.{Guid.NewGuid():N}&quot;;
+        var lowerEmail = $&quot;{baseEmail}@test.local&quot;;
+
+        var registerLower = new RegisterRequest(
+            &quot;Lowercase User&quot;,
+            lowerEmail,
+            TestConstants.TestUsers.NewUserPassword,
+            null);
+
+        var response1 = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, registerLower);
+        response1.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Act - Try to register with uppercase (same email, different case)
+        var upperEmail = $&quot;{baseEmail.ToUpper()}@TEST.LOCAL&quot;;
+        var registerUpper = new RegisterRequest(
+            &quot;Uppercase User&quot;,
+            upperEmail,
+            TestConstants.TestUsers.NewUserPassword,
+            null);
+
+        var response2 = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, registerUpper);
+
+        // Assert - Should be conflict (emails typically case-insensitive)
+        response2.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Login_WithDifferentCaseEmail_ShouldSucceed()
+    {
+        // Arrange - Use seeded user with different case
+        var uppercaseEmail = TestConstants.TestUsers.SeededUser1Email.ToUpper();
+        var request = new LoginRequest(
+            uppercaseEmail,
+            TestConstants.TestUsers.SeededUserPassword);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert - Should succeed if emails are case-insensitive
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Register_WithSpecialCharactersInName_ShouldSucceed()
+    {
+        // Arrange
+        var uniqueEmail = $&quot;special.name.{Guid.NewGuid():N}@test.local&quot;;
+        var specialName = &quot;Jos&#233; Mar&#237;a O&#39;Brien-Smith&quot;;
+        var request = new RegisterRequest(
+            specialName,
+            uniqueEmail,
+            TestConstants.TestUsers.NewUserPassword,
+            null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync&lt;RegisterResponse&gt;();
+        result!.Name.Should().Be(specialName);
+    }
+
+    [Fact]
+    public async Task Register_WithNegativeInitialBalance_ShouldHandleAppropriately()
+    {
+        // Arrange
+        var uniqueEmail = $&quot;negative.balance.{Guid.NewGuid():N}@test.local&quot;;
+        var request = new RegisterRequest(
+            &quot;Negative Balance User&quot;,
+            uniqueEmail,
+            TestConstants.TestUsers.NewUserPassword,
+            -100.00m);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert - Depending on business rules, this might be OK or BadRequest
+        // Documenting actual behavior
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest);
+    }
+
+    #endregion
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[16,61,16,74,1],[16,75,16,76,1],[16,77,16,78,1],[22,5,22,6,1],[24,9,24,70,1],[25,9,29,22,1],[32,9,32,97,1],[35,9,35,60,1],[36,9,36,83,1],[37,9,37,37,1],[38,9,38,48,1],[39,9,39,51,1],[40,9,40,52,1],[41,9,41,45,1],[42,9,42,87,1],[43,5,43,6,1],[47,5,47,6,1],[49,9,49,73,1],[50,9,54,17,1],[57,9,57,97,1],[60,9,60,60,1],[61,9,61,83,1],[62,9,62,48,1],[63,5,63,6,1],[67,5,67,6,1],[69,9,69,73,1],[70,9,74,19,1],[77,9,77,97,1],[80,9,80,60,1],[81,9,81,83,1],[82,9,82,48,1],[83,5,83,6,1],[87,5,87,6,1],[89,9,93,19,1],[96,9,96,97,1],[99,9,99,66,1],[100,5,100,6,1],[114,5,114,6,1],[116,9,116,72,1],[119,9,119,97,1],[122,9,122,68,1],[123,5,123,6,1],[127,5,127,6,1],[129,9,129,50,1],[130,9,130,68,1],[131,9,135,19,1],[138,9,138,97,1],[141,9,141,60,1],[142,9,142,83,1],[143,9,143,49,1],[144,5,144,6,1],[148,5,148,6,1],[150,9,150,48,1],[151,9,151,72,1],[152,9,156,19,1],[159,9,159,97,1],[162,9,162,68,1],[163,5,163,6,1],[171,5,171,6,1],[173,9,175,57,1],[178,9,178,94,1],[181,9,181,60,1],[182,9,182,80,1],[183,9,183,37,1],[184,9,184,77,1],[185,9,185,74,1],[186,9,186,50,1],[187,9,187,60,1],[188,9,188,45,1],[189,5,189,6,1],[193,5,193,6,1],[195,9,197,34,1],[200,9,200,94,1],[203,9,203,70,1],[204,5,204,6,1],[208,5,208,6,1],[210,9,212,57,1],[215,9,215,94,1],[218,9,218,70,1],[219,5,219,6,1],[226,5,226,6,1],[228,9,228,57,1],[231,9,231,94,1],[234,9,234,68,1],[235,5,235,6,1],[239,5,239,6,1],[241,9,241,76,1],[242,9,242,64,1],[243,9,243,99,1],[245,9,245,113,1],[246,9,246,68,1],[249,9,249,68,1],[250,9,250,104,1],[253,9,253,65,1],[254,9,254,85,1],[255,9,255,48,1],[256,9,256,50,1],[257,5,257,6,1],[261,5,261,6,1],[263,9,265,57,1],[268,9,268,95,1],[269,9,269,82,1],[272,9,272,31,1],[274,9,274,95,1],[275,9,275,82,1],[278,9,278,61,1],[279,9,279,61,1],[280,9,280,52,1],[281,9,281,52,1],[283,9,283,53,1],[284,5,284,6,1],[292,5,292,6,1],[294,9,294,79,1],[297,9,297,60,1],[298,9,298,66,1],[299,9,299,45,1],[300,5,300,6,1],[304,5,304,6,1],[306,9,306,51,1],[309,9,309,85,1],[312,9,312,60,1],[313,5,313,6,1],[321,5,321,6,1],[323,9,323,57,1],[324,9,324,52,1],[326,9,330,19,1],[332,9,332,104,1],[333,9,333,61,1],[336,9,336,62,1],[337,9,341,19,1],[343,9,343,104,1],[346,9,346,67,1],[347,5,347,6,1],[351,5,351,6,1],[353,9,353,81,1],[354,9,356,57,1],[359,9,359,94,1],[362,9,362,60,1],[363,5,363,6,1],[367,5,367,6,1],[369,9,369,73,1],[370,9,370,54,1],[371,9,375,19,1],[378,9,378,97,1],[381,9,381,60,1],[382,9,382,83,1],[383,9,383,47,1],[384,5,384,6,1],[388,5,388,6,1],[390,9,390,77,1],[391,9,395,23,1],[398,9,398,97,1],[402,9,402,92,1],[403,5,403,6,1]]);
+    </script>
+  </body>
+</html>

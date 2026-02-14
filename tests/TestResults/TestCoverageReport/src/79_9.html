@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/Fixtures/TestAuthHandler.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Security.Claims;
+using System.Text.Encodings.Web;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+
+public static class TestAuthDefaults
+{
+    public const string AuthenticationScheme = &quot;Test&quot;;
+}
+
+public sealed class TestAuthHandler : AuthenticationHandler&lt;AuthenticationSchemeOptions&gt;
+{
+    public const int DefaultUserId = 1;
+    public const string DefaultUserEmail = &quot;test.user@expense-tracker.local&quot;;
+    public const string DefaultUserName = &quot;Test User&quot;;
+
+#pragma warning disable CS0618
+    public TestAuthHandler(
+        IOptionsMonitor&lt;AuthenticationSchemeOptions&gt; options,
+        ILoggerFactory logger,
+        UrlEncoder encoder,
+        ISystemClock clock)
+        : base(options, logger, encoder, clock)
+    {
+    }
+#pragma warning restore CS0618
+
+    protected override Task&lt;AuthenticateResult&gt; HandleAuthenticateAsync()
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, DefaultUserId.ToString()),
+            new Claim(ClaimTypes.Email, DefaultUserEmail),
+            new Claim(ClaimTypes.Name, DefaultUserName)
+        };
+
+        var identity = new ClaimsIdentity(claims, TestAuthDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+        var ticket = new AuthenticationTicket(principal, TestAuthDefaults.AuthenticationScheme);
+
+        return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[26,11,26,48,1],[27,5,27,6,1],[28,5,28,6,1],[32,5,32,6,1],[33,9,38,11,1],[40,9,40,90,1],[41,9,41,55,1],[42,9,42,97,1],[44,9,44,68,1],[45,5,45,6,1]]);
+    </script>
+  </body>
+</html>

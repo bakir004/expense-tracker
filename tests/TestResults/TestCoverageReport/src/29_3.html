@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Infrastructure/Migrations/20260212122911_InitialCreate.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+
+#nullable disable
+
+namespace ExpenseTrackerAPI.Infrastructure.Migrations
+{
+    /// &lt;inheritdoc /&gt;
+    public partial class InitialCreate : Migration
+    {
+        /// &lt;inheritdoc /&gt;
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.EnsureSchema(
+                name: &quot;public&quot;);
+
+            migrationBuilder.CreateTable(
+                name: &quot;Categories&quot;,
+                schema: &quot;public&quot;,
+                columns: table =&gt; new
+                {
+                    id = table.Column&lt;int&gt;(type: &quot;integer&quot;, nullable: false)
+                        .Annotation(&quot;Npgsql:ValueGenerationStrategy&quot;, NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    name = table.Column&lt;string&gt;(type: &quot;character varying(255)&quot;, maxLength: 255, nullable: false),
+                    description = table.Column&lt;string&gt;(type: &quot;text&quot;, nullable: true),
+                    icon = table.Column&lt;string&gt;(type: &quot;character varying(100)&quot;, maxLength: 100, nullable: false)
+                },
+                constraints: table =&gt;
+                {
+                    table.PrimaryKey(&quot;PK_Categories&quot;, x =&gt; x.id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: &quot;Users&quot;,
+                schema: &quot;public&quot;,
+                columns: table =&gt; new
+                {
+                    id = table.Column&lt;int&gt;(type: &quot;integer&quot;, nullable: false)
+                        .Annotation(&quot;Npgsql:ValueGenerationStrategy&quot;, NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    name = table.Column&lt;string&gt;(type: &quot;character varying(100)&quot;, maxLength: 100, nullable: false),
+                    email = table.Column&lt;string&gt;(type: &quot;character varying(255)&quot;, maxLength: 255, nullable: false),
+                    password_hash = table.Column&lt;string&gt;(type: &quot;character varying(255)&quot;, maxLength: 255, nullable: false),
+                    initial_balance = table.Column&lt;decimal&gt;(type: &quot;numeric(12,2)&quot;, precision: 12, scale: 2, nullable: false, defaultValue: 0m),
+                    created_at = table.Column&lt;DateTime&gt;(type: &quot;timestamp&quot;, nullable: false, defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;),
+                    updated_at = table.Column&lt;DateTime&gt;(type: &quot;timestamp&quot;, nullable: false, defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;)
+                },
+                constraints: table =&gt;
+                {
+                    table.PrimaryKey(&quot;PK_Users&quot;, x =&gt; x.id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: &quot;TransactionGroups&quot;,
+                schema: &quot;public&quot;,
+                columns: table =&gt; new
+                {
+                    id = table.Column&lt;int&gt;(type: &quot;integer&quot;, nullable: false)
+                        .Annotation(&quot;Npgsql:ValueGenerationStrategy&quot;, NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    name = table.Column&lt;string&gt;(type: &quot;character varying(255)&quot;, maxLength: 255, nullable: false),
+                    description = table.Column&lt;string&gt;(type: &quot;text&quot;, nullable: true),
+                    user_id = table.Column&lt;int&gt;(type: &quot;integer&quot;, nullable: false),
+                    created_at = table.Column&lt;DateTime&gt;(type: &quot;timestamp&quot;, nullable: false, defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;)
+                },
+                constraints: table =&gt;
+                {
+                    table.PrimaryKey(&quot;PK_TransactionGroups&quot;, x =&gt; x.id);
+                    table.ForeignKey(
+                        name: &quot;FK_TransactionGroups_Users_user_id&quot;,
+                        column: x =&gt; x.user_id,
+                        principalSchema: &quot;public&quot;,
+                        principalTable: &quot;Users&quot;,
+                        principalColumn: &quot;id&quot;,
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: &quot;Transactions&quot;,
+                schema: &quot;public&quot;,
+                columns: table =&gt; new
+                {
+                    id = table.Column&lt;int&gt;(type: &quot;integer&quot;, nullable: false)
+                        .Annotation(&quot;Npgsql:ValueGenerationStrategy&quot;, NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    user_id = table.Column&lt;int&gt;(type: &quot;integer&quot;, nullable: false),
+                    transaction_type = table.Column&lt;string&gt;(type: &quot;character varying(20)&quot;, maxLength: 20, nullable: false),
+                    amount = table.Column&lt;decimal&gt;(type: &quot;numeric(12,2)&quot;, precision: 12, scale: 2, nullable: false),
+                    signed_amount = table.Column&lt;decimal&gt;(type: &quot;numeric(12,2)&quot;, precision: 12, scale: 2, nullable: false),
+                    date = table.Column&lt;DateOnly&gt;(type: &quot;date&quot;, nullable: false),
+                    subject = table.Column&lt;string&gt;(type: &quot;character varying(255)&quot;, maxLength: 255, nullable: false),
+                    notes = table.Column&lt;string&gt;(type: &quot;text&quot;, nullable: true),
+                    payment_method = table.Column&lt;string&gt;(type: &quot;character varying(20)&quot;, maxLength: 20, nullable: false),
+                    cumulative_delta = table.Column&lt;decimal&gt;(type: &quot;numeric(12,2)&quot;, precision: 12, scale: 2, nullable: false),
+                    category_id = table.Column&lt;int&gt;(type: &quot;integer&quot;, nullable: true),
+                    transaction_group_id = table.Column&lt;int&gt;(type: &quot;integer&quot;, nullable: true),
+                    created_at = table.Column&lt;DateTime&gt;(type: &quot;timestamp&quot;, nullable: false, defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;),
+                    updated_at = table.Column&lt;DateTime&gt;(type: &quot;timestamp&quot;, nullable: false, defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;)
+                },
+                constraints: table =&gt;
+                {
+                    table.PrimaryKey(&quot;PK_Transactions&quot;, x =&gt; x.id);
+                    table.ForeignKey(
+                        name: &quot;FK_Transactions_Categories_category_id&quot;,
+                        column: x =&gt; x.category_id,
+                        principalSchema: &quot;public&quot;,
+                        principalTable: &quot;Categories&quot;,
+                        principalColumn: &quot;id&quot;,
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: &quot;FK_Transactions_TransactionGroups_transaction_group_id&quot;,
+                        column: x =&gt; x.transaction_group_id,
+                        principalSchema: &quot;public&quot;,
+                        principalTable: &quot;TransactionGroups&quot;,
+                        principalColumn: &quot;id&quot;,
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: &quot;FK_Transactions_Users_user_id&quot;,
+                        column: x =&gt; x.user_id,
+                        principalSchema: &quot;public&quot;,
+                        principalTable: &quot;Users&quot;,
+                        principalColumn: &quot;id&quot;,
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateIndex(
+                name: &quot;IX_Categories_name&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Categories&quot;,
+                column: &quot;name&quot;,
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: &quot;idx_transaction_group_user&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;TransactionGroups&quot;,
+                column: &quot;user_id&quot;);
+
+            migrationBuilder.CreateIndex(
+                name: &quot;idx_transaction_group&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Transactions&quot;,
+                column: &quot;transaction_group_id&quot;);
+
+            migrationBuilder.CreateIndex(
+                name: &quot;idx_transaction_type&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Transactions&quot;,
+                columns: new[] { &quot;user_id&quot;, &quot;transaction_type&quot; });
+
+            migrationBuilder.CreateIndex(
+                name: &quot;idx_transaction_user_date&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Transactions&quot;,
+                columns: new[] { &quot;user_id&quot;, &quot;date&quot;, &quot;id&quot; },
+                descending: new[] { false, true, true });
+
+            migrationBuilder.CreateIndex(
+                name: &quot;IX_Transactions_category_id&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Transactions&quot;,
+                column: &quot;category_id&quot;);
+
+            migrationBuilder.CreateIndex(
+                name: &quot;idx_users_email&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Users&quot;,
+                column: &quot;email&quot;,
+                unique: true);
+        }
+
+        /// &lt;inheritdoc /&gt;
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: &quot;Transactions&quot;,
+                schema: &quot;public&quot;);
+
+            migrationBuilder.DropTable(
+                name: &quot;Categories&quot;,
+                schema: &quot;public&quot;);
+
+            migrationBuilder.DropTable(
+                name: &quot;TransactionGroups&quot;,
+                schema: &quot;public&quot;);
+
+            migrationBuilder.DropTable(
+                name: &quot;Users&quot;,
+                schema: &quot;public&quot;);
+        }
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[14,9,14,10,1],[15,13,16,33,1],[18,13,21,35,1],[21,35,28,18,1],[28,18,30,17,1],[30,17,30,18,1],[30,18,31,21,1],[31,21,31,66,1],[31,66,32,17,1],[32,17,32,18,1],[32,18,32,20,1],[34,13,37,35,1],[37,35,47,18,1],[47,18,49,17,1],[49,17,49,18,1],[49,18,50,21,1],[50,21,50,61,1],[50,61,51,17,1],[51,17,51,18,1],[51,18,51,20,1],[53,13,56,35,1],[56,35,64,18,1],[64,18,66,17,1],[66,17,66,18,1],[66,18,67,21,1],[67,21,67,73,1],[67,73,68,21,1],[68,21,74,62,1],[74,62,75,17,1],[75,17,75,18,1],[75,18,75,20,1],[77,13,80,35,1],[80,35,97,18,1],[97,18,99,17,1],[99,17,99,18,1],[99,18,100,21,1],[100,21,100,68,1],[100,68,101,21,1],[101,21,107,63,1],[107,63,108,21,1],[108,21,114,62,1],[114,62,115,21,1],[115,21,121,62,1],[121,62,122,17,1],[122,17,122,18,1],[122,18,122,20,1],[124,13,129,31,1],[131,13,135,36,1],[137,13,141,49,1],[143,13,147,67,1],[149,13,154,58,1],[156,13,160,40,1],[162,13,167,31,1],[168,9,168,10,1],[172,9,172,10,0],[173,13,175,35,0],[177,13,179,35,0],[181,13,183,35,0],[185,13,187,35,0],[188,9,188,10,0]]);
+    </script>
+  </body>
+</html>

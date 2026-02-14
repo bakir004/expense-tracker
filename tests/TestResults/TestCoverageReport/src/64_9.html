@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/Common/TestConstants.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+namespace ExpenseTrackerAPI.WebApi.Tests.Common;
+
+/// &lt;summary&gt;
+/// Shared constants used across all test classes.
+/// &lt;/summary&gt;
+public static class TestConstants
+{
+    /// &lt;summary&gt;
+    /// API versioning and routes.
+    /// &lt;/summary&gt;
+    public static class Routes
+    {
+        public const string ApiVersion = &quot;v1&quot;;
+        public const string BaseUrl = &quot;/api/v1&quot;;
+
+        // Auth endpoints
+        public const string AuthRegister = $&quot;{BaseUrl}/auth/register&quot;;
+        public const string AuthLogin = $&quot;{BaseUrl}/auth/login&quot;;
+        public const string AuthHealth = $&quot;{BaseUrl}/auth/health&quot;;
+
+        // Transaction endpoints
+        public const string Transactions = $&quot;{BaseUrl}/transactions&quot;;
+        public static string Transaction(int id) =&gt; $&quot;{Transactions}/{id}&quot;;
+
+        // User endpoints
+        public const string UserProfile = $&quot;{BaseUrl}/users/profile&quot;;
+
+        // Transaction Group endpoints
+        public const string TransactionGroups = $&quot;{BaseUrl}/transaction-groups&quot;;
+        public static string TransactionGroup(int id) =&gt; $&quot;{TransactionGroups}/{id}&quot;;
+
+        // Category endpoints
+        public const string Categories = $&quot;{BaseUrl}/categories&quot;;
+    }
+
+    /// &lt;summary&gt;
+    /// Test user credentials that meet password requirements.
+    /// Password must have: uppercase, lowercase, digit, special char, min 8 chars.
+    /// &lt;/summary&gt;
+    public static class TestUsers
+    {
+        // Default test user (used by TestAuthHandler)
+        public const int DefaultUserId = 1;
+        public const string DefaultUserEmail = &quot;test.user@expense-tracker.local&quot;;
+        public const string DefaultUserName = &quot;Test User&quot;;
+
+        // Seeded test users (from DatabaseSeeder)
+        public const string SeededUserPassword = &quot;Password123!&quot;;
+        public const string SeededUser1Email = &quot;john.doe@email.com&quot;;
+        public const string SeededUser1Name = &quot;John Doe&quot;;
+        public const string SeededUser2Email = &quot;jane.smith@email.com&quot;;
+        public const string SeededUser2Name = &quot;Jane Smith&quot;;
+
+        // Aliases for the primary seeded user (user 1)
+        public const string SeededUserEmail = SeededUser1Email;
+        public const string SeededUserName = SeededUser1Name;
+
+        // New user for registration tests
+        public const string NewUserEmail = &quot;new.user@expense-tracker-test.local&quot;;
+        public const string NewUserName = &quot;New Test User&quot;;
+        public const string NewUserPassword = &quot;TestP@ssw0rd!&quot;;
+
+        // Alternative user for conflict tests
+        public const string AltUserEmail = &quot;alt.user@expense-tracker-test.local&quot;;
+        public const string AltUserName = &quot;Alternative User&quot;;
+    }
+
+    /// &lt;summary&gt;
+    /// Default transaction test values.
+    /// &lt;/summary&gt;
+    public static class Transactions
+    {
+        public const decimal DefaultAmount = 100.50m;
+        public const string DefaultSubject = &quot;Test Transaction&quot;;
+        public const string DefaultNotes = &quot;Test notes for transaction&quot;;
+        public const string UpdatedSubject = &quot;Updated Transaction&quot;;
+        public const decimal UpdatedAmount = 250.75m;
+    }
+
+    /// &lt;summary&gt;
+    /// Common error messages for assertions.
+    /// &lt;/summary&gt;
+    public static class ErrorMessages
+    {
+        public const string InvalidCredentials = &quot;Invalid email or password&quot;;
+        public const string UserNotFound = &quot;User not found&quot;;
+        public const string TransactionNotFound = &quot;Transaction not found&quot;;
+        public const string EmailAlreadyExists = &quot;Email already exists&quot;;
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[23,53,23,75,1],[30,58,30,85,1],[73,9,73,54,0],[77,9,77,54,0]]);
+    </script>
+  </body>
+</html>

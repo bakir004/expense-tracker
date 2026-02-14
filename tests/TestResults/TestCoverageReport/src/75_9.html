@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/E2E/UserWorkflows/TransactionGroupWorkflowTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Net;
+using System.Net.Http.Json;
+using ExpenseTrackerAPI.Contracts.Categories;
+using ExpenseTrackerAPI.Contracts.TransactionGroups;
+using ExpenseTrackerAPI.Contracts.Transactions;
+using ExpenseTrackerAPI.WebApi.Tests.Common;
+using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+using FluentAssertions;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.UserWorkflows;
+
+/// &lt;summary&gt;
+/// E2E tests for transaction group workflows and their interactions with transactions.
+/// Tests cover CRUD operations, group-transaction relationships, cascading behaviors,
+/// and authorization scenarios.
+/// &lt;/summary&gt;
+public class TransactionGroupWorkflowTests : BaseE2ETest
+{
+    public TransactionGroupWorkflowTests(ExpenseTrackerApiFactory factory) : base(factory) { }
+
+    #region Transaction Group CRUD Tests
+
+    [Fact]
+    public async Task TransactionGroupCrudWorkflow_CreateReadUpdateDelete_ShouldCompleteSuccessfully()
+    {
+        // === CREATE ===
+        var createRequest = new CreateTransactionGroupRequest(
+            Name: &quot;Vacation Trip 2024&quot;,
+            Description: &quot;Summer vacation to Europe&quot;);
+
+        var createResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, createRequest);
+
+        // Assert Create
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var createdGroup = await createResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+        createdGroup.Should().NotBeNull();
+        createdGroup!.Id.Should().BeGreaterThan(0);
+        createdGroup.Name.Should().Be(&quot;Vacation Trip 2024&quot;);
+        createdGroup.Description.Should().Be(&quot;Summer vacation to Europe&quot;);
+        createdGroup.UserId.Should().Be(TestAuthHandler.DefaultUserId);
+
+        var groupId = createdGroup.Id;
+
+        // === READ Single ===
+        var getResponse = await Client.GetAsync(TestConstants.Routes.TransactionGroup(groupId));
+
+        // Assert Read
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var retrievedGroup = await getResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+        retrievedGroup.Should().NotBeNull();
+        retrievedGroup!.Id.Should().Be(groupId);
+        retrievedGroup.Name.Should().Be(&quot;Vacation Trip 2024&quot;);
+
+        // === UPDATE ===
+        var updateRequest = new UpdateTransactionGroupRequest(
+            Name: &quot;Updated Vacation Trip&quot;,
+            Description: &quot;Updated description for trip&quot;);
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            TestConstants.Routes.TransactionGroup(groupId),
+            updateRequest);
+
+        // Assert Update
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updatedGroup = await updateResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+        updatedGroup.Should().NotBeNull();
+        updatedGroup!.Name.Should().Be(&quot;Updated Vacation Trip&quot;);
+        updatedGroup.Description.Should().Be(&quot;Updated description for trip&quot;);
+
+        // Verify update persisted
+        var verifyResponse = await Client.GetAsync(TestConstants.Routes.TransactionGroup(groupId));
+        verifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var verifiedGroup = await verifyResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+        verifiedGroup!.Name.Should().Be(&quot;Updated Vacation Trip&quot;);
+
+        // === DELETE ===
+        var deleteResponse = await Client.DeleteAsync(TestConstants.Routes.TransactionGroup(groupId));
+
+        // Assert Delete
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Verify deletion
+        var getDeletedResponse = await Client.GetAsync(TestConstants.Routes.TransactionGroup(groupId));
+        getDeletedResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task CreateTransactionGroup_WithNullDescription_ShouldSucceed()
+    {
+        // Arrange
+        var request = new CreateTransactionGroupRequest(
+            Name: &quot;No Description Group&quot;,
+            Description: null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var group = await response.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+        group.Should().NotBeNull();
+        group!.Name.Should().Be(&quot;No Description Group&quot;);
+        group.Description.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CreateTransactionGroup_WithEmptyName_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var request = new CreateTransactionGroupRequest(
+            Name: &quot;&quot;,
+            Description: &quot;Some description&quot;);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateTransactionGroup_WithWhitespaceName_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var request = new CreateTransactionGroupRequest(
+            Name: &quot;   &quot;,
+            Description: null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task GetAllTransactionGroups_ShouldReturnUserGroups()
+    {
+        // Arrange - Create a couple of groups first
+        var group1 = new CreateTransactionGroupRequest(&quot;Test Group Alpha&quot;, &quot;Alpha description&quot;);
+        var group2 = new CreateTransactionGroupRequest(&quot;Test Group Beta&quot;, &quot;Beta description&quot;);
+
+        await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, group1);
+        await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, group2);
+
+        // Act
+        var response = await Client.GetAsync(TestConstants.Routes.TransactionGroups);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var groups = await response.Content.ReadFromJsonAsync&lt;List&lt;TransactionGroupResponse&gt;&gt;();
+        groups.Should().NotBeNull();
+        groups!.Count.Should().BeGreaterThanOrEqualTo(2);
+        groups.Should().OnlyContain(g =&gt; g.UserId == TestAuthHandler.DefaultUserId);
+    }
+
+    [Fact]
+    public async Task GetTransactionGroup_WithNonExistentId_ShouldReturnNotFound()
+    {
+        // Act
+        var response = await Client.GetAsync(TestConstants.Routes.TransactionGroup(99999));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task GetTransactionGroup_WithInvalidId_ShouldReturnBadRequest()
+    {
+        // Act
+        var response = await Client.GetAsync(TestConstants.Routes.TransactionGroup(-1));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UpdateTransactionGroup_WithNonExistentId_ShouldReturnNotFound()
+    {
+        // Arrange
+        var request = new UpdateTransactionGroupRequest(&quot;Updated Name&quot;, &quot;Updated description&quot;);
+
+        // Act
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.TransactionGroup(99999), request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task DeleteTransactionGroup_WithNonExistentId_ShouldReturnNotFound()
+    {
+        // Act
+        var response = await Client.DeleteAsync(TestConstants.Routes.TransactionGroup(99999));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task UpdateTransactionGroup_CanSetDescriptionToNull()
+    {
+        // Arrange - Create a group with description
+        var createRequest = new CreateTransactionGroupRequest(
+            Name: &quot;Group With Description&quot;,
+            Description: &quot;Initial description&quot;);
+
+        var createResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, createRequest);
+        var createdGroup = await createResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Act - Update with null description
+        var updateRequest = new UpdateTransactionGroupRequest(
+            Name: &quot;Updated Group&quot;,
+            Description: null);
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            TestConstants.Routes.TransactionGroup(createdGroup!.Id),
+            updateRequest);
+
+        // Assert
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updatedGroup = await updateResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+        updatedGroup!.Description.Should().BeNull();
+    }
+
+    #endregion
+
+    #region Transaction with TransactionGroup Tests
+
+    [Fact]
+    public async Task CreateTransaction_WithTransactionGroup_ShouldSucceed()
+    {
+        // Arrange - Create a transaction group first
+        var groupRequest = new CreateTransactionGroupRequest(
+            Name: &quot;Project Alpha&quot;,
+            Description: &quot;Project expenses&quot;);
+
+        var groupResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, groupRequest);
+        groupResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var group = await groupResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Create a transaction with the group
+        var transactionRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 150.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Project equipment&quot;,
+            Notes = &quot;Purchased for Project Alpha&quot;,
+            PaymentMethod = &quot;CREDIT_CARD&quot;,
+            CategoryId = null,
+            TransactionGroupId = group!.Id
+        };
+
+        // Act
+        var transactionResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transactionRequest);
+
+        // Assert
+        transactionResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var transaction = await transactionResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        transaction.Should().NotBeNull();
+        transaction!.TransactionGroupId.Should().Be(group.Id);
+        transaction.Subject.Should().Be(&quot;Project equipment&quot;);
+    }
+
+    [Fact]
+    public async Task CreateMultipleTransactions_WithSameGroup_ShouldSucceed()
+    {
+        // Arrange - Create a transaction group
+        var groupRequest = new CreateTransactionGroupRequest(
+            Name: &quot;Home Renovation Project&quot;,
+            Description: &quot;Kitchen remodel&quot;);
+
+        var groupResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, groupRequest);
+        var group = await groupResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Create multiple transactions for the same group
+        var transaction1 = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 500.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-5)),
+            Subject = &quot;Paint supplies&quot;,
+            PaymentMethod = &quot;DEBIT_CARD&quot;,
+            TransactionGroupId = group!.Id
+        };
+
+        var transaction2 = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 1500.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-3)),
+            Subject = &quot;Kitchen cabinets&quot;,
+            PaymentMethod = &quot;CREDIT_CARD&quot;,
+            TransactionGroupId = group.Id
+        };
+
+        var transaction3 = new CreateTransactionRequest
+        {
+            TransactionType = &quot;INCOME&quot;,
+            Amount = 200.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Refund for returned items&quot;,
+            PaymentMethod = &quot;BANK_TRANSFER&quot;,
+            TransactionGroupId = group.Id
+        };
+
+        // Act
+        var response1 = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transaction1);
+        var response2 = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transaction2);
+        var response3 = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transaction3);
+
+        // Assert
+        response1.StatusCode.Should().Be(HttpStatusCode.Created);
+        response2.StatusCode.Should().Be(HttpStatusCode.Created);
+        response3.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var t1 = await response1.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        var t2 = await response2.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        var t3 = await response3.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+
+        t1!.TransactionGroupId.Should().Be(group.Id);
+        t2!.TransactionGroupId.Should().Be(group.Id);
+        t3!.TransactionGroupId.Should().Be(group.Id);
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithNonExistentGroup_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var transactionRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Test transaction&quot;,
+            PaymentMethod = &quot;CASH&quot;,
+            TransactionGroupId = 99999 // Non-existent group
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transactionRequest);
+
+        // Assert - Should fail because the group doesn&#39;t exist
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task UpdateTransaction_AddGroupToExistingTransaction_ShouldSucceed()
+    {
+        // Arrange - Create a transaction without a group
+        var transactionRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 75.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Unassigned expense&quot;,
+            PaymentMethod = &quot;CASH&quot;,
+            TransactionGroupId = null
+        };
+
+        var createTransactionResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transactionRequest);
+        var transaction = await createTransactionResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        transaction!.TransactionGroupId.Should().BeNull();
+
+        // Create a transaction group
+        var groupRequest = new CreateTransactionGroupRequest(&quot;New Group&quot;, &quot;For testing&quot;);
+        var groupResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, groupRequest);
+        var group = await groupResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Act - Update the transaction to add the group
+        var updateRequest = new UpdateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 75.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Now assigned to group&quot;,
+            PaymentMethod = &quot;CASH&quot;,
+            TransactionGroupId = group!.Id
+        };
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            TestConstants.Routes.Transaction(transaction.Id),
+            updateRequest);
+
+        // Assert
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updatedTransaction = await updateResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        updatedTransaction!.TransactionGroupId.Should().Be(group.Id);
+    }
+
+    [Fact]
+    public async Task UpdateTransaction_RemoveGroupFromTransaction_ShouldSucceed()
+    {
+        // Arrange - Create a group and transaction with the group
+        var groupRequest = new CreateTransactionGroupRequest(&quot;Temporary Group&quot;, null);
+        var groupResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, groupRequest);
+        var group = await groupResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        var transactionRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 50.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Grouped expense&quot;,
+            PaymentMethod = &quot;DEBIT_CARD&quot;,
+            TransactionGroupId = group!.Id
+        };
+
+        var createResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transactionRequest);
+        var transaction = await createResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        transaction!.TransactionGroupId.Should().Be(group.Id);
+
+        // Act - Remove the group
+        var updateRequest = new UpdateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 50.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;No longer grouped&quot;,
+            PaymentMethod = &quot;DEBIT_CARD&quot;,
+            TransactionGroupId = null
+        };
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            TestConstants.Routes.Transaction(transaction.Id),
+            updateRequest);
+
+        // Assert
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updatedTransaction = await updateResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        updatedTransaction!.TransactionGroupId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateTransaction_ChangeGroupToAnotherGroup_ShouldSucceed()
+    {
+        // Arrange - Create two groups
+        var group1Request = new CreateTransactionGroupRequest(&quot;Group One&quot;, &quot;First group&quot;);
+        var group2Request = new CreateTransactionGroupRequest(&quot;Group Two&quot;, &quot;Second group&quot;);
+
+        var group1Response = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, group1Request);
+        var group2Response = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, group2Request);
+
+        var group1 = await group1Response.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+        var group2 = await group2Response.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Create transaction with group 1
+        var transactionRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Moving between groups&quot;,
+            PaymentMethod = &quot;CREDIT_CARD&quot;,
+            TransactionGroupId = group1!.Id
+        };
+
+        var createResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transactionRequest);
+        var transaction = await createResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+
+        // Act - Move to group 2
+        var updateRequest = new UpdateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Moved to group two&quot;,
+            PaymentMethod = &quot;CREDIT_CARD&quot;,
+            TransactionGroupId = group2!.Id
+        };
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            TestConstants.Routes.Transaction(transaction!.Id),
+            updateRequest);
+
+        // Assert
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updatedTransaction = await updateResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        updatedTransaction!.TransactionGroupId.Should().Be(group2.Id);
+    }
+
+    #endregion
+
+    #region Delete Group Cascade Behavior Tests (SetNull)
+
+    [Fact]
+    public async Task DeleteTransactionGroup_WithAssociatedTransactions_ShouldSetTransactionGroupIdToNull()
+    {
+        // Arrange - Create a group
+        var groupRequest = new CreateTransactionGroupRequest(
+            Name: &quot;Group To Delete&quot;,
+            Description: &quot;Will be deleted&quot;);
+
+        var groupResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, groupRequest);
+        groupResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var group = await groupResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Create transactions associated with the group
+        var transaction1Request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-2)),
+            Subject = &quot;First linked transaction&quot;,
+            PaymentMethod = &quot;CASH&quot;,
+            TransactionGroupId = group!.Id
+        };
+
+        var transaction2Request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 200.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)),
+            Subject = &quot;Second linked transaction&quot;,
+            PaymentMethod = &quot;DEBIT_CARD&quot;,
+            TransactionGroupId = group.Id
+        };
+
+        var t1Response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transaction1Request);
+        var t2Response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transaction2Request);
+
+        var transaction1 = await t1Response.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        var transaction2 = await t2Response.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+
+        // Verify transactions are linked to the group
+        transaction1!.TransactionGroupId.Should().Be(group.Id);
+        transaction2!.TransactionGroupId.Should().Be(group.Id);
+
+        // Act - Delete the group
+        var deleteResponse = await Client.DeleteAsync(TestConstants.Routes.TransactionGroup(group.Id));
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Assert - Transactions should still exist but with null TransactionGroupId
+        var t1VerifyResponse = await Client.GetAsync(TestConstants.Routes.Transaction(transaction1.Id));
+        var t2VerifyResponse = await Client.GetAsync(TestConstants.Routes.Transaction(transaction2.Id));
+
+        t1VerifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        t2VerifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var verifiedT1 = await t1VerifyResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        var verifiedT2 = await t2VerifyResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+
+        verifiedT1!.TransactionGroupId.Should().BeNull();
+        verifiedT2!.TransactionGroupId.Should().BeNull();
+
+        // Transaction data should remain unchanged except for the group ID
+        verifiedT1.Subject.Should().Be(&quot;First linked transaction&quot;);
+        verifiedT1.Amount.Should().Be(100.00m);
+        verifiedT2.Subject.Should().Be(&quot;Second linked transaction&quot;);
+        verifiedT2.Amount.Should().Be(200.00m);
+    }
+
+    [Fact]
+    public async Task DeleteTransactionGroup_OnlyAffectsLinkedTransactions_OtherTransactionsUnchanged()
+    {
+        // Arrange - Create a group
+        var groupRequest = new CreateTransactionGroupRequest(&quot;Group To Delete&quot;, &quot;Test&quot;);
+        var groupResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, groupRequest);
+        var group = await groupResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Create a linked transaction
+        var linkedTransactionRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 50.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Linked to group&quot;,
+            PaymentMethod = &quot;CASH&quot;,
+            TransactionGroupId = group!.Id
+        };
+
+        // Create an unlinked transaction
+        var unlinkedTransactionRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 75.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Not linked to any group&quot;,
+            PaymentMethod = &quot;CASH&quot;,
+            TransactionGroupId = null
+        };
+
+        var linkedResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, linkedTransactionRequest);
+        var unlinkedResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, unlinkedTransactionRequest);
+
+        var linkedTransaction = await linkedResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        var unlinkedTransaction = await unlinkedResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+
+        // Act - Delete the group
+        await Client.DeleteAsync(TestConstants.Routes.TransactionGroup(group.Id));
+
+        // Assert - Both transactions should still exist
+        var linkedVerify = await Client.GetAsync(TestConstants.Routes.Transaction(linkedTransaction!.Id));
+        var unlinkedVerify = await Client.GetAsync(TestConstants.Routes.Transaction(unlinkedTransaction!.Id));
+
+        linkedVerify.StatusCode.Should().Be(HttpStatusCode.OK);
+        unlinkedVerify.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var verifiedLinked = await linkedVerify.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        var verifiedUnlinked = await unlinkedVerify.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+
+        // Linked transaction should have null group ID now
+        verifiedLinked!.TransactionGroupId.Should().BeNull();
+
+        // Unlinked transaction should still have null group ID (unchanged)
+        verifiedUnlinked!.TransactionGroupId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteTransactionGroup_WithNoTransactions_ShouldSucceed()
+    {
+        // Arrange - Create a group with no transactions
+        var groupRequest = new CreateTransactionGroupRequest(&quot;Empty Group&quot;, &quot;No transactions&quot;);
+        var groupResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, groupRequest);
+        var group = await groupResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Act
+        var deleteResponse = await Client.DeleteAsync(TestConstants.Routes.TransactionGroup(group!.Id));
+
+        // Assert
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Verify it&#39;s actually deleted
+        var getResponse = await Client.GetAsync(TestConstants.Routes.TransactionGroup(group.Id));
+        getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    #endregion
+
+    #region Combined Transaction and Category Tests with Groups
+
+    [Fact]
+    public async Task CreateTransaction_WithCategoryAndGroup_ShouldSucceed()
+    {
+        // Arrange - Create a transaction group
+        var groupRequest = new CreateTransactionGroupRequest(&quot;Business Trip&quot;, &quot;Work travel expenses&quot;);
+        var groupResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, groupRequest);
+        var group = await groupResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Get available categories
+        var categoriesResponse = await Client.GetAsync(TestConstants.Routes.Categories);
+        categoriesResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var categories = await categoriesResponse.Content.ReadFromJsonAsync&lt;List&lt;CategoryResponse&gt;&gt;();
+        categories.Should().NotBeEmpty();
+
+        var transportationCategory = categories!.FirstOrDefault(c =&gt; c.Name.Contains(&quot;Transportation&quot;));
+        transportationCategory.Should().NotBeNull();
+
+        // Create transaction with both category and group
+        var transactionRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 350.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Flight tickets for business trip&quot;,
+            Notes = &quot;Round trip to conference&quot;,
+            PaymentMethod = &quot;CREDIT_CARD&quot;,
+            CategoryId = transportationCategory!.Id,
+            TransactionGroupId = group!.Id
+        };
+
+        // Act
+        var transactionResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, transactionRequest);
+
+        // Assert
+        transactionResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var transaction = await transactionResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        transaction.Should().NotBeNull();
+        transaction!.CategoryId.Should().Be(transportationCategory.Id);
+        transaction.TransactionGroupId.Should().Be(group.Id);
+    }
+
+    #endregion
+
+    #region Transaction Group List with Transactions Tests
+
+    [Fact]
+    public async Task GetAllGroups_AfterMultipleCreations_ShouldReturnAllUserGroups()
+    {
+        // Arrange - Create multiple groups
+        var groupNames = new[] { &quot;Group A Test&quot;, &quot;Group B Test&quot;, &quot;Group C Test&quot; };
+
+        foreach (var name in groupNames)
+        {
+            var request = new CreateTransactionGroupRequest(name, $&quot;Description for {name}&quot;);
+            var response = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, request);
+            response.StatusCode.Should().Be(HttpStatusCode.Created);
+        }
+
+        // Act
+        var getResponse = await Client.GetAsync(TestConstants.Routes.TransactionGroups);
+
+        // Assert
+        getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var groups = await getResponse.Content.ReadFromJsonAsync&lt;List&lt;TransactionGroupResponse&gt;&gt;();
+        groups.Should().NotBeNull();
+
+        // Should contain all the groups we created
+        foreach (var name in groupNames)
+        {
+            groups!.Should().Contain(g =&gt; g.Name == name);
+        }
+    }
+
+    #endregion
+
+    #region Edge Cases and Validation Tests
+
+    [Fact]
+    public async Task CreateTransactionGroup_WithVeryLongName_ShouldHandleCorrectly()
+    {
+        // Arrange - Name at max length (255 characters)
+        var maxLengthName = new string(&#39;A&#39;, 255);
+        var request = new CreateTransactionGroupRequest(maxLengthName, null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, request);
+
+        // Assert - Should succeed
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var group = await response.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+        group!.Name.Should().Be(maxLengthName);
+    }
+
+    [Fact]
+    public async Task CreateTransactionGroup_WithNameTooLong_ShouldReturnBadRequest()
+    {
+        // Arrange - Name exceeds max length (256 characters)
+        var tooLongName = new string(&#39;A&#39;, 256);
+        var request = new CreateTransactionGroupRequest(tooLongName, null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UpdateTransactionGroup_TrimsWhitespaceFromName()
+    {
+        // Arrange - Create a group
+        var createRequest = new CreateTransactionGroupRequest(&quot;Original Name&quot;, null);
+        var createResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, createRequest);
+        var group = await createResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Act - Update with whitespace-padded name
+        var updateRequest = new UpdateTransactionGroupRequest(&quot;  Trimmed Name  &quot;, null);
+        var updateResponse = await Client.PutAsJsonAsync(
+            TestConstants.Routes.TransactionGroup(group!.Id),
+            updateRequest);
+
+        // Assert
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updatedGroup = await updateResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+        updatedGroup!.Name.Should().Be(&quot;Trimmed Name&quot;);
+    }
+
+    [Fact]
+    public async Task TransactionGroup_CreatedAtTimestamp_ShouldBeSet()
+    {
+        // Arrange
+        var beforeCreation = DateTime.UtcNow.AddSeconds(-1);
+        var request = new CreateTransactionGroupRequest(&quot;Timestamp Test&quot;, null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, request);
+        var afterCreation = DateTime.UtcNow.AddSeconds(1);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var group = await response.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+        group!.CreatedAt.Should().BeAfter(beforeCreation);
+        group.CreatedAt.Should().BeBefore(afterCreation);
+    }
+
+    #endregion
+
+    #region Mixed Income and Expense with Same Group Tests
+
+    [Fact]
+    public async Task TransactionGroup_CanContainBothExpensesAndIncome()
+    {
+        // Arrange - Create a group for a project that has both expenses and income
+        var groupRequest = new CreateTransactionGroupRequest(
+            &quot;Freelance Project&quot;,
+            &quot;Client project with expenses and payments&quot;);
+        var groupResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, groupRequest);
+        var group = await groupResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // Create expense
+        var expenseRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 50.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-3)),
+            Subject = &quot;Software license for project&quot;,
+            PaymentMethod = &quot;CREDIT_CARD&quot;,
+            TransactionGroupId = group!.Id
+        };
+
+        // Create income
+        var incomeRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;INCOME&quot;,
+            Amount = 500.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Client payment milestone 1&quot;,
+            PaymentMethod = &quot;BANK_TRANSFER&quot;,
+            TransactionGroupId = group.Id
+        };
+
+        // Act
+        var expenseResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, expenseRequest);
+        var incomeResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, incomeRequest);
+
+        // Assert
+        expenseResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        incomeResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var expense = await expenseResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        var income = await incomeResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+
+        expense!.TransactionGroupId.Should().Be(group.Id);
+        expense.TransactionType.Should().Be(&quot;EXPENSE&quot;);
+
+        income!.TransactionGroupId.Should().Be(group.Id);
+        income.TransactionType.Should().Be(&quot;INCOME&quot;);
+    }
+
+    #endregion
+
+    #region Complete Workflow Tests
+
+    [Fact]
+    public async Task CompleteProjectWorkflow_CreateGroupAddTransactionsDeleteGroup()
+    {
+        // This test simulates a complete project lifecycle:
+        // 1. Create a transaction group for a project
+        // 2. Add multiple transactions (expenses and income)
+        // 3. Update some transactions
+        // 4. Delete the group
+        // 5. Verify transactions still exist with null group ID
+
+        // === STEP 1: Create project group ===
+        var groupRequest = new CreateTransactionGroupRequest(
+            &quot;Kitchen Renovation 2024&quot;,
+            &quot;Complete kitchen remodel project&quot;);
+        var groupResponse = await Client.PostAsJsonAsync(TestConstants.Routes.TransactionGroups, groupRequest);
+        groupResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var group = await groupResponse.Content.ReadFromJsonAsync&lt;TransactionGroupResponse&gt;();
+
+        // === STEP 2: Add transactions ===
+        var expenses = new[]
+        {
+            new CreateTransactionRequest
+            {
+                TransactionType = &quot;EXPENSE&quot;,
+                Amount = 2000.00m,
+                Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30)),
+                Subject = &quot;Kitchen cabinets&quot;,
+                PaymentMethod = &quot;CREDIT_CARD&quot;,
+                TransactionGroupId = group!.Id
+            },
+            new CreateTransactionRequest
+            {
+                TransactionType = &quot;EXPENSE&quot;,
+                Amount = 800.00m,
+                Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-20)),
+                Subject = &quot;Countertops&quot;,
+                PaymentMethod = &quot;DEBIT_CARD&quot;,
+                TransactionGroupId = group.Id
+            },
+            new CreateTransactionRequest
+            {
+                TransactionType = &quot;EXPENSE&quot;,
+                Amount = 500.00m,
+                Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-10)),
+                Subject = &quot;Plumbing work&quot;,
+                PaymentMethod = &quot;CASH&quot;,
+                TransactionGroupId = group.Id
+            }
+        };
+
+        var income = new CreateTransactionRequest
+        {
+            TransactionType = &quot;INCOME&quot;,
+            Amount = 200.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-5)),
+            Subject = &quot;Refund for damaged cabinet&quot;,
+            PaymentMethod = &quot;BANK_TRANSFER&quot;,
+            TransactionGroupId = group.Id
+        };
+
+        var transactionIds = new List&lt;int&gt;();
+
+        foreach (var expense in expenses)
+        {
+            var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, expense);
+            response.StatusCode.Should().Be(HttpStatusCode.Created);
+            var transaction = await response.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+            transactionIds.Add(transaction!.Id);
+        }
+
+        var incomeResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, income);
+        incomeResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var incomeTransaction = await incomeResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        transactionIds.Add(incomeTransaction!.Id);
+
+        // Verify all transactions are linked to the group
+        foreach (var id in transactionIds)
+        {
+            var getResponse = await Client.GetAsync(TestConstants.Routes.Transaction(id));
+            var transaction = await getResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+            transaction!.TransactionGroupId.Should().Be(group.Id);
+        }
+
+        // === STEP 3: Update a transaction ===
+        var updateRequest = new UpdateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 850.00m, // Price adjustment
+            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-20)),
+            Subject = &quot;Countertops (upgraded)&quot;,
+            PaymentMethod = &quot;DEBIT_CARD&quot;,
+            TransactionGroupId = group.Id
+        };
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            TestConstants.Routes.Transaction(transactionIds[1]),
+            updateRequest);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // === STEP 4: Delete the group ===
+        var deleteResponse = await Client.DeleteAsync(TestConstants.Routes.TransactionGroup(group.Id));
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // === STEP 5: Verify transactions still exist with null group ID ===
+        foreach (var id in transactionIds)
+        {
+            var getResponse = await Client.GetAsync(TestConstants.Routes.Transaction(id));
+            getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+            var transaction = await getResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+            transaction!.TransactionGroupId.Should().BeNull(
+                $&quot;Transaction {id} should have null TransactionGroupId after group deletion&quot;);
+        }
+
+        // Verify the updated transaction still has the updated values
+        var updatedTransactionResponse = await Client.GetAsync(TestConstants.Routes.Transaction(transactionIds[1]));
+        var updatedTransaction = await updatedTransactionResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        updatedTransaction!.Amount.Should().Be(850.00m);
+        updatedTransaction.Subject.Should().Be(&quot;Countertops (upgraded)&quot;);
+    }
+
+    #endregion
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[19,78,19,91,1],[19,92,19,93,1],[19,94,19,95,1],[25,5,25,6,1],[27,9,29,55,1],[31,9,31,114,1],[34,9,34,71,1],[35,9,35,103,1],[36,9,36,43,1],[37,9,37,52,1],[38,9,38,61,1],[39,9,39,75,1],[40,9,40,72,1],[42,9,42,39,1],[45,9,45,97,1],[48,9,48,63,1],[49,9,49,102,1],[50,9,50,45,1],[51,9,51,49,1],[52,9,52,63,1],[55,9,57,58,1],[59,9,61,28,1],[64,9,64,66,1],[65,9,65,103,1],[66,9,66,43,1],[67,9,67,65,1],[68,9,68,78,1],[71,9,71,100,1],[72,9,72,66,1],[73,9,73,104,1],[74,9,74,66,1],[77,9,77,103,1],[80,9,80,73,1],[83,9,83,104,1],[84,9,84,76,1],[85,5,85,6,1],[89,5,89,6,1],[91,9,93,32,1],[96,9,96,102,1],[99,9,99,65,1],[100,9,100,90,1],[101,9,101,36,1],[102,9,102,57,1],[103,9,103,45,1],[104,5,104,6,1],[108,5,108,6,1],[110,9,112,46,1],[115,9,115,102,1],[118,9,118,68,1],[119,5,119,6,1],[123,5,123,6,1],[125,9,127,32,1],[130,9,130,102,1],[133,9,133,68,1],[134,5,134,6,1],[138,5,138,6,1],[140,9,140,97,1],[141,9,141,95,1],[143,9,143,86,1],[144,9,144,86,1],[147,9,147,86,1],[150,9,150,60,1],[151,9,151,97,1],[152,9,152,37,1],[153,9,153,58,1],[154,9,154,85,1],[155,5,155,6,1],[159,5,159,6,1],[161,9,161,92,1],[164,9,164,66,1],[165,5,165,6,1],[169,5,169,6,1],[171,9,171,89,1],[174,9,174,68,1],[175,5,175,6,1],[179,5,179,6,1],[181,9,181,96,1],[184,9,184,107,1],[187,9,187,66,1],[188,5,188,6,1],[192,5,192,6,1],[194,9,194,95,1],[197,9,197,66,1],[198,5,198,6,1],[202,5,202,6,1],[204,9,206,49,1],[208,9,208,114,1],[209,9,209,103,1],[212,9,214,32,1],[216,9,218,28,1],[221,9,221,66,1],[222,9,222,103,1],[223,9,223,53,1],[224,5,224,6,1],[232,5,232,6,1],[234,9,236,46,1],[238,9,238,112,1],[239,9,239,70,1],[240,9,240,95,1],[243,9,253,11,1],[256,9,256,119,1],[259,9,259,76,1],[260,9,260,102,1],[261,9,261,42,1],[262,9,262,63,1],[263,9,263,62,1],[264,5,264,6,1],[268,5,268,6,1],[270,9,272,45,1],[274,9,274,112,1],[275,9,275,95,1],[278,9,286,11,1],[288,9,296,11,1],[298,9,306,11,1],[309,9,309,103,1],[310,9,310,103,1],[311,9,311,103,1],[314,9,314,66,1],[315,9,315,66,1],[316,9,316,66,1],[318,9,318,83,1],[319,9,319,83,1],[320,9,320,83,1],[322,9,322,54,1],[323,9,323,54,1],[324,9,324,54,1],[325,5,325,6,1],[329,5,329,6,1],[331,9,339,11,1],[342,9,342,108,1],[345,9,345,98,1],[346,5,346,6,1],[350,5,350,6,1],[352,9,360,11,1],[362,9,362,125,1],[363,9,363,108,1],[364,9,364,59,1],[367,9,367,90,1],[368,9,368,112,1],[369,9,369,95,1],[372,9,380,11,1],[382,9,384,28,1],[387,9,387,66,1],[388,9,388,104,1],[389,9,389,70,1],[390,5,390,6,1],[394,5,394,6,1],[396,9,396,87,1],[397,9,397,112,1],[398,9,398,95,1],[400,9,408,11,1],[410,9,410,114,1],[411,9,411,97,1],[412,9,412,63,1],[415,9,423,11,1],[425,9,427,28,1],[430,9,430,66,1],[431,9,431,104,1],[432,9,432,66,1],[433,5,433,6,1],[437,5,437,6,1],[439,9,439,91,1],[440,9,440,92,1],[442,9,442,114,1],[443,9,443,114,1],[445,9,445,97,1],[446,9,446,97,1],[449,9,457,11,1],[459,9,459,114,1],[460,9,460,97,1],[463,9,471,11,1],[473,9,475,28,1],[478,9,478,66,1],[479,9,479,104,1],[480,9,480,71,1],[481,5,481,6,1],[489,5,489,6,1],[491,9,493,45,1],[495,9,495,112,1],[496,9,496,70,1],[497,9,497,95,1],[500,9,508,11,1],[510,9,518,11,1],[520,9,520,111,1],[521,9,521,111,1],[523,9,523,94,1],[524,9,524,94,1],[527,9,527,64,1],[528,9,528,64,1],[531,9,531,104,1],[532,9,532,73,1],[535,9,535,105,1],[536,9,536,105,1],[538,9,538,68,1],[539,9,539,68,1],[541,9,541,98,1],[542,9,542,98,1],[544,9,544,58,1],[545,9,545,58,1],[548,9,548,68,1],[549,9,549,48,1],[550,9,550,69,1],[551,9,551,48,1],[552,5,552,6,1],[556,5,556,6,1],[558,9,558,89,1],[559,9,559,112,1],[560,9,560,95,1],[563,9,571,11,1],[574,9,582,11,1],[584,9,584,120,1],[585,9,585,124,1],[587,9,587,103,1],[588,9,588,107,1],[591,9,591,83,1],[594,9,594,107,1],[595,9,595,111,1],[597,9,597,64,1],[598,9,598,66,1],[600,9,600,98,1],[601,9,601,102,1],[604,9,604,62,1],[607,9,607,64,1],[608,5,608,6,1],[612,5,612,6,1],[614,9,614,96,1],[615,9,615,112,1],[616,9,616,95,1],[619,9,619,105,1],[622,9,622,73,1],[625,9,625,98,1],[626,9,626,69,1],[627,5,627,6,1],[635,5,635,6,1],[637,9,637,103,1],[638,9,638,112,1],[639,9,639,95,1],[642,9,642,89,1],[643,9,643,70,1],[644,9,644,103,1],[645,9,645,42,1],[647,9,647,70,1],[647,70,647,103,1],[647,103,647,105,1],[648,9,648,53,1],[651,9,661,11,1],[664,9,664,119,1],[667,9,667,76,1],[668,9,668,102,1],[669,9,669,42,1],[670,9,670,72,1],[671,9,671,62,1],[672,5,672,6,1],[680,5,680,6,1],[682,9,682,83,1],[684,9,684,16,1],[684,18,684,26,1],[684,27,684,29,1],[684,30,684,40,1],[685,9,685,10,1],[686,13,686,94,1],[687,13,687,106,1],[688,13,688,69,1],[689,9,689,10,1],[692,9,692,89,1],[695,9,695,63,1],[696,9,696,100,1],[697,9,697,37,1],[700,9,700,16,1],[700,18,700,26,1],[700,27,700,29,1],[700,30,700,40,1],[701,9,701,10,1],[702,13,702,59,1],[703,9,703,10,1],[704,5,704,6,1],[712,5,712,6,1],[714,9,714,50,1],[715,9,715,78,1],[718,9,718,102,1],[721,9,721,65,1],[722,9,722,90,1],[723,9,723,48,1],[724,5,724,6,1],[728,5,728,6,1],[730,9,730,48,1],[731,9,731,76,1],[734,9,734,102,1],[737,9,737,68,1],[738,5,738,6,1],[742,5,742,6,1],[744,9,744,86,1],[745,9,745,114,1],[746,9,746,96,1],[749,9,749,89,1],[750,9,752,28,1],[755,9,755,66,1],[756,9,756,103,1],[757,9,757,56,1],[758,5,758,6,1],[762,5,762,6,1],[764,9,764,61,1],[765,9,765,81,1],[768,9,768,102,1],[769,9,769,59,1],[772,9,772,65,1],[773,9,773,90,1],[774,9,774,59,1],[775,9,775,58,1],[776,5,776,6,1],[784,5,784,6,1],[786,9,788,58,1],[789,9,789,112,1],[790,9,790,95,1],[793,9,801,11,1],[804,9,812,11,1],[815,9,815,111,1],[816,9,816,109,1],[819,9,819,72,1],[820,9,820,71,1],[822,9,822,94,1],[823,9,823,92,1],[825,9,825,59,1],[826,9,826,56,1],[828,9,828,58,1],[829,9,829,54,1],[830,5,830,6,1],[838,5,838,6,1],[847,9,849,49,1],[850,9,850,112,1],[851,9,851,70,1],[852,9,852,95,1],[855,9,884,11,1],[886,9,894,11,1],[896,9,896,46,1],[898,9,898,16,1],[898,18,898,29,1],[898,30,898,32,1],[898,33,898,41,1],[899,9,899,10,1],[900,13,900,101,1],[901,13,901,69,1],[902,13,902,95,1],[903,13,903,49,1],[904,9,904,10,1],[906,9,906,102,1],[907,9,907,71,1],[908,9,908,103,1],[909,9,909,51,1],[912,9,912,16,1],[912,18,912,24,1],[912,25,912,27,1],[912,28,912,42,1],[913,9,913,10,1],[914,13,914,91,1],[915,13,915,98,1],[916,13,916,67,1],[917,9,917,10,1],[920,9,928,11,1],[930,9,932,28,1],[933,9,933,66,1],[936,9,936,104,1],[937,9,937,73,1],[940,9,940,16,1],[940,18,940,24,1],[940,25,940,27,1],[940,28,940,42,1],[941,9,941,10,1],[942,13,942,91,1],[943,13,943,67,1],[944,13,944,98,1],[945,13,946,95,1],[947,9,947,10,1],[950,9,950,117,1],[951,9,951,116,1],[952,9,952,57,1],[953,9,953,74,1],[954,5,954,6,1]]);
+    </script>
+  </body>
+</html>

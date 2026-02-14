@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/E2E/Errors/ErrorResponseModels.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Text.Json.Serialization;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.Errors;
+
+/// &lt;summary&gt;
+/// Represents the standard ProblemDetails format (RFC 9110/7807).
+/// Used for validating error response structure in API tests.
+/// &lt;/summary&gt;
+public class ProblemDetailsResponse
+{
+    [JsonPropertyName(&quot;type&quot;)]
+    public string? Type { get; set; }
+
+    [JsonPropertyName(&quot;title&quot;)]
+    public string? Title { get; set; }
+
+    [JsonPropertyName(&quot;status&quot;)]
+    public int? Status { get; set; }
+
+    [JsonPropertyName(&quot;detail&quot;)]
+    public string? Detail { get; set; }
+
+    [JsonPropertyName(&quot;instance&quot;)]
+    public string? Instance { get; set; }
+
+    [JsonPropertyName(&quot;traceId&quot;)]
+    public string? TraceId { get; set; }
+
+    /// &lt;summary&gt;
+    /// Additional extension members (for custom error properties).
+    /// &lt;/summary&gt;
+    [JsonExtensionData]
+    public Dictionary&lt;string, object&gt;? Extensions { get; set; }
+}
+
+/// &lt;summary&gt;
+/// Represents the ValidationProblemDetails format (RFC 9110/7807 with validation errors).
+/// Used for validating validation error responses in API tests.
+/// &lt;/summary&gt;
+public class ValidationProblemDetailsResponse : ProblemDetailsResponse
+{
+    [JsonPropertyName(&quot;errors&quot;)]
+    public Dictionary&lt;string, string[]&gt;? Errors { get; set; }
+}
+
+/// &lt;summary&gt;
+/// Helper class for validating error response formats.
+/// &lt;/summary&gt;
+public static class ErrorResponseValidator
+{
+    /// &lt;summary&gt;
+    /// Validates that all error keys in the response do not contain dots.
+    /// This ensures proper error key formatting without nested property paths.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;errors&quot;&gt;Dictionary of error keys and messages&lt;/param&gt;
+    /// &lt;returns&gt;True if all keys are valid (no dots), false otherwise&lt;/returns&gt;
+    public static bool AllKeysAreValid(Dictionary&lt;string, string[]&gt;? errors)
+    {
+        if (errors == null || errors.Count == 0)
+            return true;
+
+        return errors.Keys.All(key =&gt; !key.Contains(&#39;.&#39;));
+    }
+
+    /// &lt;summary&gt;
+    /// Gets all error keys that contain dots (invalid keys).
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;errors&quot;&gt;Dictionary of error keys and messages&lt;/param&gt;
+    /// &lt;returns&gt;List of invalid keys containing dots&lt;/returns&gt;
+    public static List&lt;string&gt; GetInvalidKeys(Dictionary&lt;string, string[]&gt;? errors)
+    {
+        if (errors == null || errors.Count == 0)
+            return new List&lt;string&gt;();
+
+        return errors.Keys.Where(key =&gt; key.Contains(&#39;.&#39;)).ToList();
+    }
+
+    /// &lt;summary&gt;
+    /// Validates that the response conforms to RFC 9110 ProblemDetails format.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;problem&quot;&gt;The problem details response to validate&lt;/param&gt;
+    /// &lt;returns&gt;True if valid, false otherwise&lt;/returns&gt;
+    public static bool IsValidProblemDetails(ProblemDetailsResponse? problem)
+    {
+        if (problem == null)
+            return false;
+
+        // Must have a status code
+        if (!problem.Status.HasValue)
+            return false;
+
+        // Status should be a valid HTTP status code (4xx or 5xx for errors)
+        if (problem.Status.Value &lt; 400 || problem.Status.Value &gt;= 600)
+            return false;
+
+        // Should have either title or detail
+        if (string.IsNullOrWhiteSpace(problem.Title) &amp;&amp; string.IsNullOrWhiteSpace(problem.Detail))
+            return false;
+
+        return true;
+    }
+
+    /// &lt;summary&gt;
+    /// Validates that the response conforms to ValidationProblemDetails format.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;validation&quot;&gt;The validation problem details response to validate&lt;/param&gt;
+    /// &lt;returns&gt;True if valid, false otherwise&lt;/returns&gt;
+    public static bool IsValidValidationProblemDetails(ValidationProblemDetailsResponse? validation)
+    {
+        if (validation == null)
+            return false;
+
+        // Must conform to base ProblemDetails
+        if (!IsValidProblemDetails(validation))
+            return false;
+
+        // Must have errors dictionary
+        if (validation.Errors == null)
+            return false;
+
+        // Status should be 400 for validation errors
+        if (validation.Status != 400)
+            return false;
+
+        // All error keys must not contain dots
+        if (!AllKeysAreValid(validation.Errors))
+            return false;
+
+        return true;
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[58,5,58,6,1],[59,9,59,49,1],[60,13,60,25,0],[62,9,62,39,1],[62,39,62,57,1],[62,57,62,59,1],[63,5,63,6,1],[71,5,71,6,1],[72,9,72,49,1],[73,13,73,39,0],[75,9,75,41,1],[75,41,75,58,1],[75,58,75,69,1],[76,5,76,6,1],[84,5,84,6,1],[85,9,85,29,1],[86,13,86,26,0],[89,9,89,38,1],[90,13,90,26,0],[93,9,93,71,1],[94,13,94,26,0],[97,9,97,99,1],[98,13,98,26,0],[100,9,100,21,1],[101,5,101,6,1],[109,5,109,6,1],[110,9,110,32,1],[111,13,111,26,0],[114,9,114,48,1],[115,13,115,26,0],[118,9,118,39,1],[119,13,119,26,0],[122,9,122,38,1],[123,13,123,26,0],[126,9,126,49,1],[127,13,127,26,0],[129,9,129,21,1],[130,5,130,6,1]]);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/E2E/Errors/TransactionErrorFormatTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Net;
+using System.Net.Http.Json;
+using ExpenseTrackerAPI.Contracts.Transactions;
+using ExpenseTrackerAPI.WebApi.Tests.Common;
+using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+using FluentAssertions;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.Errors;
+
+/// &lt;summary&gt;
+/// Tests RFC 9110 compliant error response formats for Transaction endpoints.
+/// Validates that all error responses follow proper structure and error keys don&#39;t contain dots.
+/// &lt;/summary&gt;
+public class TransactionErrorFormatTests : BaseE2ETest
+{
+    public TransactionErrorFormatTests(ExpenseTrackerApiFactory factory) : base(factory) { }
+
+    #region Create Transaction Error Format Tests
+
+    [Fact]
+    public async Task CreateTransaction_WithInvalidTransactionType_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;INVALID_TYPE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Test Transaction&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+        problemDetails.Should().NotBeNull();
+
+        // Validate RFC 9110 compliance
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue(
+            &quot;response should conform to RFC 9110 ProblemDetails format&quot;);
+
+        // Validate no dots in error keys
+        var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails!.Errors);
+        invalidKeys.Should().BeEmpty(
+            $&quot;error keys should not contain dots, but found: {string.Join(&quot;, &quot;, invalidKeys)}&quot;);
+
+        problemDetails.Status.Should().Be(400);
+        problemDetails.Errors.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithNegativeAmount_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = -50.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Test Transaction&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue(
+            &quot;error keys should not contain dots&quot;);
+
+        problemDetails.Errors.Should().ContainKey(&quot;Amount&quot;);
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithZeroAmount_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 0m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Test Transaction&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+
+        problemDetails.Errors.Should().ContainKey(&quot;Amount&quot;);
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithEmptySubject_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+
+        problemDetails.Errors.Should().ContainKey(&quot;Subject&quot;);
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithInvalidPaymentMethod_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Test Transaction&quot;,
+            PaymentMethod = &quot;INVALID_METHOD&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithMultipleValidationErrors_ShouldReturnAllErrorsWithoutDotsInKeys()
+    {
+        // Arrange - Multiple validation errors
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;INVALID&quot;,
+            Amount = -100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;&quot;,
+            PaymentMethod = &quot;INVALID&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+        problemDetails.Should().NotBeNull();
+
+        // Validate RFC 9110 compliance
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+
+        // Validate no dots in ANY error keys
+        var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails!.Errors);
+        invalidKeys.Should().BeEmpty(
+            $&quot;no error keys should contain dots, but found: {string.Join(&quot;, &quot;, invalidKeys)}&quot;);
+
+        // Should have multiple errors
+        problemDetails.Errors.Should().NotBeNull();
+        problemDetails.Errors!.Count.Should().BeGreaterThan(1, &quot;multiple validation errors should be present&quot;);
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithFutureDateTooFar_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(10)),
+            Subject = &quot;Future Transaction&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert - May be BadRequest if future dates are restricted
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+            ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+        }
+    }
+
+    [Fact]
+    public async Task CreateTransaction_ExpenseWithoutCategory_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange - Expense transactions may require a category
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Expense without category&quot;,
+            PaymentMethod = &quot;CASH&quot;,
+            CategoryId = null
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert - May require category for expenses
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+            ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+
+            problemDetails!.Errors.Should().ContainKey(&quot;CategoryId&quot;);
+        }
+    }
+
+    #endregion
+
+    #region Get Transaction Error Format Tests
+
+    [Fact]
+    public async Task GetTransaction_WithInvalidId_ShouldReturnNotFoundProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var nonExistentId = 999999;
+
+        // Act
+        var response = await Client.GetAsync(TestConstants.Routes.Transaction(nonExistentId));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ProblemDetailsResponse&gt;();
+        problemDetails.Should().NotBeNull();
+
+        // Validate RFC 9110 compliance
+        ErrorResponseValidator.IsValidProblemDetails(problemDetails).Should().BeTrue();
+
+        problemDetails!.Status.Should().Be(404);
+        problemDetails.Title.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task GetTransaction_WithNegativeId_ShouldReturnBadRequestProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var invalidId = -1;
+
+        // Act
+        var response = await Client.GetAsync(TestConstants.Routes.Transaction(invalidId));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidProblemDetails(problemDetails).Should().BeTrue();
+
+        problemDetails!.Status.Should().Be(400);
+    }
+
+    [Fact]
+    public async Task GetTransaction_WithZeroId_ShouldReturnBadRequestProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var invalidId = 0;
+
+        // Act
+        var response = await Client.GetAsync(TestConstants.Routes.Transaction(invalidId));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidProblemDetails(problemDetails).Should().BeTrue();
+    }
+
+    #endregion
+
+    #region Update Transaction Error Format Tests
+
+    [Fact]
+    public async Task UpdateTransaction_WithNonExistentId_ShouldReturnNotFoundProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var nonExistentId = 999999;
+        var request = new UpdateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 200.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Updated Transaction&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.Transaction(nonExistentId), request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidProblemDetails(problemDetails).Should().BeTrue();
+
+        problemDetails!.Status.Should().Be(404);
+    }
+
+    [Fact]
+    public async Task UpdateTransaction_WithInvalidData_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var validId = 1; // Assuming a transaction exists
+        var request = new UpdateTransactionRequest
+        {
+            TransactionType = &quot;INVALID&quot;,
+            Amount = -100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;&quot;,
+            PaymentMethod = &quot;INVALID&quot;
+        };
+
+        // Act
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.Transaction(validId), request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+
+        var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails!.Errors);
+        invalidKeys.Should().BeEmpty(
+            $&quot;no error keys should contain dots, but found: {string.Join(&quot;, &quot;, invalidKeys)}&quot;);
+    }
+
+    [Fact]
+    public async Task UpdateTransaction_WithInvalidId_ShouldReturnBadRequestProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var invalidId = -5;
+        var request = new UpdateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Test&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.Transaction(invalidId), request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidProblemDetails(problemDetails).Should().BeTrue();
+    }
+
+    #endregion
+
+    #region Delete Transaction Error Format Tests
+
+    [Fact]
+    public async Task DeleteTransaction_WithNonExistentId_ShouldReturnNotFoundProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var nonExistentId = 999999;
+
+        // Act
+        var response = await Client.DeleteAsync(TestConstants.Routes.Transaction(nonExistentId));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidProblemDetails(problemDetails).Should().BeTrue();
+
+        problemDetails!.Status.Should().Be(404);
+    }
+
+    [Fact]
+    public async Task DeleteTransaction_WithInvalidId_ShouldReturnBadRequestProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var invalidId = 0;
+
+        // Act
+        var response = await Client.DeleteAsync(TestConstants.Routes.Transaction(invalidId));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidProblemDetails(problemDetails).Should().BeTrue();
+    }
+
+    #endregion
+
+    #region Filter/Query Error Format Tests
+
+    [Fact]
+    public async Task GetTransactions_WithInvalidTransactionTypeFilter_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var queryString = &quot;?transactionType=INVALID_TYPE&quot;;
+
+        // Act
+        var response = await Client.GetAsync($&quot;{TestConstants.Routes.Transactions}{queryString}&quot;);
+
+        // Assert
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                ErrorResponseValidator.AllKeysAreValid(problemDetails.Errors).Should().BeTrue();
+            }
+        }
+        else
+        {
+            // If not BadRequest, the API may allow this and filter it out
+            response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest);
+        }
+    }
+
+    [Fact]
+    public async Task GetTransactions_WithInvalidAmountRange_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange - minAmount &gt; maxAmount
+        var queryString = &quot;?minAmount=100&amp;maxAmount=50&quot;;
+
+        // Act
+        var response = await Client.GetAsync($&quot;{TestConstants.Routes.Transactions}{queryString}&quot;);
+
+        // Assert
+        // This may be accepted as valid (filtering by range), so just verify it doesn&#39;t error with dots if it&#39;s BadRequest
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                ErrorResponseValidator.AllKeysAreValid(problemDetails.Errors).Should().BeTrue();
+            }
+        }
+        else
+        {
+            // If not BadRequest, it&#39;s acceptable - the API may allow this query
+            response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest);
+        }
+    }
+
+    [Fact]
+    public async Task GetTransactions_WithInvalidDateFormat_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var queryString = &quot;?dateFrom=invalid-date&amp;dateTo=also-invalid&quot;;
+
+        // Act
+        var response = await Client.GetAsync($&quot;{TestConstants.Routes.Transactions}{queryString}&quot;);
+
+        // Assert
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails.Errors);
+                invalidKeys.Should().BeEmpty(
+                    $&quot;error keys should not contain dots, but found: {string.Join(&quot;, &quot;, invalidKeys)}&quot;);
+            }
+        }
+        else
+        {
+            // If not BadRequest, the API may ignore invalid date formats
+            response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest);
+        }
+    }
+
+    [Fact]
+    public async Task GetTransactions_WithInvalidPageSize_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange - Page size outside valid range
+        var queryString = &quot;?pageSize=0&quot;;
+
+        // Act
+        var response = await Client.GetAsync($&quot;{TestConstants.Routes.Transactions}{queryString}&quot;);
+
+        // Assert
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                ErrorResponseValidator.AllKeysAreValid(problemDetails.Errors).Should().BeTrue();
+            }
+        }
+        else
+        {
+            // If not BadRequest, the API may default to a valid page size
+            response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest);
+        }
+    }
+
+    [Fact]
+    public async Task GetTransactions_WithExcessivePageSize_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange - Page size exceeds maximum
+        var queryString = &quot;?pageSize=1000&quot;;
+
+        // Act
+        var response = await Client.GetAsync($&quot;{TestConstants.Routes.Transactions}{queryString}&quot;);
+
+        // Assert
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                ErrorResponseValidator.AllKeysAreValid(problemDetails.Errors).Should().BeTrue();
+            }
+        }
+        else
+        {
+            // If not BadRequest, the API may cap the page size
+            response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest);
+        }
+    }
+
+    [Fact]
+    public async Task GetTransactions_WithInvalidPageNumber_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var queryString = &quot;?page=0&quot;;
+
+        // Act
+        var response = await Client.GetAsync($&quot;{TestConstants.Routes.Transactions}{queryString}&quot;);
+
+        // Assert
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                ErrorResponseValidator.AllKeysAreValid(problemDetails.Errors).Should().BeTrue();
+            }
+        }
+        else
+        {
+            // If not BadRequest, the API may default to page 1
+            response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.BadRequest);
+        }
+    }
+
+    #endregion
+
+    #region RFC 9110 Compliance Tests
+
+    [Fact]
+    public async Task AllTransactionErrors_ShouldHaveProperStatusCodes()
+    {
+        // 400 Bad Request - validation error
+        var validationRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;INVALID&quot;,
+            Amount = -100m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;&quot;,
+            PaymentMethod = &quot;INVALID&quot;
+        };
+        var validationResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, validationRequest);
+        validationResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // 404 Not Found - resource doesn&#39;t exist
+        var notFoundResponse = await Client.GetAsync(TestConstants.Routes.Transaction(999999));
+        notFoundResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task AllTransactionValidationErrors_ShouldIncludeRequiredProblemDetailsFields()
+    {
+        // Arrange
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;INVALID&quot;,
+            Amount = 0m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        // RFC 9110 required fields
+        problemDetails!.Status.Should().NotBeNull(&quot;status is required by RFC 9110&quot;);
+        problemDetails.Status.Should().Be((int)response.StatusCode, &quot;status should match response code&quot;);
+
+        // At least one of title or detail should be present
+        var hasDescription = !string.IsNullOrWhiteSpace(problemDetails.Title) ||
+                            !string.IsNullOrWhiteSpace(problemDetails.Detail);
+        hasDescription.Should().BeTrue(&quot;either title or detail is required for problem description&quot;);
+    }
+
+    [Fact]
+    public async Task AllTransactionErrors_ShouldHaveTraceIdForDebugging()
+    {
+        // Arrange
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = -50m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Test&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        problemDetails!.TraceId.Should().NotBeNullOrEmpty(&quot;traceId should be present for request tracking&quot;);
+    }
+
+    [Theory]
+    [InlineData(&quot;INVALID&quot;, 100, &quot;Test&quot;, &quot;CASH&quot;)]
+    [InlineData(&quot;EXPENSE&quot;, -50, &quot;Test&quot;, &quot;CASH&quot;)]
+    [InlineData(&quot;EXPENSE&quot;, 0, &quot;Test&quot;, &quot;CASH&quot;)]
+    [InlineData(&quot;EXPENSE&quot;, 100, &quot;&quot;, &quot;CASH&quot;)]
+    [InlineData(&quot;EXPENSE&quot;, 100, &quot;Test&quot;, &quot;INVALID&quot;)]
+    public async Task CreateTransaction_ValidationErrors_ShouldNeverContainDotsInErrorKeys(
+        string transactionType, decimal amount, string subject, string paymentMethod)
+    {
+        // Arrange
+        var request = new CreateTransactionRequest
+        {
+            TransactionType = transactionType,
+            Amount = amount,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = subject,
+            PaymentMethod = paymentMethod
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+
+        // Assert
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails.Errors);
+                invalidKeys.Should().BeEmpty(
+                    $&quot;error keys must not contain dots. Found invalid keys: {string.Join(&quot;, &quot;, invalidKeys)}&quot;);
+            }
+        }
+    }
+
+    #endregion
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[16,76,16,89,1],[16,90,16,91,1],[16,92,16,93,1],[22,5,22,6,1],[24,9,31,11,1],[34,9,34,97,1],[37,9,37,68,1],[39,9,39,107,1],[40,9,40,45,1],[43,9,44,74,1],[47,9,47,89,1],[48,9,49,97,1],[51,9,51,48,1],[52,9,52,52,1],[53,5,53,6,1],[57,5,57,6,1],[59,9,66,11,1],[69,9,69,97,1],[72,9,72,68,1],[74,9,74,107,1],[76,9,76,98,1],[77,9,78,51,1],[80,9,80,61,1],[81,5,81,6,1],[85,5,85,6,1],[87,9,94,11,1],[97,9,97,97,1],[100,9,100,68,1],[102,9,102,107,1],[104,9,104,98,1],[105,9,105,90,1],[107,9,107,61,1],[108,5,108,6,1],[112,5,112,6,1],[114,9,121,11,1],[124,9,124,97,1],[127,9,127,68,1],[129,9,129,107,1],[131,9,131,98,1],[132,9,132,90,1],[134,9,134,62,1],[135,5,135,6,1],[139,5,139,6,1],[141,9,148,11,1],[151,9,151,97,1],[154,9,154,68,1],[156,9,156,107,1],[158,9,158,98,1],[159,9,159,90,1],[160,5,160,6,1],[164,5,164,6,1],[166,9,173,11,1],[176,9,176,97,1],[179,9,179,68,1],[181,9,181,107,1],[182,9,182,45,1],[185,9,185,98,1],[188,9,188,89,1],[189,9,190,96,1],[193,9,193,52,1],[194,9,194,112,1],[195,5,195,6,1],[199,5,199,6,1],[201,9,208,11,1],[211,9,211,97,1],[214,9,214,62,1],[215,9,215,10,1],[216,13,216,111,1],[218,13,218,102,1],[219,13,219,94,1],[220,9,220,10,1],[221,5,221,6,1],[225,5,225,6,1],[227,9,235,11,1],[238,9,238,97,1],[241,9,241,62,1],[242,9,242,10,0],[243,13,243,111,0],[245,13,245,102,0],[246,13,246,94,0],[248,13,248,70,0],[249,9,249,10,0],[250,5,250,6,1],[258,5,258,6,1],[260,9,260,36,1],[263,9,263,95,1],[266,9,266,66,1],[268,9,268,97,1],[269,9,269,45,1],[272,9,272,88,1],[274,9,274,49,1],[275,9,275,58,1],[276,5,276,6,1],[280,5,280,6,1],[282,9,282,28,1],[285,9,285,91,1],[288,9,288,68,1],[290,9,290,97,1],[292,9,292,88,1],[294,9,294,49,1],[295,5,295,6,1],[299,5,299,6,1],[301,9,301,27,1],[304,9,304,91,1],[307,9,307,68,1],[309,9,309,97,1],[311,9,311,88,1],[312,5,312,6,1],[320,5,320,6,1],[322,9,322,36,1],[323,9,330,11,1],[333,9,333,110,1],[336,9,336,66,1],[338,9,338,97,1],[340,9,340,88,1],[342,9,342,49,1],[343,5,343,6,1],[347,5,347,6,1],[349,9,349,25,1],[350,9,357,11,1],[360,9,360,104,1],[363,9,363,68,1],[365,9,365,107,1],[367,9,367,98,1],[369,9,369,89,1],[370,9,371,96,1],[372,5,372,6,1],[376,5,376,6,1],[378,9,378,28,1],[379,9,386,11,1],[389,9,389,106,1],[392,9,392,68,1],[394,9,394,97,1],[396,9,396,88,1],[397,5,397,6,1],[405,5,405,6,1],[407,9,407,36,1],[410,9,410,98,1],[413,9,413,66,1],[415,9,415,97,1],[417,9,417,88,1],[419,9,419,49,1],[420,5,420,6,1],[424,5,424,6,1],[426,9,426,27,1],[429,9,429,94,1],[432,9,432,68,1],[434,9,434,97,1],[436,9,436,88,1],[437,5,437,6,1],[445,5,445,6,1],[447,9,447,59,1],[450,9,450,99,1],[453,9,453,62,1],[454,9,454,10,1],[455,13,455,111,1],[457,13,457,48,1],[458,13,458,14,1],[459,17,459,97,1],[460,13,460,14,1],[461,9,461,10,1],[463,9,463,10,0],[465,13,465,96,0],[466,9,466,10,0],[467,5,467,6,1],[471,5,471,6,1],[473,9,473,57,1],[476,9,476,99,1],[480,9,480,62,1],[481,9,481,10,1],[482,13,482,111,1],[484,13,484,48,1],[485,13,485,14,1],[486,17,486,97,1],[487,13,487,14,1],[488,9,488,10,1],[490,9,490,10,0],[492,13,492,96,0],[493,9,493,10,0],[494,5,494,6,1],[498,5,498,6,1],[500,9,500,72,1],[503,9,503,99,1],[506,9,506,62,1],[507,9,507,10,1],[508,13,508,111,1],[510,13,510,48,1],[511,13,511,14,1],[512,17,512,96,1],[513,17,514,105,1],[515,13,515,14,1],[516,9,516,10,1],[518,9,518,10,0],[520,13,520,96,0],[521,9,521,10,0],[522,5,522,6,1],[526,5,526,6,1],[528,9,528,41,1],[531,9,531,99,1],[534,9,534,62,1],[535,9,535,10,1],[536,13,536,111,1],[538,13,538,48,1],[539,13,539,14,1],[540,17,540,97,1],[541,13,541,14,1],[542,9,542,10,1],[544,9,544,10,0],[546,13,546,96,0],[547,9,547,10,0],[548,5,548,6,1],[552,5,552,6,1],[554,9,554,44,1],[557,9,557,99,1],[560,9,560,62,1],[561,9,561,10,1],[562,13,562,111,1],[564,13,564,48,1],[565,13,565,14,1],[566,17,566,97,1],[567,13,567,14,1],[568,9,568,10,1],[570,9,570,10,0],[572,13,572,96,0],[573,9,573,10,0],[574,5,574,6,1],[578,5,578,6,1],[580,9,580,37,1],[583,9,583,99,1],[586,9,586,62,1],[587,9,587,10,1],[588,13,588,111,1],[590,13,590,48,1],[591,13,591,14,1],[592,17,592,97,1],[593,13,593,14,1],[594,9,594,10,1],[596,9,596,10,0],[598,13,598,96,0],[599,9,599,10,0],[600,5,600,6,1],[608,5,608,6,1],[610,9,617,11,1],[618,9,618,117,1],[619,9,619,78,1],[622,9,622,96,1],[623,9,623,74,1],[624,5,624,6,1],[628,5,628,6,1],[630,9,637,11,1],[640,9,640,97,1],[643,9,643,107,1],[646,9,646,85,1],[647,9,647,106,1],[650,9,651,79,1],[652,9,652,102,1],[653,5,653,6,1],[657,5,657,6,1],[659,9,666,11,1],[669,9,669,97,1],[672,9,672,107,1],[674,9,674,109,1],[675,5,675,6,1],[685,5,685,6,1],[687,9,694,11,1],[697,9,697,97,1],[700,9,700,62,1],[701,9,701,10,1],[702,13,702,111,1],[704,13,704,48,1],[705,13,705,14,1],[706,17,706,96,1],[707,17,708,112,1],[709,13,709,14,1],[710,9,710,10,1],[711,5,711,6,1]]);
+    </script>
+  </body>
+</html>

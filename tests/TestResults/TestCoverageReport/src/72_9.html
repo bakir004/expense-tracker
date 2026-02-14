@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/E2E/Transactions/TransactionApiTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Net;
+using System.Net.Http.Json;
+using ExpenseTrackerAPI.Contracts.Transactions;
+using ExpenseTrackerAPI.Domain.Entities;
+using ExpenseTrackerAPI.Infrastructure.Persistence;
+using ExpenseTrackerAPI.WebApi.Tests.Common;
+using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.Transactions;
+
+/// &lt;summary&gt;
+/// E2E tests for transaction API endpoints.
+/// Tests transaction creation, validation, and database persistence.
+/// &lt;/summary&gt;
+public class TransactionApiTests : BaseE2ETest
+{
+    public TransactionApiTests(ExpenseTrackerApiFactory factory) : base(factory) { }
+
+    [Fact]
+    public async Task CreateTransaction_ShouldSaveToRealDb()
+    {
+        // 1. Arrange: Define a valid payload with string values for enums
+        var payload = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.50m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Utility Bill&quot;,
+            Notes = &quot;Monthly electricity&quot;,
+            PaymentMethod = &quot;BANK_TRANSFER&quot;,
+            CategoryId = null,
+            TransactionGroupId = null
+        };
+
+        // 2. Act: Hit the actual endpoint
+        var response = await Client.PostAsJsonAsync(&quot;/api/v1/transactions&quot;, payload);
+
+        // 3. Assert: Response is correct
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // 4. Verify E2E: Go behind the API&#39;s back and check the REAL Postgres DB
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var savedTransaction = await db.Transactions
+            .FirstOrDefaultAsync(t =&gt; t.Subject == &quot;Utility Bill&quot;);
+
+        savedTransaction.Should().NotBeNull();
+        savedTransaction!.Amount.Should().Be(100.50m);
+        savedTransaction.TransactionType.Should().Be(TransactionType.EXPENSE); // Domain entity still uses enum
+        savedTransaction.Subject.Should().Be(&quot;Utility Bill&quot;);
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithLowercaseTransactionType_ShouldSucceed()
+    {
+        // Arrange: Use lowercase for transaction type (should be case-insensitive)
+        var payload = new CreateTransactionRequest
+        {
+            TransactionType = &quot;expense&quot;,
+            Amount = 50.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Lowercase Type Test&quot;,
+            PaymentMethod = &quot;cash&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(&quot;/api/v1/transactions&quot;, payload);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var transaction = await response.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        transaction.Should().NotBeNull();
+        transaction!.TransactionType.Should().Be(&quot;EXPENSE&quot;);
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithInvalidTransactionType_ShouldReturnBadRequest()
+    {
+        // Arrange: Use invalid transaction type
+        var payload = new CreateTransactionRequest
+        {
+            TransactionType = &quot;INVALID_TYPE&quot;,
+            Amount = 50.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Invalid Type Test&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(&quot;/api/v1/transactions&quot;, payload);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithInvalidPaymentMethod_ShouldReturnBadRequest()
+    {
+        // Arrange: Use invalid payment method
+        var payload = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 50.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Invalid Payment Test&quot;,
+            PaymentMethod = &quot;INVALID_PAYMENT&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(&quot;/api/v1/transactions&quot;, payload);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithEmptyTransactionType_ShouldReturnBadRequest()
+    {
+        // Arrange: Use empty transaction type
+        var payload = new CreateTransactionRequest
+        {
+            TransactionType = &quot;&quot;,
+            Amount = 50.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Empty Type Test&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        // Act
+        var response = await Client.PostAsJsonAsync(&quot;/api/v1/transactions&quot;, payload);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateTransaction_WithAllPaymentMethodStrings_ShouldSucceed()
+    {
+        var paymentMethods = new[]
+        {
+            &quot;CASH&quot;,
+            &quot;CREDIT_CARD&quot;,
+            &quot;DEBIT_CARD&quot;,
+            &quot;BANK_TRANSFER&quot;,
+            &quot;MOBILE_PAYMENT&quot;,
+            &quot;PAYPAL&quot;,
+            &quot;CRYPTO&quot;,
+            &quot;OTHER&quot;
+        };
+
+        foreach (var paymentMethod in paymentMethods)
+        {
+            // Arrange
+            var request = new CreateTransactionRequest
+            {
+                TransactionType = &quot;EXPENSE&quot;,
+                Amount = 10.00m,
+                Date = DateOnly.FromDateTime(DateTime.UtcNow),
+                Subject = $&quot;Payment via {paymentMethod}&quot;,
+                PaymentMethod = paymentMethod
+            };
+
+            // Act
+            var response = await Client.PostAsJsonAsync(&quot;/api/v1/transactions&quot;, request);
+
+            // Assert
+            response.StatusCode.Should().Be(HttpStatusCode.Created,
+                $&quot;Expected Created for payment method {paymentMethod}&quot;);
+        }
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[20,68,20,81,1],[20,82,20,83,1],[20,84,20,85,1],[24,5,24,6,1],[26,9,36,11,1],[39,9,39,86,1],[42,9,42,65,1],[45,9,45,58,1],[46,9,46,83,1],[47,9,48,68,1],[50,9,50,47,1],[51,9,51,55,1],[52,9,52,79,1],[53,9,53,62,1],[54,5,54,6,1],[58,5,58,6,1],[60,9,67,11,1],[70,9,70,86,1],[73,9,73,65,1],[74,9,74,91,1],[75,9,75,42,1],[76,9,76,61,1],[77,5,77,6,1],[81,5,81,6,1],[83,9,90,11,1],[93,9,93,86,1],[96,9,96,68,1],[97,5,97,6,1],[101,5,101,6,1],[103,9,110,11,1],[113,9,113,86,1],[116,9,116,68,1],[117,5,117,6,1],[121,5,121,6,1],[123,9,130,11,1],[133,9,133,86,1],[136,9,136,68,1],[137,5,137,6,1],[141,5,141,6,1],[142,9,152,11,1],[154,9,154,16,1],[154,18,154,35,1],[154,36,154,38,1],[154,39,154,53,1],[155,9,155,10,1],[157,13,164,15,1],[167,13,167,90,1],[170,13,171,73,1],[172,9,172,10,1],[173,5,173,6,1]]);
+    </script>
+  </body>
+</html>

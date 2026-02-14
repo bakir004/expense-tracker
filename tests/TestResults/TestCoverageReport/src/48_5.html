@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.WebApi/Controllers/V1/CategoryController.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using Microsoft.AspNetCore.Mvc;
+using ExpenseTrackerAPI.Application.Categories.Interfaces.Application;
+using ExpenseTrackerAPI.Contracts.Categories;
+using Microsoft.AspNetCore.Authorization;
+using Asp.Versioning;
+
+namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
+
+/// &lt;summary&gt;
+/// Category management endpoints for API version 1.0.
+/// &lt;/summary&gt;
+[ApiController]
+[Route(&quot;api/v{version:apiVersion}/categories&quot;)]
+[ApiVersion(&quot;1.0&quot;)]
+[Authorize]
+public class CategoryController : ApiControllerBase
+{
+    private readonly ICategoryService _categoryService;
+    private readonly ILogger&lt;CategoryController&gt; _logger;
+
+    /// &lt;summary&gt;
+    /// Initializes a new instance of the CategoryController class.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;categoryService&quot;&gt;Category service&lt;/param&gt;
+    /// &lt;param name=&quot;logger&quot;&gt;Logger instance&lt;/param&gt;
+    public CategoryController(
+        ICategoryService categoryService,
+        ILogger&lt;CategoryController&gt; logger)
+    {
+        _categoryService = categoryService ?? throw new ArgumentNullException(nameof(categoryService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// &lt;summary&gt;
+    /// Get all categories.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;cancellationToken&quot;&gt;Cancellation token&lt;/param&gt;
+    /// &lt;returns&gt;List of all categories&lt;/returns&gt;
+    /// &lt;response code=&quot;200&quot;&gt;Categories retrieved successfully&lt;/response&gt;
+    /// &lt;response code=&quot;401&quot;&gt;User not authenticated&lt;/response&gt;
+    [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable&lt;CategoryResponse&gt;), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
+    public async Task&lt;IActionResult&gt; GetAll(CancellationToken cancellationToken = default)
+    {
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
+
+        var result = await _categoryService.GetAllAsync(cancellationToken);
+
+        if (result.IsError)
+        {
+            _logger.LogWarning(&quot;Failed to get categories: {Errors}&quot;,
+                string.Join(&quot;, &quot;, result.Errors.Select(e =&gt; e.Description)));
+            return Problem(result.Errors);
+        }
+
+        var categories = result.Value;
+        return Ok(categories.ToResponses());
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[26,5,28,44,1],[29,5,29,6,1],[30,9,30,104,1],[31,9,31,77,1],[32,5,32,6,1],[46,5,46,6,1],[47,9,47,53,1],[48,9,48,40,1],[48,41,48,67,0],[50,9,50,76,1],[52,9,52,28,1],[53,9,53,10,0],[54,13,55,61,0],[55,61,55,74,0],[55,74,55,78,0],[56,13,56,43,0],[59,9,59,39,1],[60,9,60,45,1],[61,5,61,6,1]]);
+    </script>
+  </body>
+</html>

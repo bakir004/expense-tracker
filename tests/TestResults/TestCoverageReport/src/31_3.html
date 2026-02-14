@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Infrastructure/Migrations/20260212123935_FixTimestampColumns.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+namespace ExpenseTrackerAPI.Infrastructure.Migrations
+{
+    /// &lt;inheritdoc /&gt;
+    public partial class FixTimestampColumns : Migration
+    {
+        /// &lt;inheritdoc /&gt;
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.AlterColumn&lt;DateTime&gt;(
+                name: &quot;updated_at&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Users&quot;,
+                type: &quot;timestamp with time zone&quot;,
+                nullable: false,
+                defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;,
+                oldClrType: typeof(DateTime),
+                oldType: &quot;timestamp&quot;,
+                oldDefaultValueSql: &quot;CURRENT_TIMESTAMP&quot;);
+
+            migrationBuilder.AlterColumn&lt;DateTime&gt;(
+                name: &quot;created_at&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Users&quot;,
+                type: &quot;timestamp with time zone&quot;,
+                nullable: false,
+                defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;,
+                oldClrType: typeof(DateTime),
+                oldType: &quot;timestamp&quot;,
+                oldDefaultValueSql: &quot;CURRENT_TIMESTAMP&quot;);
+
+            migrationBuilder.AlterColumn&lt;DateTime&gt;(
+                name: &quot;updated_at&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Transactions&quot;,
+                type: &quot;timestamp with time zone&quot;,
+                nullable: false,
+                defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;,
+                oldClrType: typeof(DateTime),
+                oldType: &quot;timestamp&quot;,
+                oldDefaultValueSql: &quot;CURRENT_TIMESTAMP&quot;);
+
+            migrationBuilder.AlterColumn&lt;DateTime&gt;(
+                name: &quot;created_at&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Transactions&quot;,
+                type: &quot;timestamp with time zone&quot;,
+                nullable: false,
+                defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;,
+                oldClrType: typeof(DateTime),
+                oldType: &quot;timestamp&quot;,
+                oldDefaultValueSql: &quot;CURRENT_TIMESTAMP&quot;);
+
+            migrationBuilder.AlterColumn&lt;DateTime&gt;(
+                name: &quot;created_at&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;TransactionGroups&quot;,
+                type: &quot;timestamp with time zone&quot;,
+                nullable: false,
+                defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;,
+                oldClrType: typeof(DateTime),
+                oldType: &quot;timestamp&quot;,
+                oldDefaultValueSql: &quot;CURRENT_TIMESTAMP&quot;);
+        }
+
+        /// &lt;inheritdoc /&gt;
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.AlterColumn&lt;DateTime&gt;(
+                name: &quot;updated_at&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Users&quot;,
+                type: &quot;timestamp&quot;,
+                nullable: false,
+                defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;,
+                oldClrType: typeof(DateTime),
+                oldType: &quot;timestamp with time zone&quot;,
+                oldDefaultValueSql: &quot;CURRENT_TIMESTAMP&quot;);
+
+            migrationBuilder.AlterColumn&lt;DateTime&gt;(
+                name: &quot;created_at&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Users&quot;,
+                type: &quot;timestamp&quot;,
+                nullable: false,
+                defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;,
+                oldClrType: typeof(DateTime),
+                oldType: &quot;timestamp with time zone&quot;,
+                oldDefaultValueSql: &quot;CURRENT_TIMESTAMP&quot;);
+
+            migrationBuilder.AlterColumn&lt;DateTime&gt;(
+                name: &quot;updated_at&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Transactions&quot;,
+                type: &quot;timestamp&quot;,
+                nullable: false,
+                defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;,
+                oldClrType: typeof(DateTime),
+                oldType: &quot;timestamp with time zone&quot;,
+                oldDefaultValueSql: &quot;CURRENT_TIMESTAMP&quot;);
+
+            migrationBuilder.AlterColumn&lt;DateTime&gt;(
+                name: &quot;created_at&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;Transactions&quot;,
+                type: &quot;timestamp&quot;,
+                nullable: false,
+                defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;,
+                oldClrType: typeof(DateTime),
+                oldType: &quot;timestamp with time zone&quot;,
+                oldDefaultValueSql: &quot;CURRENT_TIMESTAMP&quot;);
+
+            migrationBuilder.AlterColumn&lt;DateTime&gt;(
+                name: &quot;created_at&quot;,
+                schema: &quot;public&quot;,
+                table: &quot;TransactionGroups&quot;,
+                type: &quot;timestamp&quot;,
+                nullable: false,
+                defaultValueSql: &quot;CURRENT_TIMESTAMP&quot;,
+                oldClrType: typeof(DateTime),
+                oldType: &quot;timestamp with time zone&quot;,
+                oldDefaultValueSql: &quot;CURRENT_TIMESTAMP&quot;);
+        }
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[13,9,13,10,1],[14,13,23,58,1],[25,13,34,58,1],[36,13,45,58,1],[47,13,56,58,1],[58,13,67,58,1],[68,9,68,10,1],[72,9,72,10,0],[73,13,82,58,0],[84,13,93,58,0],[95,13,104,58,0],[106,13,115,58,0],[117,13,126,58,0],[127,9,127,10,0]]);
+    </script>
+  </body>
+</html>

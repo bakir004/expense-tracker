@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.Infrastructure.Tests/Repositories/TransactionRepositoryFilteringTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ExpenseTrackerAPI.Contracts.Transactions;
+using ExpenseTrackerAPI.Domain.Entities;
+using ExpenseTrackerAPI.Infrastructure.Categories;
+using ExpenseTrackerAPI.Infrastructure.Tests.Fixtures;
+using ExpenseTrackerAPI.Infrastructure.TransactionGroups;
+using ExpenseTrackerAPI.Infrastructure.Transactions;
+using ExpenseTrackerAPI.Infrastructure.Users;
+
+namespace ExpenseTrackerAPI.Infrastructure.Tests.Repositories;
+
+/// &lt;summary&gt;
+/// Tests for TransactionRepository filtering functionality.
+/// Tests the GetByUserIdWithFilterAsync method and its filter/sort logic.
+/// &lt;/summary&gt;
+[Collection(nameof(DatabaseCollection))]
+public class TransactionRepositoryFilteringTests : IAsyncLifetime
+{
+    private readonly DatabaseFixture _fixture;
+    private TransactionRepository _repository = null!;
+    private User _testUser = null!;
+    private Category _testCategory1 = null!;
+    private Category _testCategory2 = null!;
+    private TransactionGroup _testGroup1 = null!;
+    private TransactionGroup _testGroup2 = null!;
+
+    public TransactionRepositoryFilteringTests(DatabaseFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.ResetDatabaseAsync();
+        _repository = new TransactionRepository(_fixture.DbContext);
+
+        // Create test user
+        var userRepo = new UserRepository(_fixture.DbContext);
+        var userResult = await userRepo.CreateAsync(new User(
+            name: &quot;Filter Test User&quot;,
+            email: $&quot;filtertest-{Guid.NewGuid():N}@test.com&quot;,
+            passwordHash: &quot;hashed_password&quot;,
+            initialBalance: 0
+        ), CancellationToken.None);
+        _testUser = userResult.Value;
+
+        // Create test categories
+        _testCategory1 = new Category
+        {
+            Name = &quot;Food&quot;,
+            Icon = &quot;&#127828;&quot;,
+            Description = null
+        };
+        _fixture.DbContext.Categories.Add(_testCategory1);
+        await _fixture.DbContext.SaveChangesAsync();
+
+        _testCategory2 = new Category
+        {
+            Name = &quot;Transport&quot;,
+            Icon = &quot;&#128663;&quot;,
+            Description = null
+        };
+        _fixture.DbContext.Categories.Add(_testCategory2);
+        await _fixture.DbContext.SaveChangesAsync();
+
+        // Create test transaction groups
+        _testGroup1 = new TransactionGroup
+        {
+            Name = &quot;Monthly Bills&quot;,
+            Description = null,
+            UserId = _testUser.Id,
+            CreatedAt = DateTime.UtcNow
+        };
+        _fixture.DbContext.TransactionGroups.Add(_testGroup1);
+        await _fixture.DbContext.SaveChangesAsync();
+
+        _testGroup2 = new TransactionGroup
+        {
+            Name = &quot;Vacation Expenses&quot;,
+            Description = null,
+            UserId = _testUser.Id,
+            CreatedAt = DateTime.UtcNow
+        };
+        _fixture.DbContext.TransactionGroups.Add(_testGroup2);
+        await _fixture.DbContext.SaveChangesAsync();
+    }
+
+    public Task DisposeAsync() =&gt; Task.CompletedTask;
+
+    #region Helper Methods
+
+    private async Task&lt;Transaction&gt; CreateTransactionAsync(
+        TransactionType type,
+        decimal amount,
+        DateOnly date,
+        string subject,
+        PaymentMethod paymentMethod = PaymentMethod.CASH,
+        string? notes = null,
+        int? categoryId = null,
+        int? transactionGroupId = null,
+        DateTime? createdAt = null)
+    {
+        var transaction = new Transaction(
+            userId: _testUser.Id,
+            transactionType: type,
+            amount: amount,
+            date: date,
+            subject: subject,
+            paymentMethod: paymentMethod,
+            notes: notes,
+            categoryId: categoryId,
+            transactionGroupId: transactionGroupId,
+            createdAt: createdAt ?? DateTime.UtcNow,
+            updatedAt: createdAt ?? DateTime.UtcNow
+        );
+
+        var result = await _repository.CreateAsync(transaction, CancellationToken.None);
+        Assert.False(result.IsError);
+        return result.Value;
+    }
+
+    private static TransactionFilter CreateFilter(
+        TransactionType? transactionType = null,
+        decimal? minAmount = null,
+        decimal? maxAmount = null,
+        DateOnly? dateFrom = null,
+        DateOnly? dateTo = null,
+        string? subjectContains = null,
+        string? notesContains = null,
+        IReadOnlyList&lt;PaymentMethod&gt;? paymentMethods = null,
+        IReadOnlyList&lt;int&gt;? categoryIds = null,
+        bool uncategorized = false,
+        IReadOnlyList&lt;int&gt;? transactionGroupIds = null,
+        bool ungrouped = false,
+        TransactionSortField sortBy = TransactionSortField.Date,
+        bool sortDescending = true,
+        int page = 1,
+        int pageSize = 20)
+    {
+        return new TransactionFilter
+        {
+            TransactionType = transactionType,
+            MinAmount = minAmount,
+            MaxAmount = maxAmount,
+            DateFrom = dateFrom,
+            DateTo = dateTo,
+            SubjectContains = subjectContains,
+            NotesContains = notesContains,
+            PaymentMethods = paymentMethods,
+            CategoryIds = categoryIds,
+            Uncategorized = uncategorized,
+            TransactionGroupIds = transactionGroupIds,
+            Ungrouped = ungrouped,
+            SortBy = sortBy,
+            SortDescending = sortDescending,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    #endregion
+
+    #region Transaction Type Filtering
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByExpenseType_ReturnsOnlyExpenses()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Expense 1&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 75m, new DateOnly(2024, 1, 2), &quot;Expense 2&quot;);
+        await CreateTransactionAsync(TransactionType.INCOME, 100m, new DateOnly(2024, 1, 3), &quot;Income 1&quot;);
+        await CreateTransactionAsync(TransactionType.INCOME, 200m, new DateOnly(2024, 1, 4), &quot;Income 2&quot;);
+
+        var filter = CreateFilter(transactionType: TransactionType.EXPENSE, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Equal(TransactionType.EXPENSE, t.TransactionType));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByIncomeType_ReturnsOnlyIncome()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Expense 1&quot;);
+        await CreateTransactionAsync(TransactionType.INCOME, 100m, new DateOnly(2024, 1, 2), &quot;Income 1&quot;);
+        await CreateTransactionAsync(TransactionType.INCOME, 200m, new DateOnly(2024, 1, 3), &quot;Income 2&quot;);
+
+        var filter = CreateFilter(transactionType: TransactionType.INCOME, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Equal(TransactionType.INCOME, t.TransactionType));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_NoTypeFilter_ReturnsAllTypes()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Expense 1&quot;);
+        await CreateTransactionAsync(TransactionType.INCOME, 100m, new DateOnly(2024, 1, 2), &quot;Income 1&quot;);
+
+        var filter = CreateFilter(pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+    }
+
+    #endregion
+
+    #region Amount Filtering
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByMinAmount_ReturnsTransactionsAboveMinimum()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 25m, new DateOnly(2024, 1, 1), &quot;Low amount&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 2), &quot;Mid amount&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 100m, new DateOnly(2024, 1, 3), &quot;High amount&quot;);
+
+        var filter = CreateFilter(minAmount: 50m, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.True(t.Amount &gt;= 50m));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByMaxAmount_ReturnsTransactionsBelowMaximum()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 25m, new DateOnly(2024, 1, 1), &quot;Low amount&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 2), &quot;Mid amount&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 100m, new DateOnly(2024, 1, 3), &quot;High amount&quot;);
+
+        var filter = CreateFilter(maxAmount: 50m, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.True(t.Amount &lt;= 50m));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByAmountRange_ReturnsTransactionsInRange()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 25m, new DateOnly(2024, 1, 1), &quot;Too low&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 2), &quot;In range 1&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 75m, new DateOnly(2024, 1, 3), &quot;In range 2&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 100m, new DateOnly(2024, 1, 4), &quot;In range 3&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 150m, new DateOnly(2024, 1, 5), &quot;Too high&quot;);
+
+        var filter = CreateFilter(minAmount: 50m, maxAmount: 100m, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.True(t.Amount &gt;= 50m &amp;&amp; t.Amount &lt;= 100m));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByExactAmount_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Exact 1&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 2), &quot;Exact 2&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 75m, new DateOnly(2024, 1, 3), &quot;Different&quot;);
+
+        var filter = CreateFilter(minAmount: 50m, maxAmount: 50m, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Equal(50m, t.Amount));
+    }
+
+    #endregion
+
+    #region Date Filtering
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByDateFrom_ReturnsTransactionsFromDate()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Before&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 5), &quot;On date&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 10), &quot;After&quot;);
+
+        var filter = CreateFilter(dateFrom: new DateOnly(2024, 1, 5), pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.True(t.Date &gt;= new DateOnly(2024, 1, 5)));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByDateTo_ReturnsTransactionsUpToDate()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Before&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 5), &quot;On date&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 10), &quot;After&quot;);
+
+        var filter = CreateFilter(dateTo: new DateOnly(2024, 1, 5), pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.True(t.Date &lt;= new DateOnly(2024, 1, 5)));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByDateRange_ReturnsTransactionsInRange()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Before range&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 5), &quot;Start of range&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 7), &quot;Middle of range&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 80m, new DateOnly(2024, 1, 10), &quot;End of range&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 90m, new DateOnly(2024, 1, 15), &quot;After range&quot;);
+
+        var filter = CreateFilter(
+            dateFrom: new DateOnly(2024, 1, 5),
+            dateTo: new DateOnly(2024, 1, 10),
+            pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.True(
+            t.Date &gt;= new DateOnly(2024, 1, 5) &amp;&amp; t.Date &lt;= new DateOnly(2024, 1, 10)));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterBySingleDate_ReturnsTransactionsOnThatDate()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 4), &quot;Day before&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 5), &quot;Target day 1&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 5), &quot;Target day 2&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 80m, new DateOnly(2024, 1, 6), &quot;Day after&quot;);
+
+        var targetDate = new DateOnly(2024, 1, 5);
+        var filter = CreateFilter(dateFrom: targetDate, dateTo: targetDate, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Equal(targetDate, t.Date));
+    }
+
+    #endregion
+
+    #region Subject and Notes Filtering
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterBySubjectContains_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Grocery Shopping&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Gas Station&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Shopping Mall&quot;);
+
+        var filter = CreateFilter(subjectContains: &quot;shopping&quot;, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Contains(&quot;shopping&quot;, t.Subject, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterBySubjectContains_IsCaseInsensitive()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;COFFEE Shop&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;coffee break&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Tea House&quot;);
+
+        var filter = CreateFilter(subjectContains: &quot;CoFfEe&quot;, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByNotesContains_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Purchase 1&quot;, notes: &quot;urgent payment&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Purchase 2&quot;, notes: &quot;regular payment&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Purchase 3&quot;, notes: &quot;invoice received&quot;);
+
+        var filter = CreateFilter(notesContains: &quot;payment&quot;, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Contains(&quot;payment&quot;, t.Notes ?? &quot;&quot;, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByNotesContains_ExcludesNullNotes()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;With notes&quot;, notes: &quot;important&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Without notes&quot;, notes: null);
+
+        var filter = CreateFilter(notesContains: &quot;important&quot;, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Single(transactions);
+        Assert.NotNull(transactions[0].Notes);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByBothSubjectAndNotes_ReturnsOnlyMatchingBoth()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Coffee shop&quot;, notes: &quot;urgent&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Coffee house&quot;, notes: &quot;regular&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Tea shop&quot;, notes: &quot;urgent&quot;);
+
+        var filter = CreateFilter(subjectContains: &quot;coffee&quot;, notesContains: &quot;urgent&quot;, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Single(transactions);
+        Assert.Contains(&quot;coffee&quot;, transactions[0].Subject, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(&quot;urgent&quot;, transactions[0].Notes ?? &quot;&quot;, StringComparison.OrdinalIgnoreCase);
+    }
+
+    #endregion
+
+    #region Payment Method Filtering
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterBySinglePaymentMethod_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Cash payment&quot;, PaymentMethod.CASH);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Card payment&quot;, PaymentMethod.DEBIT_CARD);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Another cash&quot;, PaymentMethod.CASH);
+
+        var filter = CreateFilter(paymentMethods: new[] { PaymentMethod.CASH }, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Equal(PaymentMethod.CASH, t.PaymentMethod));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByMultiplePaymentMethods_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Cash&quot;, PaymentMethod.CASH);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Debit&quot;, PaymentMethod.DEBIT_CARD);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Credit&quot;, PaymentMethod.CREDIT_CARD);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 80m, new DateOnly(2024, 1, 4), &quot;Bank&quot;, PaymentMethod.BANK_TRANSFER);
+
+        var filter = CreateFilter(
+            paymentMethods: new[] { PaymentMethod.CASH, PaymentMethod.DEBIT_CARD, PaymentMethod.CREDIT_CARD },
+            pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Contains(t.PaymentMethod,
+            new[] { PaymentMethod.CASH, PaymentMethod.DEBIT_CARD, PaymentMethod.CREDIT_CARD }));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_EmptyPaymentMethodsList_ReturnsAllTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Cash&quot;, PaymentMethod.CASH);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Card&quot;, PaymentMethod.DEBIT_CARD);
+
+        var filter = CreateFilter(paymentMethods: Array.Empty&lt;PaymentMethod&gt;(), pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+    }
+
+    #endregion
+
+    #region Category Filtering
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterBySingleCategory_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Food&quot;, categoryId: _testCategory1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Transport&quot;, categoryId: _testCategory2.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;More food&quot;, categoryId: _testCategory1.Id);
+
+        var filter = CreateFilter(categoryIds: new[] { _testCategory1.Id }, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Equal(_testCategory1.Id, t.CategoryId));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByMultipleCategories_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Food&quot;, categoryId: _testCategory1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Transport&quot;, categoryId: _testCategory2.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Uncategorized&quot;, categoryId: null);
+
+        var filter = CreateFilter(categoryIds: new[] { _testCategory1.Id, _testCategory2.Id }, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.True(
+            t.CategoryId == _testCategory1.Id || t.CategoryId == _testCategory2.Id));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByUncategorized_ReturnsOnlyUncategorizedTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Food&quot;, categoryId: _testCategory1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Uncategorized 1&quot;, categoryId: null);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Uncategorized 2&quot;, categoryId: null);
+
+        var filter = CreateFilter(uncategorized: true, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Null(t.CategoryId));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_EmptyCategoryIdsList_ReturnsAllTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Food&quot;, categoryId: _testCategory1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Transport&quot;, categoryId: _testCategory2.Id);
+
+        var filter = CreateFilter(categoryIds: Array.Empty&lt;int&gt;(), pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+    }
+
+    #endregion
+
+    #region Transaction Group Filtering
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterBySingleGroup_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Bill 1&quot;, transactionGroupId: _testGroup1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Vacation 1&quot;, transactionGroupId: _testGroup2.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Bill 2&quot;, transactionGroupId: _testGroup1.Id);
+
+        var filter = CreateFilter(transactionGroupIds: new[] { _testGroup1.Id }, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Equal(_testGroup1.Id, t.TransactionGroupId));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByMultipleGroups_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Bill&quot;, transactionGroupId: _testGroup1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Vacation&quot;, transactionGroupId: _testGroup2.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Ungrouped&quot;, transactionGroupId: null);
+
+        var filter = CreateFilter(transactionGroupIds: new[] { _testGroup1.Id, _testGroup2.Id }, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.True(
+            t.TransactionGroupId == _testGroup1.Id || t.TransactionGroupId == _testGroup2.Id));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_FilterByUngrouped_ReturnsOnlyUngroupedTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Grouped&quot;, transactionGroupId: _testGroup1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Ungrouped 1&quot;, transactionGroupId: null);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Ungrouped 2&quot;, transactionGroupId: null);
+
+        var filter = CreateFilter(ungrouped: true, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.All(transactions, t =&gt; Assert.Null(t.TransactionGroupId));
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_EmptyTransactionGroupIdsList_ReturnsAllTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Grouped 1&quot;, transactionGroupId: _testGroup1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Grouped 2&quot;, transactionGroupId: _testGroup2.Id);
+
+        var filter = CreateFilter(transactionGroupIds: Array.Empty&lt;int&gt;(), pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+    }
+
+    #endregion
+
+    #region Sorting Tests
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_SortByDateAscending_ReturnsTransactionsInCorrectOrder()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 10), &quot;Latest&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 5), &quot;Middle&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 1), &quot;Earliest&quot;);
+
+        var filter = CreateFilter(sortBy: TransactionSortField.Date, sortDescending: false, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        Assert.Equal(new DateOnly(2024, 1, 1), transactions[0].Date);
+        Assert.Equal(new DateOnly(2024, 1, 5), transactions[1].Date);
+        Assert.Equal(new DateOnly(2024, 1, 10), transactions[2].Date);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_SortByDateDescending_ReturnsTransactionsInCorrectOrder()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Earliest&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 5), &quot;Middle&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 10), &quot;Latest&quot;);
+
+        var filter = CreateFilter(sortBy: TransactionSortField.Date, sortDescending: true, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        Assert.Equal(new DateOnly(2024, 1, 10), transactions[0].Date);
+        Assert.Equal(new DateOnly(2024, 1, 5), transactions[1].Date);
+        Assert.Equal(new DateOnly(2024, 1, 1), transactions[2].Date);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_SortByAmountAscending_ReturnsTransactionsInCorrectOrder()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 100m, new DateOnly(2024, 1, 1), &quot;Highest&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 2), &quot;Middle&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 25m, new DateOnly(2024, 1, 3), &quot;Lowest&quot;);
+
+        var filter = CreateFilter(sortBy: TransactionSortField.Amount, sortDescending: false, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        Assert.Equal(25m, transactions[0].Amount);
+        Assert.Equal(50m, transactions[1].Amount);
+        Assert.Equal(100m, transactions[2].Amount);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_SortByAmountDescending_ReturnsTransactionsInCorrectOrder()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 25m, new DateOnly(2024, 1, 1), &quot;Lowest&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 2), &quot;Middle&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 100m, new DateOnly(2024, 1, 3), &quot;Highest&quot;);
+
+        var filter = CreateFilter(sortBy: TransactionSortField.Amount, sortDescending: true, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        Assert.Equal(100m, transactions[0].Amount);
+        Assert.Equal(50m, transactions[1].Amount);
+        Assert.Equal(25m, transactions[2].Amount);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_SortBySubjectAscending_ReturnsTransactionsInCorrectOrder()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Zebra&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Apple&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Mango&quot;);
+
+        var filter = CreateFilter(sortBy: TransactionSortField.Subject, sortDescending: false, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        Assert.Equal(&quot;Apple&quot;, transactions[0].Subject);
+        Assert.Equal(&quot;Mango&quot;, transactions[1].Subject);
+        Assert.Equal(&quot;Zebra&quot;, transactions[2].Subject);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_SortByCreatedAtAscending_ReturnsTransactionsInCorrectOrder()
+    {
+        // Arrange - create with explicit CreatedAt timestamps
+        var baseTime = DateTime.UtcNow.AddDays(-10);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Third&quot;, createdAt: baseTime.AddHours(3));
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 1), &quot;First&quot;, createdAt: baseTime.AddHours(1));
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 1), &quot;Second&quot;, createdAt: baseTime.AddHours(2));
+
+        var filter = CreateFilter(sortBy: TransactionSortField.CreatedAt, sortDescending: false, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        Assert.Equal(&quot;First&quot;, transactions[0].Subject);
+        Assert.Equal(&quot;Second&quot;, transactions[1].Subject);
+        Assert.Equal(&quot;Third&quot;, transactions[2].Subject);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_SortByUpdatedAtDescending_ReturnsTransactionsInCorrectOrder()
+    {
+        // Arrange
+        var baseTime = DateTime.UtcNow.AddDays(-10);
+        var t1 = await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Oldest update&quot;, createdAt: baseTime);
+        var t2 = await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Middle update&quot;, createdAt: baseTime);
+        var t3 = await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Newest update&quot;, createdAt: baseTime);
+
+        // Update t3 to have the most recent UpdatedAt
+        await Task.Delay(10);
+        t3.UpdateCumulativeDelta(t3.CumulativeDelta); // This updates UpdatedAt
+        await _fixture.DbContext.SaveChangesAsync();
+
+        var filter = CreateFilter(sortBy: TransactionSortField.UpdatedAt, sortDescending: true, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        Assert.Equal(&quot;Newest update&quot;, transactions[0].Subject);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_SortByDate_ThenByCreatedAt_AsSecondarySort()
+    {
+        // Arrange - same date, different creation times
+        var baseTime = DateTime.UtcNow.AddDays(-10);
+        var sameDate = new DateOnly(2024, 1, 5);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, sameDate, &quot;Third&quot;, createdAt: baseTime.AddHours(3));
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, sameDate, &quot;First&quot;, createdAt: baseTime.AddHours(1));
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, sameDate, &quot;Second&quot;, createdAt: baseTime.AddHours(2));
+
+        var filter = CreateFilter(sortBy: TransactionSortField.Date, sortDescending: false, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        // All same date, so should be sorted by CreatedAt ascending
+        Assert.Equal(&quot;First&quot;, transactions[0].Subject);
+        Assert.Equal(&quot;Second&quot;, transactions[1].Subject);
+        Assert.Equal(&quot;Third&quot;, transactions[2].Subject);
+    }
+
+    #endregion
+
+    #region Pagination Tests
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_Pagination_FirstPage_ReturnsCorrectTransactions()
+    {
+        // Arrange - create 5 transactions
+        for (int i = 1; i &lt;= 5; i++)
+        {
+            await CreateTransactionAsync(TransactionType.EXPENSE, i * 10m, new DateOnly(2024, 1, i), $&quot;Transaction {i}&quot;);
+        }
+
+        var filter = CreateFilter(page: 1, pageSize: 2, sortDescending: false);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.Equal(&quot;Transaction 1&quot;, transactions[0].Subject);
+        Assert.Equal(&quot;Transaction 2&quot;, transactions[1].Subject);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_Pagination_SecondPage_ReturnsCorrectTransactions()
+    {
+        // Arrange
+        for (int i = 1; i &lt;= 5; i++)
+        {
+            await CreateTransactionAsync(TransactionType.EXPENSE, i * 10m, new DateOnly(2024, 1, i), $&quot;Transaction {i}&quot;);
+        }
+
+        var filter = CreateFilter(page: 2, pageSize: 2, sortDescending: false);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count);
+        Assert.Equal(&quot;Transaction 3&quot;, transactions[0].Subject);
+        Assert.Equal(&quot;Transaction 4&quot;, transactions[1].Subject);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_Pagination_LastPage_ReturnsRemainingTransactions()
+    {
+        // Arrange
+        for (int i = 1; i &lt;= 5; i++)
+        {
+            await CreateTransactionAsync(TransactionType.EXPENSE, i * 10m, new DateOnly(2024, 1, i), $&quot;Transaction {i}&quot;);
+        }
+
+        var filter = CreateFilter(page: 3, pageSize: 2, sortDescending: false);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Single(transactions);
+        Assert.Equal(&quot;Transaction 5&quot;, transactions[0].Subject);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_Pagination_BeyondLastPage_ReturnsEmpty()
+    {
+        // Arrange
+        for (int i = 1; i &lt;= 3; i++)
+        {
+            await CreateTransactionAsync(TransactionType.EXPENSE, i * 10m, new DateOnly(2024, 1, i), $&quot;Transaction {i}&quot;);
+        }
+
+        var filter = CreateFilter(page: 5, pageSize: 2);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Empty(transactions);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_LargePageSize_ReturnsAllTransactions()
+    {
+        // Arrange
+        for (int i = 1; i &lt;= 10; i++)
+        {
+            await CreateTransactionAsync(TransactionType.EXPENSE, i * 10m, new DateOnly(2024, 1, i), $&quot;Transaction {i}&quot;);
+        }
+
+        var filter = CreateFilter(page: 1, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(10, transactions.Count);
+    }
+
+    #endregion
+
+    #region Combined Filters Tests
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_CombineTypeAndAmountFilters_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 25m, new DateOnly(2024, 1, 1), &quot;Small expense&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 75m, new DateOnly(2024, 1, 2), &quot;Large expense&quot;);
+        await CreateTransactionAsync(TransactionType.INCOME, 100m, new DateOnly(2024, 1, 3), &quot;Small income&quot;);
+        await CreateTransactionAsync(TransactionType.INCOME, 200m, new DateOnly(2024, 1, 4), &quot;Large income&quot;);
+
+        var filter = CreateFilter(
+            transactionType: TransactionType.EXPENSE,
+            minAmount: 50m,
+            pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Single(transactions);
+        Assert.Equal(TransactionType.EXPENSE, transactions[0].TransactionType);
+        Assert.True(transactions[0].Amount &gt;= 50m);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_CombineDateAndPaymentMethodFilters_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Before range&quot;, PaymentMethod.CASH);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 5), &quot;In range cash&quot;, PaymentMethod.CASH);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 6), &quot;In range card&quot;, PaymentMethod.DEBIT_CARD);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 80m, new DateOnly(2024, 1, 15), &quot;After range&quot;, PaymentMethod.CASH);
+
+        var filter = CreateFilter(
+            dateFrom: new DateOnly(2024, 1, 5),
+            dateTo: new DateOnly(2024, 1, 10),
+            paymentMethods: new[] { PaymentMethod.CASH },
+            pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Single(transactions);
+        Assert.Equal(&quot;In range cash&quot;, transactions[0].Subject);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_CombineCategoryAndGroupFilters_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Cat1 Group1&quot;,
+            categoryId: _testCategory1.Id, transactionGroupId: _testGroup1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Cat2 Group1&quot;,
+            categoryId: _testCategory2.Id, transactionGroupId: _testGroup1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Cat1 Group2&quot;,
+            categoryId: _testCategory1.Id, transactionGroupId: _testGroup2.Id);
+
+        var filter = CreateFilter(
+            categoryIds: new[] { _testCategory1.Id },
+            transactionGroupIds: new[] { _testGroup1.Id },
+            pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Single(transactions);
+        Assert.Equal(&quot;Cat1 Group1&quot;, transactions[0].Subject);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_CombineTextSearchFilters_ReturnsMatchingTransactions()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Coffee shop&quot;, notes: &quot;urgent payment&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 2), &quot;Coffee house&quot;, notes: &quot;regular&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 3), &quot;Tea shop&quot;, notes: &quot;urgent payment&quot;);
+
+        var filter = CreateFilter(
+            subjectContains: &quot;coffee&quot;,
+            notesContains: &quot;urgent&quot;,
+            pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Single(transactions);
+        Assert.Equal(&quot;Coffee shop&quot;, transactions[0].Subject);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_ComplexFilterCombination_ReturnsMatchingTransactions()
+    {
+        // Arrange - create various transactions
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 5), &quot;Coffee expense&quot;,
+            PaymentMethod.CASH, &quot;urgent&quot;, _testCategory1.Id, _testGroup1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 75m, new DateOnly(2024, 1, 6), &quot;Coffee shop&quot;,
+            PaymentMethod.DEBIT_CARD, &quot;urgent&quot;, _testCategory1.Id, _testGroup1.Id);
+        await CreateTransactionAsync(TransactionType.INCOME, 100m, new DateOnly(2024, 1, 7), &quot;Coffee sale&quot;,
+            PaymentMethod.CASH, &quot;urgent&quot;, _testCategory1.Id, _testGroup1.Id);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 150m, new DateOnly(2024, 1, 8), &quot;Coffee wholesale&quot;,
+            PaymentMethod.CASH, &quot;urgent&quot;, _testCategory1.Id, _testGroup1.Id);
+
+        var filter = CreateFilter(
+            transactionType: TransactionType.EXPENSE,
+            minAmount: 50m,
+            maxAmount: 100m,
+            dateFrom: new DateOnly(2024, 1, 5),
+            dateTo: new DateOnly(2024, 1, 10),
+            subjectContains: &quot;coffee&quot;,
+            notesContains: &quot;urgent&quot;,
+            paymentMethods: new[] { PaymentMethod.CASH, PaymentMethod.DEBIT_CARD },
+            categoryIds: new[] { _testCategory1.Id },
+            transactionGroupIds: new[] { _testGroup1.Id },
+            pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(2, transactions.Count); // Should return first two transactions
+        Assert.All(transactions, t =&gt;
+        {
+            Assert.Equal(TransactionType.EXPENSE, t.TransactionType);
+            Assert.True(t.Amount &gt;= 50m &amp;&amp; t.Amount &lt;= 100m);
+            Assert.Contains(&quot;coffee&quot;, t.Subject, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(&quot;urgent&quot;, t.Notes ?? &quot;&quot;, StringComparison.OrdinalIgnoreCase);
+        });
+    }
+
+    #endregion
+
+    #region User Isolation Tests
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_OnlyReturnsTransactionsForSpecifiedUser()
+    {
+        // Arrange - create another user
+        var userRepo = new UserRepository(_fixture.DbContext);
+        var otherUserResult = await userRepo.CreateAsync(new User(
+            name: &quot;Other User&quot;,
+            email: $&quot;other-{Guid.NewGuid():N}@test.com&quot;,
+            passwordHash: &quot;hashed_password&quot;,
+            initialBalance: 0
+        ), CancellationToken.None);
+        var otherUser = otherUserResult.Value;
+
+        // Create transaction for test user
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Test user transaction&quot;);
+
+        // Create transaction for other user
+        var otherUserTransaction = new Transaction(
+            userId: otherUser.Id,
+            transactionType: TransactionType.EXPENSE,
+            amount: 100m,
+            date: new DateOnly(2024, 1, 1),
+            subject: &quot;Other user transaction&quot;,
+            paymentMethod: PaymentMethod.CASH,
+            notes: null,
+            categoryId: null,
+            transactionGroupId: null,
+            createdAt: DateTime.UtcNow,
+            updatedAt: DateTime.UtcNow
+        );
+        await _repository.CreateAsync(otherUserTransaction, CancellationToken.None);
+
+        var filter = CreateFilter(pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Single(transactions);
+        Assert.Equal(_testUser.Id, transactions[0].UserId);
+        Assert.Equal(&quot;Test user transaction&quot;, transactions[0].Subject);
+    }
+
+    #endregion
+
+    #region Edge Cases
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_NoTransactions_ReturnsEmptyList()
+    {
+        // Arrange
+        var filter = CreateFilter(pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Empty(transactions);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_NoMatchingTransactions_ReturnsEmptyList()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Expense&quot;);
+
+        var filter = CreateFilter(transactionType: TransactionType.INCOME, pageSize: 100);
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Empty(transactions);
+    }
+
+    [Fact]
+    public async Task GetByUserIdWithFilterAsync_DefaultFilter_ReturnsAllTransactionsSortedByDateDescending()
+    {
+        // Arrange
+        await CreateTransactionAsync(TransactionType.EXPENSE, 50m, new DateOnly(2024, 1, 1), &quot;Oldest&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 60m, new DateOnly(2024, 1, 5), &quot;Middle&quot;);
+        await CreateTransactionAsync(TransactionType.EXPENSE, 70m, new DateOnly(2024, 1, 10), &quot;Newest&quot;);
+
+        var filter = new TransactionFilter(); // All defaults
+
+        // Act
+        var result = await _repository.GetByUserIdWithFilterAsync(_testUser.Id, filter, CancellationToken.None);
+
+        // Assert
+        Assert.False(result.IsError);
+        var transactions = result.Value;
+        Assert.Equal(3, transactions.Count);
+        // Default sort is by Date descending
+        Assert.Equal(&quot;Newest&quot;, transactions[0].Subject);
+        Assert.Equal(&quot;Middle&quot;, transactions[1].Subject);
+        Assert.Equal(&quot;Oldest&quot;, transactions[2].Subject);
+    }
+
+    #endregion
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[19,5,19,55,1],[20,5,20,36,1],[21,5,21,45,1],[22,5,22,45,1],[23,5,23,50,1],[24,5,24,50,1],[26,5,26,72,1],[27,5,27,6,1],[28,9,28,28,1],[29,5,29,6,1],[32,5,32,6,1],[33,9,33,45,1],[34,9,34,69,1],[37,9,37,63,1],[38,9,43,36,1],[44,9,44,38,1],[47,9,52,11,1],[53,9,53,59,1],[54,9,54,53,1],[56,9,61,11,1],[62,9,62,59,1],[63,9,63,53,1],[66,9,72,11,1],[73,9,73,63,1],[74,9,74,53,1],[76,9,82,11,1],[83,9,83,63,1],[84,9,84,53,1],[85,5,85,6,1],[87,35,87,53,1],[101,5,101,6,1],[102,9,114,11,1],[116,9,116,89,1],[117,9,117,38,1],[118,9,118,29,1],[119,5,119,6,1],[138,5,138,6,1],[139,9,157,11,1],[158,5,158,6,1],[166,5,166,6,1],[168,9,168,107,1],[169,9,169,107,1],[170,9,170,106,1],[171,9,171,106,1],[173,9,173,92,1],[176,9,176,113,1],[179,9,179,38,1],[180,9,180,41,1],[181,9,181,45,1],[182,9,182,39,1],[182,39,182,95,1],[182,95,182,97,1],[183,5,183,6,1],[187,5,187,6,1],[189,9,189,107,1],[190,9,190,106,1],[191,9,191,106,1],[193,9,193,91,1],[196,9,196,113,1],[199,9,199,38,1],[200,9,200,41,1],[201,9,201,45,1],[202,9,202,39,1],[202,39,202,94,1],[202,94,202,96,1],[203,5,203,6,1],[207,5,207,6,1],[209,9,209,107,1],[210,9,210,106,1],[212,9,212,50,1],[215,9,215,113,1],[218,9,218,38,1],[219,9,219,41,1],[220,9,220,45,1],[221,5,221,6,1],[229,5,229,6,1],[231,9,231,108,1],[232,9,232,108,1],[233,9,233,110,1],[235,9,235,66,1],[238,9,238,113,1],[241,9,241,38,1],[242,9,242,41,1],[243,9,243,45,1],[244,9,244,39,1],[244,39,244,67,1],[244,67,244,69,1],[245,5,245,6,1],[249,5,249,6,1],[251,9,251,108,1],[252,9,252,108,1],[253,9,253,110,1],[255,9,255,66,1],[258,9,258,113,1],[261,9,261,38,1],[262,9,262,41,1],[263,9,263,45,1],[264,9,264,39,1],[264,39,264,67,1],[264,67,264,69,1],[265,5,265,6,1],[269,5,269,6,1],[271,9,271,105,1],[272,9,272,108,1],[273,9,273,108,1],[274,9,274,109,1],[275,9,275,107,1],[277,9,277,83,1],[280,9,280,113,1],[283,9,283,38,1],[284,9,284,41,1],[285,9,285,45,1],[286,9,286,39,1],[286,39,286,87,1],[286,87,286,89,1],[287,5,287,6,1],[291,5,291,6,1],[293,9,293,105,1],[294,9,294,105,1],[295,9,295,107,1],[297,9,297,82,1],[300,9,300,113,1],[303,9,303,38,1],[304,9,304,41,1],[305,9,305,45,1],[306,9,306,39,1],[306,39,306,66,1],[306,66,306,68,1],[307,5,307,6,1],[315,5,315,6,1],[317,9,317,104,1],[318,9,318,105,1],[319,9,319,104,1],[321,9,321,86,1],[324,9,324,113,1],[327,9,327,38,1],[328,9,328,41,1],[329,9,329,45,1],[330,9,330,39,1],[330,39,330,86,1],[330,86,330,88,1],[331,5,331,6,1],[335,5,335,6,1],[337,9,337,104,1],[338,9,338,105,1],[339,9,339,104,1],[341,9,341,84,1],[344,9,344,113,1],[347,9,347,38,1],[348,9,348,41,1],[349,9,349,45,1],[350,9,350,39,1],[350,39,350,86,1],[350,86,350,88,1],[351,5,351,6,1],[355,5,355,6,1],[357,9,357,110,1],[358,9,358,112,1],[359,9,359,113,1],[360,9,360,111,1],[361,9,361,110,1],[363,9,366,28,1],[369,9,369,113,1],[372,9,372,38,1],[373,9,373,41,1],[374,9,374,45,1],[375,9,375,39,1],[375,39,376,87,1],[376,87,376,89,1],[377,5,377,6,1],[381,5,381,6,1],[383,9,383,108,1],[384,9,384,110,1],[385,9,385,110,1],[386,9,386,107,1],[388,9,388,51,1],[389,9,389,92,1],[392,9,392,113,1],[395,9,395,38,1],[396,9,396,41,1],[397,9,397,45,1],[398,9,398,39,1],[398,39,398,71,1],[398,71,398,73,1],[399,5,399,6,1],[407,5,407,6,1],[409,9,409,114,1],[410,9,410,109,1],[411,9,411,111,1],[413,9,413,79,1],[416,9,416,113,1],[419,9,419,38,1],[420,9,420,41,1],[421,9,421,45,1],[422,9,422,39,1],[422,39,422,113,1],[422,113,422,115,1],[423,5,423,6,1],[427,5,427,6,1],[429,9,429,109,1],[430,9,430,110,1],[431,9,431,107,1],[433,9,433,77,1],[436,9,436,113,1],[439,9,439,38,1],[440,9,440,41,1],[441,9,441,45,1],[442,5,442,6,1],[446,5,446,6,1],[448,9,448,133,1],[449,9,449,134,1],[450,9,450,135,1],[452,9,452,76,1],[455,9,455,113,1],[458,9,458,38,1],[459,9,459,41,1],[460,9,460,45,1],[461,9,461,39,1],[461,39,461,116,1],[461,116,461,118,1],[462,5,462,6,1],[466,5,466,6,1],[468,9,468,128,1],[469,9,469,124,1],[471,9,471,78,1],[474,9,474,113,1],[477,9,477,38,1],[478,9,478,41,1],[479,9,479,37,1],[480,9,480,47,1],[481,5,481,6,1],[485,5,485,6,1],[487,9,487,126,1],[488,9,488,128,1],[489,9,489,123,1],[491,9,491,102,1],[494,9,494,113,1],[497,9,497,38,1],[498,9,498,41,1],[499,9,499,37,1],[500,9,500,96,1],[501,9,501,100,1],[502,5,502,6,1],[510,5,510,6,1],[512,9,512,130,1],[513,9,513,136,1],[514,9,514,130,1],[516,9,516,96,1],[519,9,519,113,1],[522,9,522,38,1],[523,9,523,41,1],[524,9,524,45,1],[525,9,525,39,1],[525,39,525,88,1],[525,88,525,90,1],[526,5,526,6,1],[530,5,530,6,1],[532,9,532,122,1],[533,9,533,129,1],[534,9,534,131,1],[535,9,535,131,1],[537,9,539,28,1],[542,9,542,113,1],[545,9,545,38,1],[546,9,546,41,1],[547,9,547,45,1],[548,9,548,39,1],[548,39,549,95,1],[549,95,549,97,1],[550,5,550,6,1],[554,5,554,6,1],[556,9,556,122,1],[557,9,557,128,1],[559,9,559,96,1],[562,9,562,113,1],[565,9,565,38,1],[566,9,566,41,1],[567,9,567,45,1],[568,5,568,6,1],[576,5,576,6,1],[578,9,578,133,1],[579,9,579,138,1],[580,9,580,138,1],[582,9,582,92,1],[585,9,585,113,1],[588,9,588,38,1],[589,9,589,41,1],[590,9,590,45,1],[591,9,591,86,1],[592,5,592,6,1],[596,5,596,6,1],[598,9,598,133,1],[599,9,599,138,1],[600,9,600,129,1],[602,9,602,111,1],[605,9,605,113,1],[608,9,608,38,1],[609,9,609,41,1],[610,9,610,45,1],[611,9,612,86,1],[613,5,613,6,1],[617,5,617,6,1],[619,9,619,133,1],[620,9,620,131,1],[621,9,621,131,1],[623,9,623,71,1],[626,9,626,113,1],[629,9,629,38,1],[630,9,630,41,1],[631,9,631,45,1],[632,9,632,39,1],[632,39,632,64,1],[632,64,632,66,1],[633,5,633,6,1],[637,5,637,6,1],[639,9,639,133,1],[640,9,640,138,1],[642,9,642,83,1],[645,9,645,113,1],[648,9,648,38,1],[649,9,649,41,1],[650,9,650,45,1],[651,5,651,6,1],[659,5,659,6,1],[661,9,661,140,1],[662,9,662,144,1],[663,9,663,140,1],[665,9,665,97,1],[668,9,668,113,1],[671,9,671,38,1],[672,9,672,41,1],[673,9,673,45,1],[674,9,674,91,1],[675,5,675,6,1],[679,5,679,6,1],[681,9,681,138,1],[682,9,682,142,1],[683,9,683,133,1],[685,9,685,113,1],[688,9,688,113,1],[691,9,691,38,1],[692,9,692,41,1],[693,9,693,45,1],[694,9,695,96,1],[696,5,696,6,1],[700,5,700,6,1],[702,9,702,141,1],[703,9,703,135,1],[704,9,704,135,1],[706,9,706,67,1],[709,9,709,113,1],[712,9,712,38,1],[713,9,713,41,1],[714,9,714,45,1],[715,9,715,39,1],[715,39,715,72,1],[715,72,715,74,1],[716,5,716,6,1],[720,5,720,6,1],[722,9,722,143,1],[723,9,723,143,1],[725,9,725,91,1],[728,9,728,113,1],[731,9,731,38,1],[732,9,732,41,1],[733,9,733,45,1],[734,5,734,6,1],[742,5,742,6,1],[744,9,744,105,1],[745,9,745,104,1],[746,9,746,106,1],[748,9,748,108,1],[751,9,751,113,1],[754,9,754,38,1],[755,9,755,41,1],[756,9,756,45,1],[757,9,757,70,1],[758,9,758,70,1],[759,9,759,71,1],[760,5,760,6,1],[764,5,764,6,1],[766,9,766,106,1],[767,9,767,104,1],[768,9,768,105,1],[770,9,770,107,1],[773,9,773,113,1],[776,9,776,38,1],[777,9,777,41,1],[778,9,778,45,1],[779,9,779,71,1],[780,9,780,70,1],[781,9,781,70,1],[782,5,782,6,1],[786,5,786,6,1],[788,9,788,106,1],[789,9,789,104,1],[790,9,790,104,1],[792,9,792,110,1],[795,9,795,113,1],[798,9,798,38,1],[799,9,799,41,1],[800,9,800,45,1],[801,9,801,51,1],[802,9,802,51,1],[803,9,803,52,1],[804,5,804,6,1],[808,5,808,6,1],[810,9,810,104,1],[811,9,811,104,1],[812,9,812,106,1],[814,9,814,109,1],[817,9,817,113,1],[820,9,820,38,1],[821,9,821,41,1],[822,9,822,45,1],[823,9,823,52,1],[824,9,824,51,1],[825,9,825,51,1],[826,5,826,6,1],[830,5,830,6,1],[832,9,832,103,1],[833,9,833,103,1],[834,9,834,103,1],[836,9,836,111,1],[839,9,839,113,1],[842,9,842,38,1],[843,9,843,41,1],[844,9,844,45,1],[845,9,845,56,1],[846,9,846,56,1],[847,9,847,56,1],[848,5,848,6,1],[852,5,852,6,1],[854,9,854,53,1],[855,9,855,136,1],[856,9,856,136,1],[857,9,857,137,1],[859,9,859,113,1],[862,9,862,113,1],[865,9,865,38,1],[866,9,866,41,1],[867,9,867,45,1],[868,9,868,56,1],[869,9,869,57,1],[870,9,870,56,1],[871,5,871,6,1],[875,5,875,6,1],[877,9,877,53,1],[878,9,878,141,1],[879,9,879,141,1],[880,9,880,141,1],[883,9,883,30,1],[884,9,884,54,1],[885,9,885,53,1],[887,9,887,112,1],[890,9,890,113,1],[893,9,893,38,1],[894,9,894,41,1],[895,9,895,45,1],[896,9,896,64,1],[897,5,897,6,1],[901,5,901,6,1],[903,9,903,53,1],[904,9,904,49,1],[905,9,905,120,1],[906,9,906,120,1],[907,9,907,121,1],[909,9,909,108,1],[912,9,912,113,1],[915,9,915,38,1],[916,9,916,41,1],[917,9,917,45,1],[919,9,919,56,1],[920,9,920,57,1],[921,9,921,56,1],[922,5,922,6,1],[930,5,930,6,1],[932,14,932,23,1],[932,25,932,31,1],[932,33,932,36,1],[933,9,933,10,1],[934,13,934,122,1],[935,9,935,10,1],[937,9,937,80,1],[940,9,940,113,1],[943,9,943,38,1],[944,9,944,41,1],[945,9,945,45,1],[946,9,946,64,1],[947,9,947,64,1],[948,5,948,6,1],[952,5,952,6,1],[954,14,954,23,1],[954,25,954,31,1],[954,33,954,36,1],[955,9,955,10,1],[956,13,956,122,1],[957,9,957,10,1],[959,9,959,80,1],[962,9,962,113,1],[965,9,965,38,1],[966,9,966,41,1],[967,9,967,45,1],[968,9,968,64,1],[969,9,969,64,1],[970,5,970,6,1],[974,5,974,6,1],[976,14,976,23,1],[976,25,976,31,1],[976,33,976,36,1],[977,9,977,10,1],[978,13,978,122,1],[979,9,979,10,1],[981,9,981,80,1],[984,9,984,113,1],[987,9,987,38,1],[988,9,988,41,1],[989,9,989,37,1],[990,9,990,64,1],[991,5,991,6,1],[995,5,995,6,1],[997,14,997,23,1],[997,25,997,31,1],[997,33,997,36,1],[998,9,998,10,1],[999,13,999,122,1],[1000,9,1000,10,1],[1002,9,1002,57,1],[1005,9,1005,113,1],[1008,9,1008,38,1],[1009,9,1009,41,1],[1010,9,1010,36,1],[1011,5,1011,6,1],[1015,5,1015,6,1],[1017,14,1017,23,1],[1017,25,1017,32,1],[1017,34,1017,37,1],[1018,9,1018,10,1],[1019,13,1019,122,1],[1020,9,1020,10,1],[1022,9,1022,59,1],[1025,9,1025,113,1],[1028,9,1028,38,1],[1029,9,1029,41,1],[1030,9,1030,46,1],[1031,5,1031,6,1],[1039,5,1039,6,1],[1041,9,1041,111,1],[1042,9,1042,111,1],[1043,9,1043,110,1],[1044,9,1044,110,1],[1046,9,1049,28,1],[1052,9,1052,113,1],[1055,9,1055,38,1],[1056,9,1056,41,1],[1057,9,1057,37,1],[1058,9,1058,80,1],[1059,9,1059,52,1],[1060,5,1060,6,1],[1064,5,1064,6,1],[1066,9,1066,130,1],[1067,9,1067,131,1],[1068,9,1068,137,1],[1069,9,1069,130,1],[1071,9,1075,28,1],[1078,9,1078,113,1],[1081,9,1081,38,1],[1082,9,1082,41,1],[1083,9,1083,37,1],[1084,9,1084,64,1],[1085,5,1085,6,1],[1089,5,1089,6,1],[1091,9,1092,80,1],[1093,9,1094,80,1],[1095,9,1096,80,1],[1098,9,1101,28,1],[1104,9,1104,113,1],[1107,9,1107,38,1],[1108,9,1108,41,1],[1109,9,1109,37,1],[1110,9,1110,62,1],[1111,5,1111,6,1],[1115,5,1115,6,1],[1117,9,1117,134,1],[1118,9,1118,128,1],[1119,9,1119,131,1],[1121,9,1124,28,1],[1127,9,1127,113,1],[1130,9,1130,38,1],[1131,9,1131,41,1],[1132,9,1132,37,1],[1133,9,1133,62,1],[1134,5,1134,6,1],[1138,5,1138,6,1],[1140,9,1141,78,1],[1142,9,1143,84,1],[1144,9,1145,78,1],[1146,9,1147,78,1],[1149,9,1160,28,1],[1163,9,1163,113,1],[1166,9,1166,38,1],[1167,9,1167,41,1],[1168,9,1168,45,1],[1169,9,1170,9,1],[1170,9,1170,10,1],[1170,10,1171,13,1],[1171,13,1171,70,1],[1171,70,1172,13,1],[1172,13,1172,62,1],[1172,62,1173,13,1],[1173,13,1173,86,1],[1173,86,1174,13,1],[1174,13,1174,90,1],[1174,90,1175,9,1],[1175,9,1175,10,1],[1175,10,1175,12,1],[1176,5,1176,6,1],[1184,5,1184,6,1],[1186,9,1186,63,1],[1187,9,1192,36,1],[1193,9,1193,47,1],[1196,9,1196,119,1],[1199,9,1211,11,1],[1212,9,1212,85,1],[1214,9,1214,50,1],[1217,9,1217,113,1],[1220,9,1220,38,1],[1221,9,1221,41,1],[1222,9,1222,37,1],[1223,9,1223,60,1],[1224,9,1224,72,1],[1225,5,1225,6,1],[1233,5,1233,6,1],[1235,9,1235,50,1],[1238,9,1238,113,1],[1241,9,1241,38,1],[1242,9,1242,41,1],[1243,9,1243,36,1],[1244,5,1244,6,1],[1248,5,1248,6,1],[1250,9,1250,105,1],[1252,9,1252,91,1],[1255,9,1255,113,1],[1258,9,1258,38,1],[1259,9,1259,41,1],[1260,9,1260,36,1],[1261,5,1261,6,1],[1265,5,1265,6,1],[1267,9,1267,104,1],[1268,9,1268,104,1],[1269,9,1269,105,1],[1271,9,1271,46,1],[1274,9,1274,113,1],[1277,9,1277,38,1],[1278,9,1278,41,1],[1279,9,1279,45,1],[1281,9,1281,57,1],[1282,9,1282,57,1],[1283,9,1283,57,1],[1284,5,1284,6,1]]);
+    </script>
+  </body>
+</html>

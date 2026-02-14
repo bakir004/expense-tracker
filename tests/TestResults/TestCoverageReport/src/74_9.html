@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/E2E/UserWorkflows/CompleteUserJourneyTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Net;
+using System.Net.Http.Json;
+using ExpenseTrackerAPI.Contracts.Transactions;
+using ExpenseTrackerAPI.Contracts.Users;
+using ExpenseTrackerAPI.Domain.Entities;
+using ExpenseTrackerAPI.Infrastructure.Persistence;
+using ExpenseTrackerAPI.WebApi.Tests.Common;
+using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.UserWorkflows;
+
+/// &lt;summary&gt;
+/// E2E tests for complete user journeys.
+/// Tests realistic user scenarios from start to finish.
+///
+/// NOTE: The TestAuthHandler authenticates all requests as user ID 1 (the seeded user).
+/// Tests that use RegisterAndLoginAsync still work for testing the auth endpoints,
+/// but subsequent authenticated requests will be processed as user ID 1.
+/// For true multi-user isolation testing, a separate test factory without TestAuthHandler would be needed.
+/// &lt;/summary&gt;
+public class CompleteUserJourneyTests : BaseE2ETest
+{
+    public CompleteUserJourneyTests(ExpenseTrackerApiFactory factory) : base(factory) { }
+
+    /// &lt;summary&gt;
+    /// Tests the complete lifecycle of transaction management:
+    /// Create Transactions -&gt; Read Transactions -&gt; Update Transaction -&gt; Delete Transaction
+    /// Uses the seeded user (ID 1) via TestAuthHandler.
+    /// &lt;/summary&gt;
+    [Fact]
+    public async Task CompleteTransactionManagementJourney_ShouldSucceed()
+    {
+        // === STEP 1: CREATE INCOME TRANSACTION ===
+        var incomeRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;INCOME&quot;,
+            Amount = 5000.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Journey Test - Monthly Salary&quot;,
+            Notes = &quot;Regular monthly income&quot;,
+            PaymentMethod = &quot;BANK_TRANSFER&quot;
+        };
+
+        var incomeResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, incomeRequest);
+        incomeResponse.StatusCode.Should().Be(HttpStatusCode.Created, &quot;Income creation should succeed&quot;);
+
+        var incomeTransaction = await incomeResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        incomeTransaction.Should().NotBeNull();
+        incomeTransaction!.TransactionType.Should().Be(&quot;INCOME&quot;);
+
+        // === STEP 2: CREATE MULTIPLE EXPENSE TRANSACTIONS ===
+        var expenses = new[]
+        {
+            (&quot;Journey - Grocery Shopping&quot;, 150.00m, &quot;DEBIT_CARD&quot;),
+            (&quot;Journey - Electric Bill&quot;, 85.50m, &quot;BANK_TRANSFER&quot;),
+            (&quot;Journey - Coffee Shop&quot;, 12.75m, &quot;CREDIT_CARD&quot;),
+            (&quot;Journey - Gas Station&quot;, 45.00m, &quot;CREDIT_CARD&quot;)
+        };
+
+        var createdExpenseIds = new List&lt;int&gt;();
+
+        foreach (var (subject, amount, paymentMethod) in expenses)
+        {
+            var expenseRequest = new CreateTransactionRequest
+            {
+                TransactionType = &quot;EXPENSE&quot;,
+                Amount = amount,
+                Date = DateOnly.FromDateTime(DateTime.UtcNow),
+                Subject = subject,
+                PaymentMethod = paymentMethod
+            };
+
+            var expenseResponse = await Client.PostAsJsonAsync(
+                TestConstants.Routes.Transactions,
+                expenseRequest);
+
+            expenseResponse.StatusCode.Should().Be(HttpStatusCode.Created, $&quot;Expense &#39;{subject}&#39; creation should succeed&quot;);
+
+            var expense = await expenseResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+            createdExpenseIds.Add(expense!.Id);
+        }
+
+        createdExpenseIds.Should().HaveCount(4, &quot;All expenses should be created&quot;);
+
+        // === STEP 3: READ AND VERIFY TRANSACTIONS ===
+        // Verify income
+        var getIncomeResponse = await Client.GetAsync(
+            TestConstants.Routes.Transaction(incomeTransaction.Id));
+        getIncomeResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var retrievedIncome = await getIncomeResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        retrievedIncome!.Amount.Should().Be(5000.00m);
+        retrievedIncome.Subject.Should().Be(&quot;Journey Test - Monthly Salary&quot;);
+
+        // Verify first expense
+        var getExpenseResponse = await Client.GetAsync(
+            TestConstants.Routes.Transaction(createdExpenseIds[0]));
+        getExpenseResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var retrievedExpense = await getExpenseResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        retrievedExpense!.Subject.Should().Be(&quot;Journey - Grocery Shopping&quot;);
+
+        // === STEP 4: UPDATE A TRANSACTION ===
+        var updateRequest = new UpdateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 15.50m, // Increased amount
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Journey - Coffee Shop - Team Meeting&quot;,
+            Notes = &quot;Business expense&quot;,
+            PaymentMethod = &quot;CREDIT_CARD&quot;
+        };
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            TestConstants.Routes.Transaction(createdExpenseIds[2]),
+            updateRequest);
+
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK, &quot;Update should succeed&quot;);
+
+        var updatedTransaction = await updateResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        updatedTransaction!.Amount.Should().Be(15.50m);
+        updatedTransaction.Subject.Should().Contain(&quot;Team Meeting&quot;);
+
+        // === STEP 5: DELETE A TRANSACTION ===
+        var deleteResponse = await Client.DeleteAsync(
+            TestConstants.Routes.Transaction(createdExpenseIds[3])); // Gas Station
+
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent, &quot;Delete should succeed&quot;);
+
+        // Verify deletion
+        var verifyDeleteResponse = await Client.GetAsync(
+            TestConstants.Routes.Transaction(createdExpenseIds[3]));
+        verifyDeleteResponse.StatusCode.Should().Be(HttpStatusCode.NotFound, &quot;Deleted transaction should not exist&quot;);
+
+        // === STEP 6: VERIFY REMAINING TRANSACTIONS STILL EXIST ===
+        var remainingIds = new[] { incomeTransaction.Id, createdExpenseIds[0], createdExpenseIds[1], createdExpenseIds[2] };
+
+        foreach (var id in remainingIds)
+        {
+            var response = await Client.GetAsync(TestConstants.Routes.Transaction(id));
+            response.StatusCode.Should().Be(HttpStatusCode.OK, $&quot;Transaction {id} should still exist&quot;);
+        }
+
+        // === CLEANUP: Delete created transactions ===
+        foreach (var id in remainingIds)
+        {
+            await Client.DeleteAsync(TestConstants.Routes.Transaction(id));
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Tests a monthly expense tracking scenario where a user tracks their spending over time.
+    /// &lt;/summary&gt;
+    [Fact]
+    public async Task MonthlyBudgetTrackingJourney_ShouldTrackExpensesAndIncome()
+    {
+        // === RECORD INCOME ===
+        var incomeItems = new[]
+        {
+            (&quot;Budget Journey - Salary&quot;, 4500.00m),
+            (&quot;Budget Journey - Freelance Project&quot;, 800.00m),
+            (&quot;Budget Journey - Investment Dividend&quot;, 125.00m)
+        };
+
+        var incomeIds = new List&lt;int&gt;();
+        var totalIncome = 0m;
+
+        foreach (var (subject, amount) in incomeItems)
+        {
+            var request = new CreateTransactionRequest
+            {
+                TransactionType = &quot;INCOME&quot;,
+                Amount = amount,
+                Date = DateOnly.FromDateTime(DateTime.UtcNow),
+                Subject = subject,
+                PaymentMethod = &quot;BANK_TRANSFER&quot;
+            };
+
+            var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+            response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+            var transaction = await response.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+            incomeIds.Add(transaction!.Id);
+            totalIncome += amount;
+        }
+
+        totalIncome.Should().Be(5425.00m);
+
+        // === RECORD EXPENSES BY CATEGORY ===
+        var expenseCategories = new Dictionary&lt;string, (string Subject, decimal Amount, string Method)[]&gt;
+        {
+            [&quot;Housing&quot;] = new[]
+            {
+                (&quot;Budget Journey - Rent Payment&quot;, 1200.00m, &quot;BANK_TRANSFER&quot;),
+                (&quot;Budget Journey - Utilities&quot;, 150.00m, &quot;BANK_TRANSFER&quot;)
+            },
+            [&quot;Food&quot;] = new[]
+            {
+                (&quot;Budget Journey - Weekly Groceries&quot;, 120.00m, &quot;DEBIT_CARD&quot;),
+                (&quot;Budget Journey - Restaurant Dinner&quot;, 65.00m, &quot;CREDIT_CARD&quot;)
+            },
+            [&quot;Transportation&quot;] = new[]
+            {
+                (&quot;Budget Journey - Gas&quot;, 80.00m, &quot;CREDIT_CARD&quot;),
+                (&quot;Budget Journey - Car Insurance&quot;, 125.00m, &quot;BANK_TRANSFER&quot;)
+            }
+        };
+
+        var expenseIds = new List&lt;int&gt;();
+        var totalExpenses = 0m;
+
+        foreach (var category in expenseCategories)
+        {
+            foreach (var (subject, amount, method) in category.Value)
+            {
+                var request = new CreateTransactionRequest
+                {
+                    TransactionType = &quot;EXPENSE&quot;,
+                    Amount = amount,
+                    Date = DateOnly.FromDateTime(DateTime.UtcNow),
+                    Subject = subject,
+                    Notes = $&quot;Category: {category.Key}&quot;,
+                    PaymentMethod = method
+                };
+
+                var response = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, request);
+                response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+                var transaction = await response.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+                expenseIds.Add(transaction!.Id);
+                totalExpenses += amount;
+            }
+        }
+
+        totalExpenses.Should().Be(1740.00m);
+
+        // === VERIFY TRANSACTIONS WERE SAVED ===
+        var allIds = incomeIds.Concat(expenseIds).ToList();
+        allIds.Should().HaveCount(9);
+
+        foreach (var id in allIds)
+        {
+            var response = await Client.GetAsync(TestConstants.Routes.Transaction(id));
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+        }
+
+        // === ADJUST AN EXPENSE ===
+        // Realized the restaurant bill was wrong
+        var restaurantId = expenseIds[3]; // Restaurant Dinner
+        var adjustRequest = new UpdateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 72.50m, // Corrected amount
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Budget Journey - Restaurant Dinner (corrected)&quot;,
+            Notes = &quot;Category: Food - tip was higher&quot;,
+            PaymentMethod = &quot;CREDIT_CARD&quot;
+        };
+
+        var adjustResponse = await Client.PutAsJsonAsync(
+            TestConstants.Routes.Transaction(restaurantId),
+            adjustRequest);
+
+        adjustResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // === REMOVE A DUPLICATE ENTRY ===
+        var duplicateId = expenseIds[2]; // Weekly Groceries
+        var removeResponse = await Client.DeleteAsync(TestConstants.Routes.Transaction(duplicateId));
+        removeResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Verify removal
+        var verifyRemoval = await Client.GetAsync(TestConstants.Routes.Transaction(duplicateId));
+        verifyRemoval.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        // === CLEANUP ===
+        foreach (var id in allIds.Where(id =&gt; id != duplicateId))
+        {
+            await Client.DeleteAsync(TestConstants.Routes.Transaction(id));
+        }
+    }
+
+    /// &lt;summary&gt;
+    /// Tests the registration and login flow works correctly.
+    /// Note: After registration/login, subsequent requests still use TestAuthHandler (user ID 1).
+    /// &lt;/summary&gt;
+    [Fact]
+    public async Task RegistrationAndLoginFlow_ShouldCreateUserAndAllowLogin()
+    {
+        // Generate unique email for this test
+        var uniqueEmail = $&quot;journey_test_{Guid.NewGuid():N}@example.com&quot;;
+        var password = &quot;TestPassword123!&quot;;
+
+        // Register new user
+        var registerRequest = new RegisterRequest(
+            &quot;Journey Test User&quot;,
+            uniqueEmail,
+            password,
+            1000.00m);
+
+        var registerResponse = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, registerRequest);
+        registerResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var registerResult = await registerResponse.Content.ReadFromJsonAsync&lt;RegisterResponse&gt;();
+        registerResult.Should().NotBeNull();
+        registerResult!.Email.Should().Be(uniqueEmail);
+
+        // Login with new credentials
+        var loginRequest = new LoginRequest(uniqueEmail, password);
+        var loginResponse = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, loginRequest);
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync&lt;LoginResponse&gt;();
+        loginResult.Should().NotBeNull();
+        loginResult!.Email.Should().Be(uniqueEmail);
+        loginResult.Token.Should().NotBeNullOrEmpty();
+    }
+
+    /// &lt;summary&gt;
+    /// Tests that seeded users can login successfully.
+    /// &lt;/summary&gt;
+    [Fact]
+    public async Task SeededUsers_ShouldBeAbleToLogin()
+    {
+        // Test seeded user 1
+        var loginRequest1 = new LoginRequest(
+            TestConstants.TestUsers.SeededUserEmail,
+            TestConstants.TestUsers.SeededUserPassword);
+
+        var response1 = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, loginRequest1);
+        response1.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var result1 = await response1.Content.ReadFromJsonAsync&lt;LoginResponse&gt;();
+        result1!.Email.Should().Be(TestConstants.TestUsers.SeededUserEmail);
+
+        // Test seeded user 2
+        var loginRequest2 = new LoginRequest(
+            TestConstants.TestUsers.SeededUser2Email,
+            TestConstants.TestUsers.SeededUserPassword);
+
+        var response2 = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, loginRequest2);
+        response2.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var result2 = await response2.Content.ReadFromJsonAsync&lt;LoginResponse&gt;();
+        result2!.Email.Should().Be(TestConstants.TestUsers.SeededUser2Email);
+    }
+
+    /// &lt;summary&gt;
+    /// Tests that transactions created by the authenticated user (ID 1) can be accessed.
+    /// &lt;/summary&gt;
+    [Fact]
+    public async Task TransactionOwnership_AuthenticatedUserCanAccessOwnTransactions()
+    {
+        // Create a transaction
+        var createRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Ownership Test Transaction&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        var createResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, createRequest);
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var created = await createResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        created.Should().NotBeNull();
+        created!.UserId.Should().Be(TestAuthHandler.DefaultUserId);
+
+        // Can read it
+        var readResponse = await Client.GetAsync(TestConstants.Routes.Transaction(created.Id));
+        readResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Can update it
+        var updateRequest = new UpdateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 150.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Ownership Test - Updated&quot;,
+            PaymentMethod = &quot;DEBIT_CARD&quot;
+        };
+
+        var updateResponse = await Client.PutAsJsonAsync(
+            TestConstants.Routes.Transaction(created.Id),
+            updateRequest);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Can delete it
+        var deleteResponse = await Client.DeleteAsync(TestConstants.Routes.Transaction(created.Id));
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    /// &lt;summary&gt;
+    /// Tests transaction isolation behavior - verifies that delete operation
+    /// properly checks user ownership while documenting current read behavior.
+    ///
+    /// NOTE: The current API implementation allows reading any transaction by ID,
+    /// but properly restricts update and delete operations to the owner.
+    /// This is a security consideration that should be reviewed.
+    /// &lt;/summary&gt;
+    [Fact]
+    public async Task TransactionIsolation_DeleteOperationChecksOwnership()
+    {
+        // Get a transaction ID that belongs to user 2 (Jane Smith)
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+
+        // Find user 2&#39;s transaction
+        var user2 = await db.Users.FirstOrDefaultAsync(u =&gt; u.Email == TestConstants.TestUsers.SeededUser2Email);
+        user2.Should().NotBeNull();
+
+        var user2Transaction = await db.Transactions
+            .FirstOrDefaultAsync(t =&gt; t.UserId == user2!.Id);
+
+        if (user2Transaction == null)
+        {
+            // If user 2 has no transactions, skip this test
+            return;
+        }
+
+        // Current behavior: GetById does not check user ownership
+        // This documents the current implementation - consider adding ownership check
+        var readResponse = await Client.GetAsync(TestConstants.Routes.Transaction(user2Transaction.Id));
+        // Currently returns OK - ownership check not implemented on read
+        readResponse.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NotFound);
+
+        // Delete operation DOES check ownership
+        var deleteResponse = await Client.DeleteAsync(TestConstants.Routes.Transaction(user2Transaction.Id));
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NotFound,
+            &quot;Should not be able to delete another user&#39;s transaction&quot;);
+
+        // Verify the transaction still exists (was not deleted)
+        var stillExists = await db.Transactions.AnyAsync(t =&gt; t.Id == user2Transaction.Id);
+        stillExists.Should().BeTrue(&quot;User 2&#39;s transaction should still exist after failed delete attempt&quot;);
+    }
+
+    /// &lt;summary&gt;
+    /// Tests sequential operations on the same transaction.
+    /// &lt;/summary&gt;
+    [Fact]
+    public async Task SequentialOperations_OnSameTransaction_ShouldMaintainConsistency()
+    {
+        // Create
+        var createRequest = new CreateTransactionRequest
+        {
+            TransactionType = &quot;EXPENSE&quot;,
+            Amount = 100.00m,
+            Date = DateOnly.FromDateTime(DateTime.UtcNow),
+            Subject = &quot;Sequential Test - Original&quot;,
+            PaymentMethod = &quot;CASH&quot;
+        };
+
+        var createResponse = await Client.PostAsJsonAsync(TestConstants.Routes.Transactions, createRequest);
+        var created = await createResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+        var id = created!.Id;
+
+        // Update 5 times sequentially
+        for (int i = 1; i &lt;= 5; i++)
+        {
+            var updateRequest = new UpdateTransactionRequest
+            {
+                TransactionType = &quot;EXPENSE&quot;,
+                Amount = 100.00m + (i * 10),
+                Date = DateOnly.FromDateTime(DateTime.UtcNow),
+                Subject = $&quot;Sequential Test - Update #{i}&quot;,
+                PaymentMethod = &quot;CASH&quot;
+            };
+
+            var updateResponse = await Client.PutAsJsonAsync(
+                TestConstants.Routes.Transaction(id),
+                updateRequest);
+
+            updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            // Verify each update
+            var verifyResponse = await Client.GetAsync(TestConstants.Routes.Transaction(id));
+            var verified = await verifyResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+
+            verified!.Subject.Should().Be($&quot;Sequential Test - Update #{i}&quot;);
+            verified.Amount.Should().Be(100.00m + (i * 10));
+        }
+
+        // Final state
+        var finalResponse = await Client.GetAsync(TestConstants.Routes.Transaction(id));
+        var finalTransaction = await finalResponse.Content.ReadFromJsonAsync&lt;TransactionResponse&gt;();
+
+        finalTransaction!.Subject.Should().Be(&quot;Sequential Test - Update #5&quot;);
+        finalTransaction.Amount.Should().Be(150.00m);
+
+        // Cleanup
+        await Client.DeleteAsync(TestConstants.Routes.Transaction(id));
+    }
+
+    /// &lt;summary&gt;
+    /// Tests the complete profile update workflow.
+    /// &lt;/summary&gt;
+    [Fact]
+    public async Task ProfileUpdateJourney_ShouldUpdateAndVerify()
+    {
+        // Get current user state
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+        var originalName = user!.Name;
+        var originalBalance = user.InitialBalance;
+
+        // Update profile with new name
+        var newName = $&quot;Profile Journey User {Guid.NewGuid().ToString(&quot;N&quot;)[..8]}&quot;;
+        var updateRequest = new UpdateUserRequest(
+            Name: newName,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: 5000.00m);
+
+        var updateResponse = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var updated = await updateResponse.Content.ReadFromJsonAsync&lt;UpdateUserResponse&gt;();
+        updated!.Name.Should().Be(newName);
+        updated.InitialBalance.Should().Be(5000.00m);
+
+        // Verify login still works
+        var loginRequest = new LoginRequest(user.Email, TestConstants.TestUsers.SeededUserPassword);
+        var loginResponse = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, loginRequest);
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var loginResult = await loginResponse.Content.ReadFromJsonAsync&lt;LoginResponse&gt;();
+        loginResult!.Name.Should().Be(newName);
+
+        // Restore original state
+        var restoreRequest = new UpdateUserRequest(
+            Name: originalName,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: originalBalance);
+        await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, restoreRequest);
+    }
+
+    /// &lt;summary&gt;
+    /// Tests the health check endpoint is accessible.
+    /// &lt;/summary&gt;
+    [Fact]
+    public async Task HealthCheck_ShouldBeAccessible()
+    {
+        var response = await Client.GetAsync(TestConstants.Routes.AuthHealth);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var content = await response.Content.ReadAsStringAsync();
+        content.Should().Contain(&quot;Healthy&quot;);
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[26,73,26,86,1],[26,87,26,88,1],[26,89,26,90,1],[35,5,35,6,1],[37,9,45,11,1],[47,9,47,109,1],[48,9,48,105,1],[50,9,50,103,1],[51,9,51,48,1],[52,9,52,66,1],[55,9,61,11,1],[63,9,63,49,1],[65,9,65,16,1],[65,18,65,54,1],[65,55,65,57,1],[65,58,65,66,1],[66,9,66,10,1],[67,13,74,15,1],[76,13,78,33,1],[80,13,80,124,1],[82,13,82,98,1],[83,13,83,48,1],[84,9,84,10,1],[86,9,86,83,1],[90,9,91,69,1],[92,9,92,69,1],[94,9,94,104,1],[95,9,95,55,1],[96,9,96,78,1],[99,9,100,69,1],[101,9,101,70,1],[103,9,103,106,1],[104,9,104,77,1],[107,9,115,11,1],[117,9,119,28,1],[121,9,121,91,1],[123,9,123,104,1],[124,9,124,56,1],[125,9,125,69,1],[128,9,129,69,1],[131,9,131,98,1],[134,9,135,69,1],[136,9,136,118,1],[139,9,139,125,1],[141,9,141,16,1],[141,18,141,24,1],[141,25,141,27,1],[141,28,141,40,1],[142,9,142,10,1],[143,13,143,88,1],[144,13,144,104,1],[145,9,145,10,1],[148,9,148,16,1],[148,18,148,24,1],[148,25,148,27,1],[148,28,148,40,1],[149,9,149,10,1],[150,13,150,76,1],[151,9,151,10,1],[152,5,152,6,1],[159,5,159,6,1],[161,9,166,11,1],[168,9,168,41,1],[169,9,169,30,1],[171,9,171,16,1],[171,18,171,39,1],[171,40,171,42,1],[171,43,171,54,1],[172,9,172,10,1],[173,13,180,15,1],[182,13,182,101,1],[183,13,183,69,1],[185,13,185,95,1],[186,13,186,44,1],[187,13,187,35,1],[188,9,188,10,1],[190,9,190,43,1],[193,9,210,11,1],[212,9,212,42,1],[213,9,213,32,1],[215,9,215,16,1],[215,18,215,30,1],[215,31,215,33,1],[215,34,215,51,1],[216,9,216,10,1],[217,13,217,20,1],[217,22,217,51,1],[217,52,217,54,1],[217,55,217,69,1],[218,13,218,14,1],[219,17,227,19,1],[229,17,229,105,1],[230,17,230,73,1],[232,17,232,99,1],[233,17,233,49,1],[234,17,234,41,1],[235,13,235,14,1],[236,9,236,10,1],[238,9,238,45,1],[241,9,241,60,1],[242,9,242,38,1],[244,9,244,16,1],[244,18,244,24,1],[244,25,244,27,1],[244,28,244,34,1],[245,9,245,10,1],[246,13,246,88,1],[247,13,247,64,1],[248,9,248,10,1],[252,9,252,42,1],[253,9,261,11,1],[263,9,265,28,1],[267,9,267,66,1],[270,9,270,41,1],[271,9,271,102,1],[272,9,272,73,1],[275,9,275,98,1],[276,9,276,71,1],[279,9,279,16,1],[279,18,279,24,1],[279,25,279,27,1],[279,28,279,47,1],[279,47,279,64,1],[279,64,279,65,1],[280,9,280,10,1],[281,13,281,76,1],[282,9,282,10,1],[283,5,283,6,1],[291,5,291,6,1],[293,9,293,74,1],[294,9,294,43,1],[297,9,301,23,1],[303,9,303,113,1],[304,9,304,68,1],[306,9,306,99,1],[307,9,307,45,1],[308,9,308,56,1],[311,9,311,68,1],[312,9,312,104,1],[313,9,313,65,1],[315,9,315,90,1],[316,9,316,42,1],[317,9,317,53,1],[318,9,318,55,1],[319,5,319,6,1],[326,5,326,6,1],[328,9,330,57,1],[332,9,332,101,1],[333,9,333,61,1],[335,9,335,82,1],[336,9,336,77,1],[339,9,341,57,1],[343,9,343,101,1],[344,9,344,61,1],[346,9,346,82,1],[347,9,347,78,1],[348,5,348,6,1],[355,5,355,6,1],[357,9,364,11,1],[366,9,366,109,1],[367,9,367,71,1],[369,9,369,93,1],[370,9,370,38,1],[371,9,371,68,1],[374,9,374,96,1],[375,9,375,64,1],[378,9,385,11,1],[387,9,389,28,1],[390,9,390,66,1],[393,9,393,101,1],[394,9,394,73,1],[395,5,395,6,1],[407,5,407,6,1],[409,9,409,58,1],[410,9,410,83,1],[413,9,413,114,1],[414,9,414,36,1],[416,9,417,62,1],[419,9,419,38,1],[420,9,420,10,0],[422,13,422,20,0],[427,9,427,105,1],[429,9,429,94,1],[432,9,432,110,1],[433,9,434,72,1],[437,9,437,92,1],[438,9,438,108,1],[439,5,439,6,1],[446,5,446,6,1],[448,9,455,11,1],[457,9,457,109,1],[458,9,458,93,1],[459,9,459,30,1],[462,14,462,23,1],[462,25,462,31,1],[462,33,462,36,1],[463,9,463,10,1],[464,13,471,15,1],[473,13,475,32,1],[477,13,477,70,1],[480,13,480,94,1],[481,13,481,98,1],[483,13,483,77,1],[484,13,484,61,1],[485,9,485,10,1],[488,9,488,89,1],[489,9,489,101,1],[491,9,491,78,1],[492,9,492,54,1],[495,9,495,72,1],[496,5,496,6,1],[503,5,503,6,1],[505,9,505,58,1],[506,9,506,83,1],[507,9,507,99,1],[508,9,508,39,1],[509,9,509,51,1],[512,9,512,83,1],[513,9,518,39,1],[520,9,520,107,1],[521,9,521,66,1],[523,9,523,92,1],[524,9,524,44,1],[525,9,525,54,1],[528,9,528,101,1],[529,9,529,104,1],[530,9,530,65,1],[532,9,532,90,1],[533,9,533,48,1],[536,9,541,46,1],[542,9,542,87,1],[543,5,543,6,1],[550,5,550,6,1],[551,9,551,79,1],[552,9,552,60,1],[554,9,554,66,1],[555,9,555,45,1],[556,5,556,6,1]]);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Contracts/TransactionGroups/TransactionGroupMappingExtensions.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ExpenseTrackerAPI.Domain.Entities;
+
+namespace ExpenseTrackerAPI.Contracts.TransactionGroups;
+
+/// &lt;summary&gt;
+/// Extension methods for mapping TransactionGroup entities to response contracts.
+/// &lt;/summary&gt;
+public static class TransactionGroupMappingExtensions
+{
+    /// &lt;summary&gt;
+    /// Maps a TransactionGroup entity to a TransactionGroupResponse contract.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;transactionGroup&quot;&gt;The transaction group entity to map.&lt;/param&gt;
+    /// &lt;returns&gt;A TransactionGroupResponse containing the transaction group data.&lt;/returns&gt;
+    public static TransactionGroupResponse ToResponse(this TransactionGroup transactionGroup)
+    {
+        return new TransactionGroupResponse(
+            Id: transactionGroup.Id,
+            Name: transactionGroup.Name,
+            Description: transactionGroup.Description,
+            UserId: transactionGroup.UserId,
+            CreatedAt: transactionGroup.CreatedAt);
+    }
+
+    /// &lt;summary&gt;
+    /// Maps a collection of TransactionGroup entities to TransactionGroupResponse contracts.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;transactionGroups&quot;&gt;The transaction group entities to map.&lt;/param&gt;
+    /// &lt;returns&gt;A collection of TransactionGroupResponse contracts.&lt;/returns&gt;
+    public static IEnumerable&lt;TransactionGroupResponse&gt; ToResponses(this IEnumerable&lt;TransactionGroup&gt; transactionGroups)
+    {
+        return transactionGroups.Select(g =&gt; g.ToResponse());
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[16,5,16,6,1],[17,9,22,52,1],[23,5,23,6,1],[31,5,31,6,1],[32,9,32,46,1],[32,46,32,60,1],[32,60,32,62,1],[33,5,33,6,1]]);
+    </script>
+  </body>
+</html>

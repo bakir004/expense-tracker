@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Infrastructure/Persistence/Configurations/CategoryConfiguration.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using ExpenseTrackerAPI.Domain.Entities;
+
+namespace ExpenseTrackerAPI.Infrastructure.Persistence.Configurations;
+
+public class CategoryConfiguration : IEntityTypeConfiguration&lt;Category&gt;
+{
+    public void Configure(EntityTypeBuilder&lt;Category&gt; builder)
+    {
+        builder.ToTable(&quot;Categories&quot;);
+
+        builder.HasKey(c =&gt; c.Id);
+
+        builder.Property(c =&gt; c.Id)
+            .HasColumnName(&quot;id&quot;)
+            .ValueGeneratedOnAdd();
+
+        builder.Property(c =&gt; c.Name)
+            .HasColumnName(&quot;name&quot;)
+            .IsRequired()
+            .HasMaxLength(255);
+
+        builder.Property(c =&gt; c.Description)
+            .HasColumnName(&quot;description&quot;)
+            .HasColumnType(&quot;text&quot;);
+
+        builder.Property(c =&gt; c.Icon)
+            .HasColumnName(&quot;icon&quot;)
+            .HasMaxLength(100);
+
+        // Unique constraint
+        builder.HasIndex(c =&gt; c.Name)
+            .IsUnique();
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[10,5,10,6,1],[11,9,11,39,1],[13,9,13,35,1],[15,9,17,36,1],[19,9,22,32,1],[24,9,26,36,1],[28,9,30,32,1],[33,9,34,25,1],[35,5,35,6,1]]);
+    </script>
+  </body>
+</html>

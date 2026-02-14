@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Infrastructure/Persistence/Configurations/TransactionGroupConfiguration.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using ExpenseTrackerAPI.Domain.Entities;
+
+namespace ExpenseTrackerAPI.Infrastructure.Persistence.Configurations;
+
+public class TransactionGroupConfiguration : IEntityTypeConfiguration&lt;TransactionGroup&gt;
+{
+    public void Configure(EntityTypeBuilder&lt;TransactionGroup&gt; builder)
+    {
+        builder.ToTable(&quot;TransactionGroups&quot;);
+
+        builder.HasKey(tg =&gt; tg.Id);
+
+        builder.Property(tg =&gt; tg.Id)
+            .HasColumnName(&quot;id&quot;)
+            .ValueGeneratedOnAdd();
+
+        builder.Property(tg =&gt; tg.Name)
+            .HasColumnName(&quot;name&quot;)
+            .IsRequired()
+            .HasMaxLength(255);
+
+        builder.Property(tg =&gt; tg.Description)
+            .HasColumnName(&quot;description&quot;)
+            .HasColumnType(&quot;text&quot;);
+
+        builder.Property(tg =&gt; tg.UserId)
+            .HasColumnName(&quot;user_id&quot;)
+            .IsRequired();
+
+        builder.Property(tg =&gt; tg.CreatedAt)
+            .HasColumnName(&quot;created_at&quot;)
+            .HasColumnType(&quot;timestamp with time zone&quot;)
+            .HasDefaultValueSql(&quot;CURRENT_TIMESTAMP&quot;);
+
+        // Index
+        builder.HasIndex(tg =&gt; tg.UserId)
+            .HasDatabaseName(&quot;idx_transaction_group_user&quot;);
+
+        // Foreign key relationship
+        builder.HasOne&lt;User&gt;()
+            .WithMany()
+            .HasForeignKey(tg =&gt; tg.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[10,5,10,6,1],[11,9,11,46,1],[13,9,13,37,1],[15,9,17,36,1],[19,9,22,32,1],[24,9,26,36,1],[28,9,30,27,1],[32,9,35,54,1],[38,9,39,60,1],[42,9,45,47,1],[46,5,46,6,1]]);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.Infrastructure.Tests/Fixtures/DatabaseFixture.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ExpenseTrackerAPI.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Testcontainers.PostgreSql;
+
+namespace ExpenseTrackerAPI.Infrastructure.Tests.Fixtures;
+
+public class DatabaseFixture : IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
+        .WithImage(&quot;postgres:16-alpine&quot;)
+        .WithDatabase(&quot;expense_tracker_test&quot;)
+        .WithUsername(&quot;test_user&quot;)
+        .WithPassword(&quot;test_password&quot;)
+        .Build();
+
+    public ApplicationDbContext DbContext { get; private set; } = null!;
+
+    public async Task InitializeAsync()
+    {
+        await _container.StartAsync();
+
+        var options = new DbContextOptionsBuilder&lt;ApplicationDbContext&gt;()
+            .UseNpgsql(_container.GetConnectionString())
+            .Options;
+
+        DbContext = new ApplicationDbContext(options);
+        await DbContext.Database.MigrateAsync();
+    }
+
+    public async Task DisposeAsync()
+    {
+        await DbContext.DisposeAsync();
+        await _container.DisposeAsync();
+    }
+
+    public async Task ResetDatabaseAsync()
+    {
+        // Dispose old context
+        await DbContext.DisposeAsync();
+
+        // Recreate context with fresh connection
+        var options = new DbContextOptionsBuilder&lt;ApplicationDbContext&gt;()
+            .UseNpgsql(_container.GetConnectionString())
+            .Options;
+
+        DbContext = new ApplicationDbContext(options);
+
+        // Reset database
+        await DbContext.Database.EnsureDeletedAsync();
+        await DbContext.Database.MigrateAsync();
+    }
+
+    public ApplicationDbContext CreateNewContext()
+    {
+        var options = new DbContextOptionsBuilder&lt;ApplicationDbContext&gt;()
+            .UseNpgsql(_container.GetConnectionString())
+            .Options;
+
+        return new ApplicationDbContext(options);
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[9,5,14,18,1],[16,67,16,72,1],[19,5,19,6,1],[20,9,20,39,1],[22,9,24,22,1],[26,9,26,55,1],[27,9,27,49,1],[28,5,28,6,1],[31,5,31,6,1],[32,9,32,40,1],[33,9,33,41,1],[34,5,34,6,1],[37,5,37,6,1],[39,9,39,40,1],[42,9,44,22,1],[46,9,46,55,1],[49,9,49,55,1],[50,9,50,49,1],[51,5,51,6,1],[54,5,54,6,1],[55,9,57,22,1],[59,9,59,50,1],[60,5,60,6,1]]);
+    </script>
+  </body>
+</html>

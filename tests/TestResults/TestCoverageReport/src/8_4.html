@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Contracts/Transactions/TransactionFilter.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ExpenseTrackerAPI.Domain.Entities;
+
+namespace ExpenseTrackerAPI.Contracts.Transactions;
+
+/// &lt;summary&gt;
+/// Validated and parsed filter model for querying transactions.
+/// This is the internal representation created from &lt;see cref=&quot;TransactionFilterRequest&quot;/&gt;.
+/// All values are validated and strongly-typed for safe use in queries.
+/// &lt;/summary&gt;
+public record TransactionFilter
+{
+    /// &lt;summary&gt;
+    /// Filter by transaction type (EXPENSE or INCOME).
+    /// Null means no filtering by type.
+    /// &lt;/summary&gt;
+    public TransactionType? TransactionType { get; init; }
+
+    /// &lt;summary&gt;
+    /// Filter by minimum amount (inclusive).
+    /// Filters on the absolute amount value.
+    /// &lt;/summary&gt;
+    public decimal? MinAmount { get; init; }
+
+    /// &lt;summary&gt;
+    /// Filter by maximum amount (inclusive).
+    /// Filters on the absolute amount value.
+    /// &lt;/summary&gt;
+    public decimal? MaxAmount { get; init; }
+
+    /// &lt;summary&gt;
+    /// Filter by date range start (inclusive).
+    /// &lt;/summary&gt;
+    public DateOnly? DateFrom { get; init; }
+
+    /// &lt;summary&gt;
+    /// Filter by date range end (inclusive).
+    /// &lt;/summary&gt;
+    public DateOnly? DateTo { get; init; }
+
+    /// &lt;summary&gt;
+    /// Filter by subject containing this text (case-insensitive).
+    /// &lt;/summary&gt;
+    public string? SubjectContains { get; init; }
+
+    /// &lt;summary&gt;
+    /// Filter by notes containing this text (case-insensitive).
+    /// &lt;/summary&gt;
+    public string? NotesContains { get; init; }
+
+    /// &lt;summary&gt;
+    /// Filter by payment methods.
+    /// Null or empty means no filtering by payment method.
+    /// &lt;/summary&gt;
+    public IReadOnlyList&lt;PaymentMethod&gt;? PaymentMethods { get; init; }
+
+    /// &lt;summary&gt;
+    /// Filter by category IDs.
+    /// Null or empty means no filtering by category.
+    /// &lt;/summary&gt;
+    public IReadOnlyList&lt;int&gt;? CategoryIds { get; init; }
+
+    /// &lt;summary&gt;
+    /// When true, only return transactions without a category.
+    /// &lt;/summary&gt;
+    public bool Uncategorized { get; init; }
+
+    /// &lt;summary&gt;
+    /// Filter by transaction group IDs.
+    /// Null or empty means no filtering by transaction group.
+    /// &lt;/summary&gt;
+    public IReadOnlyList&lt;int&gt;? TransactionGroupIds { get; init; }
+
+    /// &lt;summary&gt;
+    /// When true, only return transactions without a transaction group.
+    /// &lt;/summary&gt;
+    public bool Ungrouped { get; init; }
+
+    /// &lt;summary&gt;
+    /// Field to sort by.
+    /// &lt;/summary&gt;
+    public TransactionSortField SortBy { get; init; } = TransactionSortField.Date;
+
+    /// &lt;summary&gt;
+    /// When true, sort in descending order.
+    /// Default is true (newest/highest first).
+    /// &lt;/summary&gt;
+    public bool SortDescending { get; init; } = true;
+
+    /// &lt;summary&gt;
+    /// Page number (1-based).
+    /// &lt;/summary&gt;
+    public int Page { get; init; } = 1;
+
+    /// &lt;summary&gt;
+    /// Number of items per page.
+    /// &lt;/summary&gt;
+    public int PageSize { get; init; } = 20;
+
+    /// &lt;summary&gt;
+    /// Calculates the number of items to skip for pagination.
+    /// &lt;/summary&gt;
+    public int Skip =&gt; (Page - 1) * PageSize;
+
+    /// &lt;summary&gt;
+    /// Returns true if any filter criteria are specified (excluding sorting and pagination).
+    /// &lt;/summary&gt;
+    public bool HasFilters =&gt;
+        TransactionType.HasValue ||
+        MinAmount.HasValue ||
+        MaxAmount.HasValue ||
+        DateFrom.HasValue ||
+        DateTo.HasValue ||
+        !string.IsNullOrWhiteSpace(SubjectContains) ||
+        !string.IsNullOrWhiteSpace(NotesContains) ||
+        (PaymentMethods?.Count &gt; 0) ||
+        (CategoryIds?.Count &gt; 0) ||
+        Uncategorized ||
+        (TransactionGroupIds?.Count &gt; 0) ||
+        Ungrouped;
+}
+
+/// &lt;summary&gt;
+/// Valid fields for sorting transactions.
+/// &lt;/summary&gt;
+public enum TransactionSortField
+{
+    /// &lt;summary&gt;Sort by transaction date (primary), then by created time.&lt;/summary&gt;
+    Date,
+
+    /// &lt;summary&gt;Sort by absolute amount.&lt;/summary&gt;
+    Amount,
+
+    /// &lt;summary&gt;Sort by subject alphabetically.&lt;/summary&gt;
+    Subject,
+
+    /// &lt;summary&gt;Sort by payment method.&lt;/summary&gt;
+    PaymentMethod,
+
+    /// &lt;summary&gt;Sort by creation timestamp.&lt;/summary&gt;
+    CreatedAt,
+
+    /// &lt;summary&gt;Sort by last update timestamp.&lt;/summary&gt;
+    UpdatedAt
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[81,57,81,82,1],[87,49,87,53,1],[92,38,92,39,1],[97,42,97,44,1],[102,24,102,45,1],[108,9,119,18,0]]);
+    </script>
+  </body>
+</html>

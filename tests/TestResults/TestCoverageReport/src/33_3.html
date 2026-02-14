@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Infrastructure/Migrations/ApplicationDbContextModelSnapshot.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+// &lt;auto-generated /&gt;
+using System;
+using ExpenseTrackerAPI.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+
+#nullable disable
+
+namespace ExpenseTrackerAPI.Infrastructure.Migrations
+{
+    [DbContext(typeof(ApplicationDbContext))]
+    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    {
+        protected override void BuildModel(ModelBuilder modelBuilder)
+        {
+#pragma warning disable 612, 618
+            modelBuilder
+                .HasDefaultSchema(&quot;public&quot;)
+                .HasAnnotation(&quot;ProductVersion&quot;, &quot;9.0.0&quot;)
+                .HasAnnotation(&quot;Relational:MaxIdentifierLength&quot;, 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity(&quot;ExpenseTrackerAPI.Domain.Entities.Category&quot;, b =&gt;
+                {
+                    b.Property&lt;int&gt;(&quot;Id&quot;)
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType(&quot;integer&quot;)
+                        .HasColumnName(&quot;id&quot;);
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property&lt;int&gt;(&quot;Id&quot;));
+
+                    b.Property&lt;string&gt;(&quot;Description&quot;)
+                        .HasColumnType(&quot;text&quot;)
+                        .HasColumnName(&quot;description&quot;);
+
+                    b.Property&lt;string&gt;(&quot;Icon&quot;)
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType(&quot;character varying(100)&quot;)
+                        .HasColumnName(&quot;icon&quot;);
+
+                    b.Property&lt;string&gt;(&quot;Name&quot;)
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType(&quot;character varying(255)&quot;)
+                        .HasColumnName(&quot;name&quot;);
+
+                    b.HasKey(&quot;Id&quot;);
+
+                    b.HasIndex(&quot;Name&quot;)
+                        .IsUnique();
+
+                    b.ToTable(&quot;Categories&quot;, &quot;public&quot;);
+                });
+
+            modelBuilder.Entity(&quot;ExpenseTrackerAPI.Domain.Entities.Transaction&quot;, b =&gt;
+                {
+                    b.Property&lt;int&gt;(&quot;Id&quot;)
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType(&quot;integer&quot;)
+                        .HasColumnName(&quot;id&quot;);
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property&lt;int&gt;(&quot;Id&quot;));
+
+                    b.Property&lt;decimal&gt;(&quot;Amount&quot;)
+                        .HasPrecision(12, 2)
+                        .HasColumnType(&quot;numeric(12,2)&quot;)
+                        .HasColumnName(&quot;amount&quot;);
+
+                    b.Property&lt;int?&gt;(&quot;CategoryId&quot;)
+                        .HasColumnType(&quot;integer&quot;)
+                        .HasColumnName(&quot;category_id&quot;);
+
+                    b.Property&lt;DateTime&gt;(&quot;CreatedAt&quot;)
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType(&quot;timestamp with time zone&quot;)
+                        .HasColumnName(&quot;created_at&quot;)
+                        .HasDefaultValueSql(&quot;CURRENT_TIMESTAMP&quot;);
+
+                    b.Property&lt;decimal&gt;(&quot;CumulativeDelta&quot;)
+                        .HasPrecision(12, 2)
+                        .HasColumnType(&quot;numeric(12,2)&quot;)
+                        .HasColumnName(&quot;cumulative_delta&quot;);
+
+                    b.Property&lt;DateOnly&gt;(&quot;Date&quot;)
+                        .HasColumnType(&quot;date&quot;)
+                        .HasColumnName(&quot;date&quot;);
+
+                    b.Property&lt;string&gt;(&quot;Notes&quot;)
+                        .HasColumnType(&quot;text&quot;)
+                        .HasColumnName(&quot;notes&quot;);
+
+                    b.Property&lt;string&gt;(&quot;PaymentMethod&quot;)
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType(&quot;character varying(20)&quot;)
+                        .HasColumnName(&quot;payment_method&quot;);
+
+                    b.Property&lt;decimal&gt;(&quot;SignedAmount&quot;)
+                        .HasPrecision(12, 2)
+                        .HasColumnType(&quot;numeric(12,2)&quot;)
+                        .HasColumnName(&quot;signed_amount&quot;);
+
+                    b.Property&lt;string&gt;(&quot;Subject&quot;)
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType(&quot;character varying(255)&quot;)
+                        .HasColumnName(&quot;subject&quot;);
+
+                    b.Property&lt;int?&gt;(&quot;TransactionGroupId&quot;)
+                        .HasColumnType(&quot;integer&quot;)
+                        .HasColumnName(&quot;transaction_group_id&quot;);
+
+                    b.Property&lt;string&gt;(&quot;TransactionType&quot;)
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType(&quot;character varying(20)&quot;)
+                        .HasColumnName(&quot;transaction_type&quot;);
+
+                    b.Property&lt;DateTime&gt;(&quot;UpdatedAt&quot;)
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType(&quot;timestamp with time zone&quot;)
+                        .HasColumnName(&quot;updated_at&quot;)
+                        .HasDefaultValueSql(&quot;CURRENT_TIMESTAMP&quot;);
+
+                    b.Property&lt;int&gt;(&quot;UserId&quot;)
+                        .HasColumnType(&quot;integer&quot;)
+                        .HasColumnName(&quot;user_id&quot;);
+
+                    b.HasKey(&quot;Id&quot;);
+
+                    b.HasIndex(&quot;CategoryId&quot;);
+
+                    b.HasIndex(&quot;TransactionGroupId&quot;)
+                        .HasDatabaseName(&quot;idx_transaction_group&quot;);
+
+                    b.HasIndex(&quot;UserId&quot;, &quot;TransactionType&quot;)
+                        .HasDatabaseName(&quot;idx_transaction_type&quot;);
+
+                    b.HasIndex(&quot;UserId&quot;, &quot;Date&quot;, &quot;Id&quot;)
+                        .IsDescending(false, true, true)
+                        .HasDatabaseName(&quot;idx_transaction_user_date&quot;);
+
+                    b.ToTable(&quot;Transactions&quot;, &quot;public&quot;);
+                });
+
+            modelBuilder.Entity(&quot;ExpenseTrackerAPI.Domain.Entities.TransactionGroup&quot;, b =&gt;
+                {
+                    b.Property&lt;int&gt;(&quot;Id&quot;)
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType(&quot;integer&quot;)
+                        .HasColumnName(&quot;id&quot;);
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property&lt;int&gt;(&quot;Id&quot;));
+
+                    b.Property&lt;DateTime&gt;(&quot;CreatedAt&quot;)
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType(&quot;timestamp with time zone&quot;)
+                        .HasColumnName(&quot;created_at&quot;)
+                        .HasDefaultValueSql(&quot;CURRENT_TIMESTAMP&quot;);
+
+                    b.Property&lt;string&gt;(&quot;Description&quot;)
+                        .HasColumnType(&quot;text&quot;)
+                        .HasColumnName(&quot;description&quot;);
+
+                    b.Property&lt;string&gt;(&quot;Name&quot;)
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType(&quot;character varying(255)&quot;)
+                        .HasColumnName(&quot;name&quot;);
+
+                    b.Property&lt;int&gt;(&quot;UserId&quot;)
+                        .HasColumnType(&quot;integer&quot;)
+                        .HasColumnName(&quot;user_id&quot;);
+
+                    b.HasKey(&quot;Id&quot;);
+
+                    b.HasIndex(&quot;UserId&quot;)
+                        .HasDatabaseName(&quot;idx_transaction_group_user&quot;);
+
+                    b.ToTable(&quot;TransactionGroups&quot;, &quot;public&quot;);
+                });
+
+            modelBuilder.Entity(&quot;ExpenseTrackerAPI.Domain.Entities.User&quot;, b =&gt;
+                {
+                    b.Property&lt;int&gt;(&quot;Id&quot;)
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType(&quot;integer&quot;)
+                        .HasColumnName(&quot;id&quot;);
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property&lt;int&gt;(&quot;Id&quot;));
+
+                    b.Property&lt;DateTime&gt;(&quot;CreatedAt&quot;)
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType(&quot;timestamp with time zone&quot;)
+                        .HasColumnName(&quot;created_at&quot;)
+                        .HasDefaultValueSql(&quot;CURRENT_TIMESTAMP&quot;);
+
+                    b.Property&lt;string&gt;(&quot;Email&quot;)
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType(&quot;character varying(255)&quot;)
+                        .HasColumnName(&quot;email&quot;);
+
+                    b.Property&lt;decimal&gt;(&quot;InitialBalance&quot;)
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType(&quot;numeric(12,2)&quot;)
+                        .HasDefaultValue(0m)
+                        .HasColumnName(&quot;initial_balance&quot;);
+
+                    b.Property&lt;string&gt;(&quot;Name&quot;)
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType(&quot;character varying(100)&quot;)
+                        .HasColumnName(&quot;name&quot;);
+
+                    b.Property&lt;string&gt;(&quot;PasswordHash&quot;)
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType(&quot;character varying(255)&quot;)
+                        .HasColumnName(&quot;password_hash&quot;);
+
+                    b.Property&lt;DateTime&gt;(&quot;UpdatedAt&quot;)
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType(&quot;timestamp with time zone&quot;)
+                        .HasColumnName(&quot;updated_at&quot;)
+                        .HasDefaultValueSql(&quot;CURRENT_TIMESTAMP&quot;);
+
+                    b.HasKey(&quot;Id&quot;);
+
+                    b.HasIndex(&quot;Email&quot;)
+                        .IsUnique()
+                        .HasDatabaseName(&quot;idx_users_email&quot;);
+
+                    b.ToTable(&quot;Users&quot;, &quot;public&quot;);
+                });
+
+            modelBuilder.Entity(&quot;ExpenseTrackerAPI.Domain.Entities.Transaction&quot;, b =&gt;
+                {
+                    b.HasOne(&quot;ExpenseTrackerAPI.Domain.Entities.Category&quot;, null)
+                        .WithMany()
+                        .HasForeignKey(&quot;CategoryId&quot;)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne(&quot;ExpenseTrackerAPI.Domain.Entities.TransactionGroup&quot;, null)
+                        .WithMany()
+                        .HasForeignKey(&quot;TransactionGroupId&quot;)
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne(&quot;ExpenseTrackerAPI.Domain.Entities.User&quot;, null)
+                        .WithMany()
+                        .HasForeignKey(&quot;UserId&quot;)
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity(&quot;ExpenseTrackerAPI.Domain.Entities.TransactionGroup&quot;, b =&gt;
+                {
+                    b.HasOne(&quot;ExpenseTrackerAPI.Domain.Entities.User&quot;, null)
+                        .WithMany()
+                        .HasForeignKey(&quot;UserId&quot;)
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+#pragma warning restore 612, 618
+        }
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[17,9,17,10,1],[19,13,22,70,1],[24,13,24,84,1],[26,13,27,17,1],[27,17,27,18,1],[27,18,28,21,1],[28,21,31,46,1],[31,46,33,21,1],[33,21,33,103,1],[33,103,35,21,1],[35,21,37,55,1],[37,55,39,21,1],[39,21,43,48,1],[43,48,45,21,1],[45,21,49,48,1],[49,48,51,21,1],[51,21,51,36,1],[51,36,53,21,1],[53,21,54,37,1],[54,37,56,21,1],[56,21,56,55,1],[56,55,57,17,1],[57,17,57,18,1],[57,18,57,20,1],[59,13,60,17,1],[60,17,60,18,1],[60,18,61,21,1],[61,21,64,46,1],[64,46,66,21,1],[66,21,66,103,1],[66,103,68,21,1],[68,21,71,50,1],[71,50,73,21,1],[73,21,75,55,1],[75,55,77,21,1],[77,21,81,66,1],[81,66,83,21,1],[83,21,86,60,1],[86,60,88,21,1],[88,21,90,48,1],[90,48,92,21,1],[92,21,94,49,1],[94,49,96,21,1],[96,21,100,58,1],[100,58,102,21,1],[102,21,105,57,1],[105,57,107,21,1],[107,21,111,51,1],[111,51,113,21,1],[113,21,115,64,1],[115,64,117,21,1],[117,21,121,60,1],[121,60,123,21,1],[123,21,127,66,1],[127,66,129,21,1],[129,21,131,51,1],[131,51,133,21,1],[133,21,133,36,1],[133,36,135,21,1],[135,21,135,46,1],[135,46,137,21,1],[137,21,138,67,1],[138,67,140,21,1],[140,21,141,66,1],[141,66,143,21,1],[143,21,145,71,1],[145,71,147,21,1],[147,21,147,57,1],[147,57,148,17,1],[148,17,148,18,1],[148,18,148,20,1],[150,13,151,17,1],[151,17,151,18,1],[151,18,152,21,1],[152,21,155,46,1],[155,46,157,21,1],[157,21,157,103,1],[157,103,159,21,1],[159,21,163,66,1],[163,66,165,21,1],[165,21,167,55,1],[167,55,169,21,1],[169,21,173,48,1],[173,48,175,21,1],[175,21,177,51,1],[177,51,179,21,1],[179,21,179,36,1],[179,36,181,21,1],[181,21,182,72,1],[182,72,184,21,1],[184,21,184,62,1],[184,62,185,17,1],[185,17,185,18,1],[185,18,185,20,1],[187,13,188,17,1],[188,17,188,18,1],[188,18,189,21,1],[189,21,192,46,1],[192,46,194,21,1],[194,21,194,103,1],[194,103,196,21,1],[196,21,200,66,1],[200,66,202,21,1],[202,21,206,49,1],[206,49,208,21,1],[208,21,213,59,1],[213,59,215,21,1],[215,21,219,48,1],[219,48,221,21,1],[221,21,225,57,1],[225,57,227,21,1],[227,21,231,66,1],[231,66,233,21,1],[233,21,233,36,1],[233,36,235,21,1],[235,21,237,61,1],[237,61,239,21,1],[239,21,239,50,1],[239,50,240,17,1],[240,17,240,18,1],[240,18,240,20,1],[242,13,243,17,1],[243,17,243,18,1],[243,18,244,21,1],[244,21,247,60,1],[247,60,249,21,1],[249,21,252,59,1],[252,59,254,21,1],[254,21,258,39,1],[258,39,259,17,1],[259,17,259,18,1],[259,18,259,20,1],[261,13,262,17,1],[262,17,262,18,1],[262,18,263,21,1],[263,21,267,39,1],[267,39,268,17,1],[268,17,268,18,1],[268,18,268,20,1],[270,9,270,10,1]]);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Domain/Entities/User.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Text.RegularExpressions;
+
+namespace ExpenseTrackerAPI.Domain.Entities;
+
+/// &lt;summary&gt;
+/// Represents a user in the expense tracking system.
+/// &lt;/summary&gt;
+public partial class User
+{
+    [GeneratedRegex(@&quot;^[a-zA-Z0-9]([a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$&quot;, RegexOptions.IgnoreCase)]
+    private static partial Regex EmailRegex();
+
+    public int Id { get; private set; }
+
+    public string Name { get; private set; }
+
+    public string Email { get; private set; }
+
+    public string PasswordHash { get; private set; }
+
+    /// &lt;summary&gt;
+    /// The user&#39;s starting balance when they began tracking.
+    /// Actual balance = InitialBalance + his last transaction&#39;s CumulativeDelta
+    /// &lt;/summary&gt;
+    public decimal InitialBalance { get; private set; }
+
+    public DateTime CreatedAt { get; private set; }
+
+    public DateTime UpdatedAt { get; private set; }
+
+    // EF Core constructor
+    private User()
+    {
+        Name = string.Empty;
+        Email = string.Empty;
+        PasswordHash = string.Empty;
+    }
+
+    /// &lt;summary&gt;
+    /// Creates a new user with validation.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;name&quot;&gt;User&#39;s display name (required, max 100 characters)&lt;/param&gt;
+    /// &lt;param name=&quot;email&quot;&gt;User&#39;s email address (required, must be valid format)&lt;/param&gt;
+    /// &lt;param name=&quot;passwordHash&quot;&gt;Hashed password (required)&lt;/param&gt;
+    /// &lt;param name=&quot;initialBalance&quot;&gt;Starting balance (optional, defaults to 0)&lt;/param&gt;
+    /// &lt;exception cref=&quot;ArgumentException&quot;&gt;Thrown when validation fails&lt;/exception&gt;
+    public User(string name, string email, string passwordHash, decimal initialBalance = 0)
+    {
+        // Normalize inputs before validation
+        var normalizedName = name?.Trim() ?? string.Empty;
+        var normalizedEmail = email?.Trim().ToLowerInvariant() ?? string.Empty;
+
+        ValidateBusinessRules(normalizedName, normalizedEmail, passwordHash);
+
+        Name = normalizedName;
+        Email = normalizedEmail;
+        PasswordHash = passwordHash;
+        InitialBalance = initialBalance;
+        CreatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// &lt;summary&gt;
+    /// Updates the user&#39;s profile information.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;name&quot;&gt;New display name&lt;/param&gt;
+    /// &lt;param name=&quot;email&quot;&gt;New email address&lt;/param&gt;
+    public void UpdateProfile(string name, string email)
+    {
+        // Normalize inputs before validation
+        var normalizedName = name?.Trim() ?? string.Empty;
+        var normalizedEmail = email?.Trim().ToLowerInvariant() ?? string.Empty;
+
+        ValidateBusinessRules(normalizedName, normalizedEmail, PasswordHash);
+
+        Name = normalizedName;
+        Email = normalizedEmail;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// &lt;summary&gt;
+    /// Updates the user&#39;s password hash.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;passwordHash&quot;&gt;New hashed password&lt;/param&gt;
+    public void UpdatePassword(string passwordHash)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
+            throw new ArgumentException(&quot;Password hash cannot be empty&quot;, nameof(passwordHash));
+
+        PasswordHash = passwordHash;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// &lt;summary&gt;
+    /// Updates the user&#39;s initial balance.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;initialBalance&quot;&gt;New initial balance&lt;/param&gt;
+    public void UpdateInitialBalance(decimal initialBalance)
+    {
+        InitialBalance = initialBalance;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    private static void ValidateBusinessRules(string name, string email, string passwordHash)
+    {
+        // Name validation
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException(&quot;Name cannot be empty&quot;, nameof(name));
+
+        if (name.Trim().Length &gt; 100)
+            throw new ArgumentException(&quot;Name cannot exceed 100 characters&quot;, nameof(name));
+
+        // Email validation
+        if (string.IsNullOrWhiteSpace(email))
+            throw new ArgumentException(&quot;Email cannot be empty&quot;, nameof(email));
+
+        if (email.Length &gt; 254) // RFC 5321 limit
+            throw new ArgumentException(&quot;Email cannot exceed 254 characters&quot;, nameof(email));
+
+        if (!EmailRegex().IsMatch(email) || email.Contains(&quot;..&quot;))
+            throw new ArgumentException(&quot;Email format is invalid&quot;, nameof(email));
+
+        // Password hash validation
+        if (string.IsNullOrWhiteSpace(passwordHash))
+            throw new ArgumentException(&quot;Password hash cannot be empty&quot;, nameof(passwordHash));
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[32,5,32,19,1],[33,5,33,6,1],[34,9,34,29,1],[35,9,35,30,1],[36,9,36,37,1],[37,5,37,6,1],[47,5,47,92,1],[48,5,48,6,1],[50,9,50,59,1],[51,9,51,80,1],[53,9,53,78,1],[55,9,55,31,1],[56,9,56,33,1],[57,9,57,37,1],[58,9,58,41,1],[59,9,59,37,1],[60,9,60,37,1],[61,5,61,6,1],[69,5,69,6,1],[71,9,71,59,1],[72,9,72,80,1],[74,9,74,78,1],[76,9,76,31,1],[77,9,77,33,1],[78,9,78,37,1],[79,5,79,6,1],[86,5,86,6,1],[87,9,87,53,1],[88,13,88,96,1],[90,9,90,37,1],[91,9,91,37,1],[92,5,92,6,1],[99,5,99,6,1],[100,9,100,41,1],[101,9,101,37,1],[102,5,102,6,1],[105,5,105,6,1],[107,9,107,45,1],[108,13,108,79,1],[110,9,110,38,1],[111,13,111,92,1],[114,9,114,46,1],[115,13,115,81,1],[117,9,117,32,1],[118,13,118,94,1],[120,9,120,66,1],[121,13,121,83,1],[124,9,124,53,1],[125,13,125,96,1],[126,5,126,6,1]]);
+    </script>
+  </body>
+</html>

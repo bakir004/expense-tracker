@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/E2E/Errors/DiagnosticErrorTest.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Net;
+using System.Net.Http.Json;
+using ExpenseTrackerAPI.WebApi.Tests.Common;
+using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+using FluentAssertions;
+using Xunit.Abstractions;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.Errors;
+
+/// &lt;summary&gt;
+/// Diagnostic test to inspect actual error response formats and keys.
+/// &lt;/summary&gt;
+public class DiagnosticErrorTest : BaseE2ETest
+{
+    private readonly ITestOutputHelper _output;
+
+    public DiagnosticErrorTest(ExpenseTrackerApiFactory factory, ITestOutputHelper output) : base(factory)
+    {
+        _output = output;
+    }
+
+    [Fact]
+    public async Task Diagnostic_ShowErrorKeysForInvalidPageSize()
+    {
+        // Arrange
+        var queryString = &quot;?pageSize=0&quot;;
+
+        // Act
+        var response = await Client.GetAsync($&quot;{TestConstants.Routes.Transactions}{queryString}&quot;);
+
+        // Assert
+        _output.WriteLine($&quot;Status Code: {response.StatusCode}&quot;);
+        _output.WriteLine($&quot;Content-Type: {response.Content.Headers.ContentType}&quot;);
+
+        var content = await response.Content.ReadAsStringAsync();
+        _output.WriteLine($&quot;Response Body: {content}&quot;);
+
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                _output.WriteLine(&quot;\nError Keys:&quot;);
+                foreach (var key in problemDetails.Errors.Keys)
+                {
+                    _output.WriteLine($&quot;  - &#39;{key}&#39; (Contains dot: {key.Contains(&#39;.&#39;)})&quot;);
+                    foreach (var message in problemDetails.Errors[key])
+                    {
+                        _output.WriteLine($&quot;      Message: {message}&quot;);
+                    }
+                }
+
+                var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails.Errors);
+                if (invalidKeys.Any())
+                {
+                    _output.WriteLine(&quot;\nINVALID KEYS (contain dots):&quot;);
+                    foreach (var key in invalidKeys)
+                    {
+                        _output.WriteLine($&quot;  - &#39;{key}&#39;&quot;);
+                    }
+                }
+            }
+        }
+
+        // This test always passes - it&#39;s just for diagnostics
+        Assert.True(true);
+    }
+
+    [Fact]
+    public async Task Diagnostic_ShowErrorKeysForInvalidTransactionType()
+    {
+        // Arrange
+        var queryString = &quot;?transactionType=INVALID_TYPE&quot;;
+
+        // Act
+        var response = await Client.GetAsync($&quot;{TestConstants.Routes.Transactions}{queryString}&quot;);
+
+        // Assert
+        _output.WriteLine($&quot;Status Code: {response.StatusCode}&quot;);
+        _output.WriteLine($&quot;Content-Type: {response.Content.Headers.ContentType}&quot;);
+
+        var content = await response.Content.ReadAsStringAsync();
+        _output.WriteLine($&quot;Response Body: {content}&quot;);
+
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                _output.WriteLine(&quot;\nError Keys:&quot;);
+                foreach (var key in problemDetails.Errors.Keys)
+                {
+                    _output.WriteLine($&quot;  - &#39;{key}&#39; (Contains dot: {key.Contains(&#39;.&#39;)})&quot;);
+                    foreach (var message in problemDetails.Errors[key])
+                    {
+                        _output.WriteLine($&quot;      Message: {message}&quot;);
+                    }
+                }
+
+                var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails.Errors);
+                if (invalidKeys.Any())
+                {
+                    _output.WriteLine(&quot;\nINVALID KEYS (contain dots):&quot;);
+                    foreach (var key in invalidKeys)
+                    {
+                        _output.WriteLine($&quot;  - &#39;{key}&#39;&quot;);
+                    }
+                }
+            }
+        }
+
+        // This test always passes - it&#39;s just for diagnostics
+        Assert.True(true);
+    }
+
+    [Fact]
+    public async Task Diagnostic_ShowErrorKeysForInvalidDateFormat()
+    {
+        // Arrange
+        var queryString = &quot;?dateFrom=invalid-date&quot;;
+
+        // Act
+        var response = await Client.GetAsync($&quot;{TestConstants.Routes.Transactions}{queryString}&quot;);
+
+        // Assert
+        _output.WriteLine($&quot;Status Code: {response.StatusCode}&quot;);
+        _output.WriteLine($&quot;Content-Type: {response.Content.Headers.ContentType}&quot;);
+
+        var content = await response.Content.ReadAsStringAsync();
+        _output.WriteLine($&quot;Response Body: {content}&quot;);
+
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                _output.WriteLine(&quot;\nError Keys:&quot;);
+                foreach (var key in problemDetails.Errors.Keys)
+                {
+                    _output.WriteLine($&quot;  - &#39;{key}&#39; (Contains dot: {key.Contains(&#39;.&#39;)})&quot;);
+                    foreach (var message in problemDetails.Errors[key])
+                    {
+                        _output.WriteLine($&quot;      Message: {message}&quot;);
+                    }
+                }
+
+                var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails.Errors);
+                if (invalidKeys.Any())
+                {
+                    _output.WriteLine(&quot;\nINVALID KEYS (contain dots):&quot;);
+                    foreach (var key in invalidKeys)
+                    {
+                        _output.WriteLine($&quot;  - &#39;{key}&#39;&quot;);
+                    }
+                }
+            }
+        }
+
+        // This test always passes - it&#39;s just for diagnostics
+        Assert.True(true);
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[17,94,17,107,1],[18,5,18,6,1],[19,9,19,26,1],[20,5,20,6,1],[24,5,24,6,1],[26,9,26,41,1],[29,9,29,99,1],[32,9,32,66,1],[33,9,33,84,1],[35,9,35,66,1],[36,9,36,56,1],[38,9,38,62,1],[39,9,39,10,1],[40,13,40,111,1],[42,13,42,48,1],[43,13,43,14,1],[44,17,44,52,1],[45,17,45,24,1],[45,26,45,33,1],[45,34,45,36,1],[45,37,45,63,1],[46,17,46,18,1],[47,21,47,91,1],[48,21,48,28,1],[48,30,48,41,1],[48,42,48,44,1],[48,45,48,71,1],[49,21,49,22,1],[50,25,50,72,1],[51,21,51,22,1],[52,17,52,18,1],[54,17,54,96,1],[55,17,55,39,1],[56,17,56,18,0],[57,21,57,73,0],[58,21,58,28,0],[58,30,58,37,0],[58,38,58,40,0],[58,41,58,52,0],[59,21,59,22,0],[60,25,60,59,0],[61,21,61,22,0],[62,17,62,18,0],[63,13,63,14,1],[64,9,64,10,1],[67,9,67,27,1],[68,5,68,6,1],[72,5,72,6,1],[74,9,74,59,1],[77,9,77,99,1],[80,9,80,66,1],[81,9,81,84,1],[83,9,83,66,1],[84,9,84,56,1],[86,9,86,62,1],[87,9,87,10,1],[88,13,88,111,1],[90,13,90,48,1],[91,13,91,14,1],[92,17,92,52,1],[93,17,93,24,1],[93,26,93,33,1],[93,34,93,36,1],[93,37,93,63,1],[94,17,94,18,1],[95,21,95,91,1],[96,21,96,28,1],[96,30,96,41,1],[96,42,96,44,1],[96,45,96,71,1],[97,21,97,22,1],[98,25,98,72,1],[99,21,99,22,1],[100,17,100,18,1],[102,17,102,96,1],[103,17,103,39,1],[104,17,104,18,0],[105,21,105,73,0],[106,21,106,28,0],[106,30,106,37,0],[106,38,106,40,0],[106,41,106,52,0],[107,21,107,22,0],[108,25,108,59,0],[109,21,109,22,0],[110,17,110,18,0],[111,13,111,14,1],[112,9,112,10,1],[115,9,115,27,1],[116,5,116,6,1],[120,5,120,6,1],[122,9,122,52,1],[125,9,125,99,1],[128,9,128,66,1],[129,9,129,84,1],[131,9,131,66,1],[132,9,132,56,1],[134,9,134,62,1],[135,9,135,10,1],[136,13,136,111,1],[138,13,138,48,1],[139,13,139,14,1],[140,17,140,52,1],[141,17,141,24,1],[141,26,141,33,1],[141,34,141,36,1],[141,37,141,63,1],[142,17,142,18,1],[143,21,143,91,1],[144,21,144,28,1],[144,30,144,41,1],[144,42,144,44,1],[144,45,144,71,1],[145,21,145,22,1],[146,25,146,72,1],[147,21,147,22,1],[148,17,148,18,1],[150,17,150,96,1],[151,17,151,39,1],[152,17,152,18,0],[153,21,153,73,0],[154,21,154,28,0],[154,30,154,37,0],[154,38,154,40,0],[154,41,154,52,0],[155,21,155,22,0],[156,25,156,59,0],[157,21,157,22,0],[158,17,158,18,0],[159,13,159,14,1],[160,9,160,10,1],[163,9,163,27,1],[164,5,164,6,1]]);
+    </script>
+  </body>
+</html>

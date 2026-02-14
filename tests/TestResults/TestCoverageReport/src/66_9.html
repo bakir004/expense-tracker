@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/E2E/Errors/AuthErrorFormatTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Net;
+using System.Net.Http.Json;
+using ExpenseTrackerAPI.Contracts.Users;
+using ExpenseTrackerAPI.WebApi.Tests.Common;
+using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+using FluentAssertions;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.Errors;
+
+/// &lt;summary&gt;
+/// Tests RFC 9110 compliant error response formats for Authentication endpoints.
+/// Validates that all error responses follow proper structure and error keys don&#39;t contain dots.
+/// &lt;/summary&gt;
+public class AuthErrorFormatTests : BaseE2ETest
+{
+    public AuthErrorFormatTests(ExpenseTrackerApiFactory factory) : base(factory) { }
+
+    #region Register Endpoint Error Format Tests
+
+    [Fact]
+    public async Task Register_WithEmptyName_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new RegisterRequest(
+            Name: &quot;&quot;,
+            Email: GenerateUniqueEmail(),
+            Password: TestConstants.TestUsers.NewUserPassword,
+            InitialBalance: null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+        problemDetails.Should().NotBeNull();
+
+        // Validate RFC 9110 compliance
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue(
+            &quot;response should conform to RFC 9110 ProblemDetails format&quot;);
+
+        // Validate no dots in error keys
+        var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails!.Errors);
+        invalidKeys.Should().BeEmpty(
+            $&quot;error keys should not contain dots, but found: {string.Join(&quot;, &quot;, invalidKeys)}&quot;);
+
+        problemDetails.Status.Should().Be(400);
+        problemDetails.Errors.Should().NotBeNull();
+        problemDetails.Errors.Should().ContainKey(&quot;Name&quot;);
+    }
+
+    [Fact]
+    public async Task Register_WithInvalidEmail_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new RegisterRequest(
+            Name: &quot;Test User&quot;,
+            Email: &quot;invalid-email-format&quot;,
+            Password: TestConstants.TestUsers.NewUserPassword,
+            InitialBalance: null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+        problemDetails.Should().NotBeNull();
+
+        // Validate RFC 9110 compliance
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+
+        // Validate no dots in error keys
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue(
+            &quot;error keys should not contain dots&quot;);
+
+        problemDetails.Errors.Should().ContainKey(&quot;Email&quot;);
+    }
+
+    [Fact]
+    public async Task Register_WithWeakPassword_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange - Password without special character
+        var request = new RegisterRequest(
+            Name: &quot;Test User&quot;,
+            Email: GenerateUniqueEmail(),
+            Password: &quot;WeakPassword123&quot;,
+            InitialBalance: null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+        problemDetails.Should().NotBeNull();
+
+        // Validate RFC 9110 compliance
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+
+        // Validate no dots in error keys
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+
+        problemDetails.Errors.Should().ContainKey(&quot;Password&quot;);
+    }
+
+    [Fact]
+    public async Task Register_WithShortPassword_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new RegisterRequest(
+            Name: &quot;Test User&quot;,
+            Email: GenerateUniqueEmail(),
+            Password: &quot;Short1!&quot;,
+            InitialBalance: null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+
+        problemDetails.Errors.Should().ContainKey(&quot;Password&quot;);
+    }
+
+    [Fact]
+    public async Task Register_WithMultipleValidationErrors_ShouldReturnAllErrorsWithoutDotsInKeys()
+    {
+        // Arrange - Multiple validation errors
+        var request = new RegisterRequest(
+            Name: &quot;&quot;,
+            Email: &quot;invalid-email&quot;,
+            Password: &quot;weak&quot;,
+            InitialBalance: null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+        problemDetails.Should().NotBeNull();
+
+        // Validate RFC 9110 compliance
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+
+        // Validate no dots in ANY error keys
+        var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails!.Errors);
+        invalidKeys.Should().BeEmpty(
+            $&quot;no error keys should contain dots, but found: {string.Join(&quot;, &quot;, invalidKeys)}&quot;);
+
+        // Should have multiple errors
+        problemDetails.Errors.Should().NotBeNull();
+        problemDetails.Errors!.Count.Should().BeGreaterThan(1, &quot;multiple validation errors should be present&quot;);
+    }
+
+    [Fact]
+    public async Task Register_WithDuplicateEmail_ShouldReturnConflictProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange - Use existing seeded user email
+        var request = new RegisterRequest(
+            Name: &quot;Test User&quot;,
+            Email: TestConstants.TestUsers.SeededUser1Email,
+            Password: TestConstants.TestUsers.NewUserPassword,
+            InitialBalance: null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ProblemDetailsResponse&gt;();
+        problemDetails.Should().NotBeNull();
+
+        // Validate RFC 9110 compliance
+        ErrorResponseValidator.IsValidProblemDetails(problemDetails).Should().BeTrue();
+
+        problemDetails!.Status.Should().Be(409);
+        problemDetails.Title.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task Register_WithExcessivelyLongName_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var tooLongName = new string(&#39;A&#39;, 101); // Exceeds 100 char limit
+        var request = new RegisterRequest(
+            Name: tooLongName,
+            Email: GenerateUniqueEmail(),
+            Password: TestConstants.TestUsers.NewUserPassword,
+            InitialBalance: null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+
+        problemDetails.Errors.Should().ContainKey(&quot;Name&quot;);
+    }
+
+    [Fact]
+    public async Task Register_WithMissingPassword_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new RegisterRequest(
+            Name: &quot;Test User&quot;,
+            Email: GenerateUniqueEmail(),
+            Password: &quot;&quot;,
+            InitialBalance: null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+
+        problemDetails.Errors.Should().ContainKey(&quot;Password&quot;);
+    }
+
+    #endregion
+
+    #region Login Endpoint Error Format Tests
+
+    [Fact]
+    public async Task Login_WithEmptyEmail_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new LoginRequest(
+            Email: &quot;&quot;,
+            Password: TestConstants.TestUsers.SeededUserPassword);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+
+        problemDetails.Errors.Should().ContainKey(&quot;Email&quot;);
+    }
+
+    [Fact]
+    public async Task Login_WithEmptyPassword_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new LoginRequest(
+            Email: TestConstants.TestUsers.SeededUser1Email,
+            Password: &quot;&quot;);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+
+        problemDetails.Errors.Should().ContainKey(&quot;Password&quot;);
+    }
+
+    [Fact]
+    public async Task Login_WithInvalidEmailFormat_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new LoginRequest(
+            Email: &quot;not-an-email&quot;,
+            Password: TestConstants.TestUsers.SeededUserPassword);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+        ErrorResponseValidator.AllKeysAreValid(problemDetails!.Errors).Should().BeTrue();
+
+        problemDetails.Errors.Should().ContainKey(&quot;Email&quot;);
+    }
+
+    [Fact]
+    public async Task Login_WithIncorrectPassword_ShouldReturnUnauthorizedProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new LoginRequest(
+            Email: TestConstants.TestUsers.SeededUser1Email,
+            Password: &quot;WrongPassword123!&quot;);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidProblemDetails(problemDetails).Should().BeTrue();
+
+        problemDetails!.Status.Should().Be(401);
+        problemDetails.Title.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task Login_WithNonExistentUser_ShouldReturnUnauthorizedProblemDetailsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new LoginRequest(
+            Email: &quot;nonexistent.user@test.com&quot;,
+            Password: TestConstants.TestUsers.NewUserPassword);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidProblemDetails(problemDetails).Should().BeTrue();
+
+        problemDetails!.Status.Should().Be(401);
+    }
+
+    [Fact]
+    public async Task Login_WithMultipleValidationErrors_ShouldReturnAllErrorsWithoutDotsInKeys()
+    {
+        // Arrange
+        var request = new LoginRequest(
+            Email: &quot;&quot;,
+            Password: &quot;&quot;);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        ErrorResponseValidator.IsValidValidationProblemDetails(problemDetails).Should().BeTrue();
+
+        var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails!.Errors);
+        invalidKeys.Should().BeEmpty(
+            $&quot;no error keys should contain dots, but found: {string.Join(&quot;, &quot;, invalidKeys)}&quot;);
+
+        problemDetails.Errors.Should().NotBeNull();
+        problemDetails.Errors!.Count.Should().BeGreaterThan(1);
+    }
+
+    #endregion
+
+    #region RFC 9110 Compliance Tests
+
+    [Fact]
+    public async Task AllAuthErrors_ShouldHaveProperStatusCodes()
+    {
+        // Test that error responses have status codes matching HTTP semantics
+
+        // 400 Bad Request - validation error
+        var validationRequest = new RegisterRequest(&quot;&quot;, &quot;invalid&quot;, &quot;weak&quot;, null);
+        var validationResponse = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, validationRequest);
+        validationResponse.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        // 401 Unauthorized - authentication failure
+        var authRequest = new LoginRequest(&quot;user@test.com&quot;, &quot;WrongPassword!&quot;);
+        var authResponse = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, authRequest);
+        authResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // 409 Conflict - duplicate resource
+        var conflictRequest = new RegisterRequest(
+            &quot;User&quot;,
+            TestConstants.TestUsers.SeededUser1Email,
+            TestConstants.TestUsers.NewUserPassword,
+            null);
+        var conflictResponse = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, conflictRequest);
+        conflictResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task AllAuthValidationErrors_ShouldIncludeRequiredProblemDetailsFields()
+    {
+        // Arrange
+        var request = new RegisterRequest(&quot;&quot;, &quot;invalid&quot;, &quot;weak&quot;, null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        // RFC 9110 required fields
+        problemDetails!.Status.Should().NotBeNull(&quot;status is required by RFC 9110&quot;);
+        problemDetails.Status.Should().Be((int)response.StatusCode, &quot;status should match response code&quot;);
+
+        // At least one of title or detail should be present
+        var hasDescription = !string.IsNullOrWhiteSpace(problemDetails.Title) ||
+                            !string.IsNullOrWhiteSpace(problemDetails.Detail);
+        hasDescription.Should().BeTrue(&quot;either title or detail is required for problem description&quot;);
+    }
+
+    [Fact]
+    public async Task AllAuthErrors_ShouldHaveTraceIdForDebugging()
+    {
+        // Arrange
+        var request = new RegisterRequest(&quot;&quot;, &quot;invalid&quot;, &quot;weak&quot;, null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+        // TraceId helps with debugging and correlation
+        problemDetails!.TraceId.Should().NotBeNullOrEmpty(&quot;traceId should be present for request tracking&quot;);
+    }
+
+    [Theory]
+    [InlineData(&quot;&quot;, &quot;valid@email.com&quot;, &quot;Password123!&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;&quot;, &quot;Password123!&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;invalid-email&quot;, &quot;Password123!&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;valid@email.com&quot;, &quot;&quot;)]
+    [InlineData(&quot;Valid Name&quot;, &quot;valid@email.com&quot;, &quot;short&quot;)]
+    public async Task Register_ValidationErrors_ShouldNeverContainDotsInErrorKeys(
+        string name, string email, string password)
+    {
+        // Arrange
+        var request = new RegisterRequest(name, email, password, null);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+
+        // Assert
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                var invalidKeys = ErrorResponseValidator.GetInvalidKeys(problemDetails.Errors);
+                invalidKeys.Should().BeEmpty(
+                    $&quot;error keys must not contain dots. Found invalid keys: {string.Join(&quot;, &quot;, invalidKeys)}&quot;);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(&quot;&quot;, &quot;Password123!&quot;)]
+    [InlineData(&quot;invalid-email&quot;, &quot;Password123!&quot;)]
+    [InlineData(&quot;valid@email.com&quot;, &quot;&quot;)]
+    public async Task Login_ValidationErrors_ShouldNeverContainDotsInErrorKeys(
+        string email, string password)
+    {
+        // Arrange
+        var request = new LoginRequest(email, password);
+
+        // Act
+        var response = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+
+        // Assert
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var problemDetails = await response.Content.ReadFromJsonAsync&lt;ValidationProblemDetailsResponse&gt;();
+
+            if (problemDetails?.Errors != null)
+            {
+                ErrorResponseValidator.AllKeysAreValid(problemDetails.Errors).Should().BeTrue(
+                    &quot;all error keys must be valid (no dots)&quot;);
+            }
+        }
+    }
+
+    #endregion
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[16,69,16,82,1],[16,83,16,84,1],[16,85,16,86,1],[22,5,22,6,1],[24,9,28,35,1],[31,9,31,97,1],[34,9,34,68,1],[36,9,36,107,1],[37,9,37,45,1],[40,9,41,74,1],[44,9,44,89,1],[45,9,46,97,1],[48,9,48,48,1],[49,9,49,52,1],[50,9,50,59,1],[51,5,51,6,1],[55,5,55,6,1],[57,9,61,35,1],[64,9,64,97,1],[67,9,67,68,1],[69,9,69,107,1],[70,9,70,45,1],[73,9,73,98,1],[76,9,77,51,1],[79,9,79,60,1],[80,5,80,6,1],[84,5,84,6,1],[86,9,90,35,1],[93,9,93,97,1],[96,9,96,68,1],[98,9,98,107,1],[99,9,99,45,1],[102,9,102,98,1],[105,9,105,90,1],[107,9,107,63,1],[108,5,108,6,1],[112,5,112,6,1],[114,9,118,35,1],[121,9,121,97,1],[124,9,124,68,1],[126,9,126,107,1],[128,9,128,98,1],[129,9,129,90,1],[131,9,131,63,1],[132,5,132,6,1],[136,5,136,6,1],[138,9,142,35,1],[145,9,145,97,1],[148,9,148,68,1],[150,9,150,107,1],[151,9,151,45,1],[154,9,154,98,1],[157,9,157,89,1],[158,9,159,96,1],[162,9,162,52,1],[163,9,163,112,1],[164,5,164,6,1],[168,5,168,6,1],[170,9,174,35,1],[177,9,177,97,1],[180,9,180,66,1],[182,9,182,97,1],[183,9,183,45,1],[186,9,186,88,1],[188,9,188,49,1],[189,9,189,58,1],[190,5,190,6,1],[194,5,194,6,1],[196,9,196,48,1],[197,9,201,35,1],[204,9,204,97,1],[207,9,207,68,1],[209,9,209,107,1],[211,9,211,98,1],[212,9,212,90,1],[214,9,214,59,1],[215,5,215,6,1],[219,5,219,6,1],[221,9,225,35,1],[228,9,228,97,1],[231,9,231,68,1],[233,9,233,107,1],[235,9,235,98,1],[236,9,236,90,1],[238,9,238,63,1],[239,5,239,6,1],[247,5,247,6,1],[249,9,251,67,1],[254,9,254,94,1],[257,9,257,68,1],[259,9,259,107,1],[261,9,261,98,1],[262,9,262,90,1],[264,9,264,60,1],[265,5,265,6,1],[269,5,269,6,1],[271,9,273,27,1],[276,9,276,94,1],[279,9,279,68,1],[281,9,281,107,1],[283,9,283,98,1],[284,9,284,90,1],[286,9,286,63,1],[287,5,287,6,1],[291,5,291,6,1],[293,9,295,67,1],[298,9,298,94,1],[301,9,301,68,1],[303,9,303,107,1],[305,9,305,98,1],[306,9,306,90,1],[308,9,308,60,1],[309,5,309,6,1],[313,5,313,6,1],[315,9,317,44,1],[320,9,320,94,1],[323,9,323,70,1],[325,9,325,97,1],[327,9,327,88,1],[329,9,329,49,1],[330,9,330,58,1],[331,5,331,6,1],[335,5,335,6,1],[337,9,339,64,1],[342,9,342,94,1],[345,9,345,70,1],[347,9,347,97,1],[349,9,349,88,1],[351,9,351,49,1],[352,5,352,6,1],[356,5,356,6,1],[358,9,360,27,1],[363,9,363,94,1],[366,9,366,68,1],[368,9,368,107,1],[370,9,370,98,1],[372,9,372,89,1],[373,9,374,96,1],[376,9,376,52,1],[377,9,377,64,1],[378,5,378,6,1],[386,5,386,6,1],[390,9,390,82,1],[391,9,391,117,1],[392,9,392,78,1],[395,9,395,79,1],[396,9,396,102,1],[397,9,397,74,1],[400,9,404,19,1],[405,9,405,113,1],[406,9,406,74,1],[407,5,407,6,1],[411,5,411,6,1],[413,9,413,72,1],[416,9,416,97,1],[419,9,419,107,1],[422,9,422,85,1],[423,9,423,106,1],[426,9,427,79,1],[428,9,428,102,1],[429,5,429,6,1],[433,5,433,6,1],[435,9,435,72,1],[438,9,438,97,1],[441,9,441,107,1],[444,9,444,109,1],[445,5,445,6,1],[455,5,455,6,1],[457,9,457,72,1],[460,9,460,97,1],[463,9,463,62,1],[464,9,464,10,1],[465,13,465,111,1],[467,13,467,48,1],[468,13,468,14,1],[469,17,469,96,1],[470,17,471,112,1],[472,13,472,14,1],[473,9,473,10,1],[474,5,474,6,1],[482,5,482,6,1],[484,9,484,57,1],[487,9,487,94,1],[490,9,490,62,1],[491,9,491,10,1],[492,13,492,111,1],[494,13,494,48,1],[495,13,495,14,1],[496,17,497,63,1],[498,13,498,14,1],[499,9,499,10,1],[500,5,500,6,1]]);
+    </script>
+  </body>
+</html>

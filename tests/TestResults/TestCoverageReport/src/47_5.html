@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.WebApi/Controllers/V1/AuthController.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using Microsoft.AspNetCore.Mvc;
+using ExpenseTrackerAPI.Application.Users.Interfaces.Application;
+using ExpenseTrackerAPI.Contracts.Users;
+using Asp.Versioning;
+
+namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
+
+/// &lt;summary&gt;
+/// Controller for user authentication operations.
+/// &lt;/summary&gt;
+[ApiVersion(&quot;1.0&quot;)]
+[Route(&quot;api/v{version:apiVersion}/[controller]&quot;)]
+public class AuthController : ApiControllerBase
+{
+    private readonly IUserService _userService;
+    private readonly ILogger&lt;AuthController&gt; _logger;
+
+    /// &lt;summary&gt;
+    /// Initializes a new instance of the AuthController class.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;userService&quot;&gt;User service for authentication operations&lt;/param&gt;
+    /// &lt;param name=&quot;logger&quot;&gt;Logger instance&lt;/param&gt;
+    public AuthController(IUserService userService, ILogger&lt;AuthController&gt; logger)
+    {
+        _userService = userService ?? throw new ArgumentNullException(nameof(userService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// &lt;summary&gt;
+    /// Register a new user account.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;request&quot;&gt;User registration details&lt;/param&gt;
+    /// &lt;param name=&quot;cancellationToken&quot;&gt;Cancellation token&lt;/param&gt;
+    /// &lt;returns&gt;Registration response with user details&lt;/returns&gt;
+    /// &lt;response code=&quot;201&quot;&gt;User successfully registered&lt;/response&gt;
+    /// &lt;response code=&quot;400&quot;&gt;Invalid request data or validation errors&lt;/response&gt;
+    /// &lt;response code=&quot;409&quot;&gt;User with email already exists&lt;/response&gt;
+    [HttpPost(&quot;register&quot;)]
+    [ProducesResponseType(typeof(RegisterResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task&lt;IActionResult&gt; Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _userService.RegisterAsync(request, cancellationToken);
+
+        if (result.IsError)
+        {
+            return Problem(result.Errors);
+        }
+
+        var response = result.Value;
+        return Ok(response);
+    }
+
+    /// &lt;summary&gt;
+    /// Authenticate user and generate access token.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;request&quot;&gt;Login credentials&lt;/param&gt;
+    /// &lt;param name=&quot;cancellationToken&quot;&gt;Cancellation token&lt;/param&gt;
+    /// &lt;returns&gt;Login response with access token&lt;/returns&gt;
+    /// &lt;response code=&quot;200&quot;&gt;Login successful with token&lt;/response&gt;
+    /// &lt;response code=&quot;400&quot;&gt;Invalid request data&lt;/response&gt;
+    /// &lt;response code=&quot;401&quot;&gt;Invalid credentials&lt;/response&gt;
+    [HttpPost(&quot;login&quot;)]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task&lt;IActionResult&gt; Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _userService.LoginAsync(request, cancellationToken);
+
+        if (result.IsError)
+        {
+            return Problem(result.Errors);
+        }
+
+        var response = result.Value;
+        return Ok(response);
+    }
+
+    /// &lt;summary&gt;
+    /// Health check endpoint to verify the authentication service is working.
+    /// &lt;/summary&gt;
+    /// &lt;returns&gt;Service status&lt;/returns&gt;
+    [HttpGet(&quot;health&quot;)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public IActionResult Health()
+    {
+        return Ok(new { Status = &quot;Healthy&quot;, Timestamp = DateTime.UtcNow });
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[23,5,23,84,1],[24,5,24,6,1],[25,9,25,92,1],[26,9,26,77,1],[27,5,27,6,1],[43,5,43,6,1],[44,9,44,83,1],[46,9,46,28,1],[47,9,47,10,1],[48,13,48,43,1],[51,9,51,37,1],[52,9,52,29,1],[53,5,53,6,1],[69,5,69,6,1],[70,9,70,80,1],[72,9,72,28,1],[73,9,73,10,1],[74,13,74,43,1],[77,9,77,37,1],[78,9,78,29,1],[79,5,79,6,1],[88,5,88,6,1],[89,9,89,76,1],[90,5,90,6,1]]);
+    </script>
+  </body>
+</html>

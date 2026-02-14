@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Infrastructure/Authentication/JwtTokenGenerator.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ExpenseTrackerAPI.Application.Common.Interfaces;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+
+namespace ExpenseTrackerAPI.Infrastructure.Authentication;
+
+/// &lt;summary&gt;
+/// JWT token generator implementation using System.IdentityModel.Tokens.Jwt.
+/// &lt;/summary&gt;
+public class JwtTokenGenerator : IJwtTokenGenerator
+{
+    private readonly IConfiguration _configuration;
+
+    public JwtTokenGenerator(IConfiguration configuration)
+    {
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+    }
+
+    public int TokenExpirationHours
+    {
+        get
+        {
+            var value = _configuration[&quot;Jwt:ExpirationHours&quot;];
+            return int.TryParse(value, out var hours) ? hours : 24;
+        }
+    }
+
+    public string GenerateToken(int userId, string email, string name)
+    {
+        var jwtSettings = GetJwtSettings();
+
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Email, email),
+            new Claim(JwtRegisteredClaimNames.Name, name),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(JwtRegisteredClaimNames.Iat,
+                new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds().ToString(),
+                ClaimValueTypes.Integer64),
+            new Claim(&quot;userId&quot;, userId.ToString())
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: jwtSettings.Issuer,
+            audience: jwtSettings.Audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(TokenExpirationHours),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private JwtSettings GetJwtSettings()
+    {
+        var secretKey = _configuration[&quot;Jwt:SecretKey&quot;];
+        if (string.IsNullOrEmpty(secretKey))
+        {
+            throw new InvalidOperationException(
+                &quot;JWT secret key is not configured. Please set &#39;Jwt:SecretKey&#39; in configuration.&quot;);
+        }
+
+        if (secretKey.Length &lt; 32)
+        {
+            throw new InvalidOperationException(
+                &quot;JWT secret key must be at least 32 characters long for security.&quot;);
+        }
+
+        return new JwtSettings
+        {
+            SecretKey = secretKey,
+            Issuer = _configuration[&quot;Jwt:Issuer&quot;] ?? &quot;ExpenseTrackerAPI&quot;,
+            Audience = _configuration[&quot;Jwt:Audience&quot;] ?? &quot;ExpenseTrackerAPI-Users&quot;
+        };
+    }
+
+    private class JwtSettings
+    {
+        public required string SecretKey { get; init; }
+        public required string Issuer { get; init; }
+        public required string Audience { get; init; }
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[17,5,17,59,1],[18,5,18,6,1],[19,9,19,98,1],[20,5,20,6,1],[25,9,25,10,1],[26,13,26,63,1],[27,13,27,68,1],[28,9,28,10,1],[32,5,32,6,1],[33,9,33,44,1],[35,9,45,11,1],[47,9,47,91,1],[48,9,48,86,1],[50,9,55,46,1],[57,9,57,64,1],[58,5,58,6,1],[61,5,61,6,1],[62,9,62,57,1],[63,9,63,45,1],[64,9,64,10,0],[65,13,66,99,0],[69,9,69,35,1],[70,9,70,10,0],[71,13,72,85,0],[75,9,80,11,1],[81,5,81,6,1]]);
+    </script>
+  </body>
+</html>

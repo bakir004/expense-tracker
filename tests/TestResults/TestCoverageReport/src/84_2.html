@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Application/Categories/CategoryService.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ErrorOr;
+using ExpenseTrackerAPI.Application.Categories.Interfaces.Application;
+using ExpenseTrackerAPI.Application.Categories.Interfaces.Infrastructure;
+using ExpenseTrackerAPI.Domain.Entities;
+
+namespace ExpenseTrackerAPI.Application.Categories;
+
+/// &lt;summary&gt;
+/// Application service for category operations.
+/// &lt;/summary&gt;
+public class CategoryService : ICategoryService
+{
+    private readonly ICategoryRepository _categoryRepository;
+
+    public CategoryService(ICategoryRepository categoryRepository)
+    {
+        _categoryRepository = categoryRepository ?? throw new ArgumentNullException(nameof(categoryRepository));
+    }
+
+    /// &lt;inheritdoc /&gt;
+    public async Task&lt;ErrorOr&lt;List&lt;Category&gt;&gt;&gt; GetAllAsync(CancellationToken cancellationToken)
+    {
+        return await _categoryRepository.GetAllAsync(cancellationToken);
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[15,5,15,67,1],[16,5,16,6,1],[17,9,17,113,1],[18,5,18,6,1],[22,5,22,6,1],[23,9,23,73,1],[24,5,24,6,1]]);
+    </script>
+  </body>
+</html>

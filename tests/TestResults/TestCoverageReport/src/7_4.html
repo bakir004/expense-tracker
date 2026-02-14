@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Contracts/Transactions/CreateTransactionRequest.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.ComponentModel.DataAnnotations;
+
+namespace ExpenseTrackerAPI.Contracts.Transactions;
+
+public class CreateTransactionRequest
+{
+    /// &lt;summary&gt;
+    /// Type of transaction: &quot;EXPENSE&quot; or &quot;INCOME&quot;
+    /// &lt;/summary&gt;
+    [Required(ErrorMessage = &quot;Transaction type is required.&quot;)]
+    public string TransactionType { get; set; } = string.Empty;
+
+    /// &lt;summary&gt;
+    /// The amount (always positive)
+    /// &lt;/summary&gt;
+    [Range(0.01, double.MaxValue, ErrorMessage = &quot;Amount must be greater than zero.&quot;)]
+    public decimal Amount { get; set; }
+
+    /// &lt;summary&gt;
+    /// Transaction date in yyyy-MM-dd format (e.g. 2024-01-01).
+    /// &lt;/summary&gt;
+    [Required(ErrorMessage = &quot;Date is required.&quot;)]
+    public DateOnly Date { get; set; }
+
+    /// &lt;summary&gt;
+    /// Brief description of what/why this transaction occurred.
+    /// Examples: &quot;Grocery shopping&quot;, &quot;Monthly salary&quot;
+    /// &lt;/summary&gt;
+    [Required(ErrorMessage = &quot;Subject is required.&quot;)]
+    [MinLength(1, ErrorMessage = &quot;Subject cannot be empty.&quot;)]
+    [MaxLength(255)]
+    public string Subject { get; set; } = string.Empty;
+
+    /// &lt;summary&gt;
+    /// Optional longer description with additional details
+    /// &lt;/summary&gt;
+    [MaxLength(2000)]
+    public string? Notes { get; set; }
+
+    /// &lt;summary&gt;
+    /// Payment method: &quot;CASH&quot;, &quot;DEBIT_CARD&quot;, &quot;CREDIT_CARD&quot;, &quot;BANK_TRANSFER&quot;, &quot;MOBILE_PAYMENT&quot;, &quot;PAYPAL&quot;, &quot;CRYPTO&quot;, or &quot;OTHER&quot;
+    /// &lt;/summary&gt;
+    [Required(ErrorMessage = &quot;Payment method is required.&quot;)]
+    public string PaymentMethod { get; set; } = string.Empty;
+
+    /// &lt;summary&gt;
+    /// Optional category ID
+    /// &lt;/summary&gt;
+    [Range(1, int.MaxValue, ErrorMessage = &quot;Category ID must be positive when provided.&quot;)]
+    public int? CategoryId { get; set; }
+
+    /// &lt;summary&gt;
+    /// Optional: group related transactions together (trips, projects, etc.)
+    /// &lt;/summary&gt;
+    [Range(1, int.MaxValue, ErrorMessage = &quot;Transaction group ID must be positive when provided.&quot;)]
+    public int? TransactionGroupId { get; set; }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[11,51,11,63,1],[32,43,32,55,1],[44,49,44,61,1]]);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Contracts/Users/RegisterRequest.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.ComponentModel.DataAnnotations;
+
+namespace ExpenseTrackerAPI.Contracts.Users;
+
+/// &lt;summary&gt;
+/// Request contract for user registration.
+/// &lt;/summary&gt;
+public record RegisterRequest(
+    [Required(ErrorMessage = &quot;Name is required&quot;)]
+    [StringLength(100, ErrorMessage = &quot;Name cannot exceed 100 characters&quot;)]
+    string Name,
+
+    [Required(ErrorMessage = &quot;Email is required&quot;)]
+    [RegularExpression(@&quot;^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$&quot;, ErrorMessage = &quot;Email format is invalid&quot;)]
+    [StringLength(254, ErrorMessage = &quot;Email cannot exceed 254 characters&quot;)]
+    string Email,
+
+    [Required(ErrorMessage = &quot;Password is required&quot;)]
+    [StringLength(100, MinimumLength = 8, ErrorMessage = &quot;Password must be between 8 and 100 characters&quot;)]
+    [RegularExpression(@&quot;^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\da-zA-Z]).{8,}$&quot;,
+        ErrorMessage = &quot;Password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character&quot;)]
+    string Password,
+
+    decimal? InitialBalance = null);
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([]);
+    </script>
+  </body>
+</html>

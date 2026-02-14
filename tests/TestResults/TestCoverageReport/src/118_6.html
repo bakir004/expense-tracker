@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.Domain.Tests/Entities/UserTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ExpenseTrackerAPI.Domain.Entities;
+using FluentAssertions;
+using Xunit;
+
+namespace ExpenseTrackerAPI.Domain.Tests.Entities;
+
+public class UserTests
+{
+    #region Constructor Tests
+
+    [Fact]
+    public void Constructor_WithValidParameters_ShouldCreateUser()
+    {
+        // Arrange
+        var name = &quot;John Doe&quot;;
+        var email = &quot;john.doe@example.com&quot;;
+        var passwordHash = &quot;hashedPassword123&quot;;
+        var initialBalance = 1000.50m;
+
+        // Act
+        var user = new User(name, email, passwordHash, initialBalance);
+
+        // Assert
+        user.Name.Should().Be(name);
+        user.Email.Should().Be(email.ToLowerInvariant());
+        user.PasswordHash.Should().Be(passwordHash);
+        user.InitialBalance.Should().Be(initialBalance);
+        user.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        user.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(1));
+        user.Id.Should().Be(0); // Default value for new entity
+    }
+
+    [Fact]
+    public void Constructor_WithDefaultInitialBalance_ShouldSetToZero()
+    {
+        // Arrange
+        var name = &quot;Jane Doe&quot;;
+        var email = &quot;jane.doe@example.com&quot;;
+        var passwordHash = &quot;hashedPassword456&quot;;
+
+        // Act
+        var user = new User(name, email, passwordHash);
+
+        // Assert
+        user.InitialBalance.Should().Be(0);
+    }
+
+    [Fact]
+    public void Constructor_WithWhitespaceInNameAndEmail_ShouldTrimAndNormalizeEmail()
+    {
+        // Arrange
+        var name = &quot;  John Doe  &quot;;
+        var email = &quot;  JOHN.DOE@EXAMPLE.COM  &quot;;
+        var passwordHash = &quot;hashedPassword123&quot;;
+
+        // Act
+        var user = new User(name, email, passwordHash);
+
+        // Assert
+        user.Name.Should().Be(&quot;John Doe&quot;);
+        user.Email.Should().Be(&quot;john.doe@example.com&quot;);
+    }
+
+    #endregion
+
+    #region Constructor Validation Tests
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(&quot;&quot;)]
+    [InlineData(&quot;   &quot;)]
+    public void Constructor_WithInvalidName_ShouldThrowArgumentException(string invalidName)
+    {
+        // Arrange
+        var email = &quot;test@example.com&quot;;
+        var passwordHash = &quot;hashedPassword123&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; new User(invalidName, email, passwordHash);
+        act.Should().Throw&lt;ArgumentException&gt;()
+            .WithMessage(&quot;Name cannot be empty*&quot;)
+            .And.ParamName.Should().Be(&quot;name&quot;);
+    }
+
+    [Fact]
+    public void Constructor_WithNameTooLong_ShouldThrowArgumentException()
+    {
+        // Arrange
+        var name = new string(&#39;A&#39;, 101); // 101 characters
+        var email = &quot;test@example.com&quot;;
+        var passwordHash = &quot;hashedPassword123&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; new User(name, email, passwordHash);
+        act.Should().Throw&lt;ArgumentException&gt;()
+            .WithMessage(&quot;Name cannot exceed 100 characters*&quot;)
+            .And.ParamName.Should().Be(&quot;name&quot;);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(&quot;&quot;)]
+    [InlineData(&quot;   &quot;)]
+    public void Constructor_WithInvalidEmail_ShouldThrowArgumentException(string invalidEmail)
+    {
+        // Arrange
+        var name = &quot;John Doe&quot;;
+        var passwordHash = &quot;hashedPassword123&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; new User(name, invalidEmail, passwordHash);
+        act.Should().Throw&lt;ArgumentException&gt;()
+            .WithMessage(&quot;Email cannot be empty*&quot;)
+            .And.ParamName.Should().Be(&quot;email&quot;);
+    }
+
+    [Fact]
+    public void Constructor_WithEmailTooLong_ShouldThrowArgumentException()
+    {
+        // Arrange
+        var name = &quot;John Doe&quot;;
+        var email = new string(&#39;a&#39;, 250) + &quot;@example.com&quot;; // &gt; 254 characters
+        var passwordHash = &quot;hashedPassword123&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; new User(name, email, passwordHash);
+        act.Should().Throw&lt;ArgumentException&gt;()
+            .WithMessage(&quot;Email cannot exceed 254 characters*&quot;)
+            .And.ParamName.Should().Be(&quot;email&quot;);
+    }
+
+    [Theory]
+    [InlineData(&quot;invalid-email&quot;)]
+    [InlineData(&quot;@example.com&quot;)]
+    [InlineData(&quot;test@&quot;)]
+    [InlineData(&quot;test..test@example.com&quot;)]
+    [InlineData(&quot;test@example&quot;)]
+    public void Constructor_WithInvalidEmailFormat_ShouldThrowArgumentException(string invalidEmail)
+    {
+        // Arrange
+        var name = &quot;John Doe&quot;;
+        var passwordHash = &quot;hashedPassword123&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; new User(name, invalidEmail, passwordHash);
+        act.Should().Throw&lt;ArgumentException&gt;()
+            .WithMessage(&quot;Email format is invalid*&quot;)
+            .And.ParamName.Should().Be(&quot;email&quot;);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(&quot;&quot;)]
+    [InlineData(&quot;   &quot;)]
+    public void Constructor_WithInvalidPasswordHash_ShouldThrowArgumentException(string invalidPasswordHash)
+    {
+        // Arrange
+        var name = &quot;John Doe&quot;;
+        var email = &quot;test@example.com&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; new User(name, email, invalidPasswordHash);
+        act.Should().Throw&lt;ArgumentException&gt;()
+            .WithMessage(&quot;Password hash cannot be empty*&quot;)
+            .And.ParamName.Should().Be(&quot;passwordHash&quot;);
+    }
+
+    #endregion
+
+    #region UpdateProfile Tests
+
+    [Fact]
+    public void UpdateProfile_WithValidParameters_ShouldUpdateUserAndTimestamp()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var originalUpdatedAt = user.UpdatedAt;
+        var newName = &quot;Jane Smith&quot;;
+        var newEmail = &quot;jane.smith@example.com&quot;;
+
+        // Wait a bit to ensure timestamp difference
+        Thread.Sleep(10);
+
+        // Act
+        user.UpdateProfile(newName, newEmail);
+
+        // Assert
+        user.Name.Should().Be(newName);
+        user.Email.Should().Be(newEmail.ToLowerInvariant());
+        user.UpdatedAt.Should().BeAfter(originalUpdatedAt);
+    }
+
+    [Fact]
+    public void UpdateProfile_WithWhitespaceInNameAndEmail_ShouldTrimAndNormalizeEmail()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var newName = &quot;  Jane Smith  &quot;;
+        var newEmail = &quot;  JANE.SMITH@EXAMPLE.COM  &quot;;
+
+        // Act
+        user.UpdateProfile(newName, newEmail);
+
+        // Assert
+        user.Name.Should().Be(&quot;Jane Smith&quot;);
+        user.Email.Should().Be(&quot;jane.smith@example.com&quot;);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(&quot;&quot;)]
+    [InlineData(&quot;   &quot;)]
+    public void UpdateProfile_WithInvalidName_ShouldThrowArgumentException(string invalidName)
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var newEmail = &quot;test@example.com&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; user.UpdateProfile(invalidName, newEmail);
+        act.Should().Throw&lt;ArgumentException&gt;()
+            .WithMessage(&quot;Name cannot be empty*&quot;)
+            .And.ParamName.Should().Be(&quot;name&quot;);
+    }
+
+    [Theory]
+    [InlineData(&quot;invalid-email&quot;)]
+    [InlineData(&quot;@example.com&quot;)]
+    [InlineData(&quot;test@&quot;)]
+    public void UpdateProfile_WithInvalidEmail_ShouldThrowArgumentException(string invalidEmail)
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var newName = &quot;Jane Smith&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; user.UpdateProfile(newName, invalidEmail);
+        act.Should().Throw&lt;ArgumentException&gt;()
+            .WithMessage(&quot;Email format is invalid*&quot;)
+            .And.ParamName.Should().Be(&quot;email&quot;);
+    }
+
+    #endregion
+
+    #region UpdatePassword Tests
+
+    [Fact]
+    public void UpdatePassword_WithValidPasswordHash_ShouldUpdatePasswordAndTimestamp()
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var originalUpdatedAt = user.UpdatedAt;
+        var newPasswordHash = &quot;newHashedPassword456&quot;;
+
+        // Wait a bit to ensure timestamp difference
+        Thread.Sleep(10);
+
+        // Act
+        user.UpdatePassword(newPasswordHash);
+
+        // Assert
+        user.PasswordHash.Should().Be(newPasswordHash);
+        user.UpdatedAt.Should().BeAfter(originalUpdatedAt);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(&quot;&quot;)]
+    [InlineData(&quot;   &quot;)]
+    public void UpdatePassword_WithInvalidPasswordHash_ShouldThrowArgumentException(string invalidPasswordHash)
+    {
+        // Arrange
+        var user = CreateValidUser();
+
+        // Act &amp; Assert
+        var act = () =&gt; user.UpdatePassword(invalidPasswordHash);
+        act.Should().Throw&lt;ArgumentException&gt;()
+            .WithMessage(&quot;Password hash cannot be empty*&quot;)
+            .And.ParamName.Should().Be(&quot;passwordHash&quot;);
+    }
+
+    #endregion
+
+    #region UpdateInitialBalance Tests
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1000.50)]
+    [InlineData(-500.25)]
+    [InlineData(999999.99)]
+    public void UpdateInitialBalance_WithValidBalance_ShouldUpdateBalanceAndTimestamp(decimal newBalance)
+    {
+        // Arrange
+        var user = CreateValidUser();
+        var originalUpdatedAt = user.UpdatedAt;
+
+        // Wait a bit to ensure timestamp difference
+        Thread.Sleep(10);
+
+        // Act
+        user.UpdateInitialBalance(newBalance);
+
+        // Assert
+        user.InitialBalance.Should().Be(newBalance);
+        user.UpdatedAt.Should().BeAfter(originalUpdatedAt);
+    }
+
+    #endregion
+
+    #region Email Validation Tests
+
+    [Theory]
+    [InlineData(&quot;test@example.com&quot;)]
+    [InlineData(&quot;user.name@domain.co.uk&quot;)]
+    [InlineData(&quot;test+tag@example.com&quot;)]
+    [InlineData(&quot;123456@example.com&quot;)]
+    [InlineData(&quot;test_user@sub.example.com&quot;)]
+    [InlineData(&quot;a@b.co&quot;)]
+    public void Constructor_WithValidEmailFormats_ShouldNotThrow(string validEmail)
+    {
+        // Arrange
+        var name = &quot;John Doe&quot;;
+        var passwordHash = &quot;hashedPassword123&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; new User(name, validEmail, passwordHash);
+        act.Should().NotThrow();
+    }
+
+    #endregion
+
+    #region Edge Cases and Boundary Tests
+
+    [Fact]
+    public void Constructor_WithNameExactly100Characters_ShouldNotThrow()
+    {
+        // Arrange
+        var name = new string(&#39;A&#39;, 100); // Exactly 100 characters
+        var email = &quot;test@example.com&quot;;
+        var passwordHash = &quot;hashedPassword123&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; new User(name, email, passwordHash);
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Constructor_WithEmailExactly254Characters_ShouldNotThrow()
+    {
+        // Arrange
+        var name = &quot;John Doe&quot;;
+        var localPart = new string(&#39;a&#39;, 240); // 240 + &quot;@example.com&quot; = 252 chars
+        var email = $&quot;{localPart}@example.com&quot;;
+        var passwordHash = &quot;hashedPassword123&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; new User(name, email, passwordHash);
+        act.Should().NotThrow();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-999999999.99)]
+    [InlineData(999999999.99)]
+    [InlineData(1000000.00)]
+    [InlineData(-1000000.00)]
+    public void Constructor_WithExtremeInitialBalances_ShouldNotThrow(decimal extremeBalance)
+    {
+        // Arrange
+        var name = &quot;John Doe&quot;;
+        var email = &quot;test@example.com&quot;;
+        var passwordHash = &quot;hashedPassword123&quot;;
+
+        // Act &amp; Assert
+        var act = () =&gt; new User(name, email, passwordHash, extremeBalance);
+        act.Should().NotThrow();
+    }
+
+    #endregion
+
+    #region Immutability Tests
+
+    [Fact]
+    public void User_PropertiesWithPrivateSetters_ShouldBeImmutableFromOutside()
+    {
+        // Arrange
+        var user = CreateValidUser();
+
+        // Act &amp; Assert
+        var idProperty = typeof(User).GetProperty(nameof(User.Id));
+        var nameProperty = typeof(User).GetProperty(nameof(User.Name));
+        var emailProperty = typeof(User).GetProperty(nameof(User.Email));
+        var passwordHashProperty = typeof(User).GetProperty(nameof(User.PasswordHash));
+        var initialBalanceProperty = typeof(User).GetProperty(nameof(User.InitialBalance));
+        var createdAtProperty = typeof(User).GetProperty(nameof(User.CreatedAt));
+        var updatedAtProperty = typeof(User).GetProperty(nameof(User.UpdatedAt));
+
+        idProperty!.SetMethod.Should().NotBeNull().And.Subject.IsPrivate.Should().BeTrue();
+        nameProperty!.SetMethod.Should().NotBeNull().And.Subject.IsPrivate.Should().BeTrue();
+        emailProperty!.SetMethod.Should().NotBeNull().And.Subject.IsPrivate.Should().BeTrue();
+        passwordHashProperty!.SetMethod.Should().NotBeNull().And.Subject.IsPrivate.Should().BeTrue();
+        initialBalanceProperty!.SetMethod.Should().NotBeNull().And.Subject.IsPrivate.Should().BeTrue();
+        createdAtProperty!.SetMethod.Should().NotBeNull().And.Subject.IsPrivate.Should().BeTrue();
+        updatedAtProperty!.SetMethod.Should().NotBeNull().And.Subject.IsPrivate.Should().BeTrue();
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private static User CreateValidUser()
+    {
+        return new User(
+            name: &quot;John Doe&quot;,
+            email: &quot;john.doe@example.com&quot;,
+            passwordHash: &quot;hashedPassword123&quot;,
+            initialBalance: 1000m
+        );
+    }
+
+    #endregion
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[13,5,13,6,1],[15,9,15,31,1],[16,9,16,44,1],[17,9,17,48,1],[18,9,18,39,1],[21,9,21,72,1],[24,9,24,37,1],[25,9,25,58,1],[26,9,26,53,1],[27,9,27,57,1],[28,9,28,85,1],[29,9,29,85,1],[30,9,30,32,1],[31,5,31,6,1],[35,5,35,6,1],[37,9,37,31,1],[38,9,38,44,1],[39,9,39,48,1],[42,9,42,56,1],[45,9,45,44,1],[46,5,46,6,1],[50,5,50,6,1],[52,9,52,35,1],[53,9,53,48,1],[54,9,54,48,1],[57,9,57,56,1],[60,9,60,43,1],[61,9,61,56,1],[62,5,62,6,1],[73,5,73,6,1],[75,9,75,40,1],[76,9,76,48,1],[79,9,79,25,1],[79,25,79,67,1],[79,67,79,68,1],[80,9,82,48,1],[83,5,83,6,1],[87,5,87,6,1],[89,9,89,41,1],[90,9,90,40,1],[91,9,91,48,1],[94,9,94,25,1],[94,25,94,60,1],[94,60,94,61,1],[95,9,97,48,1],[98,5,98,6,1],[105,5,105,6,1],[107,9,107,31,1],[108,9,108,48,1],[111,9,111,25,1],[111,25,111,67,1],[111,67,111,68,1],[112,9,114,49,1],[115,5,115,6,1],[119,5,119,6,1],[121,9,121,31,1],[122,9,122,59,1],[123,9,123,48,1],[126,9,126,25,1],[126,25,126,60,1],[126,60,126,61,1],[127,9,129,49,1],[130,5,130,6,1],[139,5,139,6,1],[141,9,141,31,1],[142,9,142,48,1],[145,9,145,25,1],[145,25,145,67,1],[145,67,145,68,1],[146,9,148,49,1],[149,5,149,6,1],[156,5,156,6,1],[158,9,158,31,1],[159,9,159,40,1],[162,9,162,25,1],[162,25,162,67,1],[162,67,162,68,1],[163,9,165,56,1],[166,5,166,6,1],[174,5,174,6,1],[176,9,176,38,1],[177,9,177,48,1],[178,9,178,36,1],[179,9,179,49,1],[182,9,182,26,1],[185,9,185,47,1],[188,9,188,40,1],[189,9,189,61,1],[190,9,190,60,1],[191,5,191,6,1],[195,5,195,6,1],[197,9,197,38,1],[198,9,198,40,1],[199,9,199,53,1],[202,9,202,47,1],[205,9,205,45,1],[206,9,206,58,1],[207,5,207,6,1],[214,5,214,6,1],[216,9,216,38,1],[217,9,217,43,1],[220,9,220,25,1],[220,25,220,66,1],[220,66,220,67,1],[221,9,223,48,1],[224,5,224,6,1],[231,5,231,6,1],[233,9,233,38,1],[234,9,234,36,1],[237,9,237,25,1],[237,25,237,66,1],[237,66,237,67,1],[238,9,240,49,1],[241,5,241,6,1],[249,5,249,6,1],[251,9,251,38,1],[252,9,252,48,1],[253,9,253,54,1],[256,9,256,26,1],[259,9,259,46,1],[262,9,262,56,1],[263,9,263,60,1],[264,5,264,6,1],[271,5,271,6,1],[273,9,273,38,1],[276,9,276,25,1],[276,25,276,65,1],[276,65,276,66,1],[277,9,279,56,1],[280,5,280,6,1],[292,5,292,6,1],[294,9,294,38,1],[295,9,295,48,1],[298,9,298,26,1],[301,9,301,47,1],[304,9,304,53,1],[305,9,305,60,1],[306,5,306,6,1],[320,5,320,6,1],[322,9,322,31,1],[323,9,323,48,1],[326,9,326,25,1],[326,25,326,65,1],[326,65,326,66,1],[327,9,327,33,1],[328,5,328,6,1],[336,5,336,6,1],[338,9,338,41,1],[339,9,339,40,1],[340,9,340,48,1],[343,9,343,25,1],[343,25,343,60,1],[343,60,343,61,1],[344,9,344,33,1],[345,5,345,6,1],[349,5,349,6,1],[351,9,351,31,1],[352,9,352,46,1],[353,9,353,48,1],[354,9,354,48,1],[357,9,357,25,1],[357,25,357,60,1],[357,60,357,61,1],[358,9,358,33,1],[359,5,359,6,1],[368,5,368,6,1],[370,9,370,31,1],[371,9,371,40,1],[372,9,372,48,1],[375,9,375,25,1],[375,25,375,76,1],[375,76,375,77,1],[376,9,376,33,1],[377,5,377,6,1],[385,5,385,6,1],[387,9,387,38,1],[390,9,390,68,1],[391,9,391,72,1],[392,9,392,74,1],[393,9,393,88,1],[394,9,394,92,1],[395,9,395,82,1],[396,9,396,82,1],[398,9,398,92,1],[399,9,399,94,1],[400,9,400,95,1],[401,9,401,102,1],[402,9,402,104,1],[403,9,403,99,1],[404,9,404,99,1],[405,5,405,6,1],[412,5,412,6,1],[413,9,418,11,1],[419,5,419,6,1]]);
+    </script>
+  </body>
+</html>

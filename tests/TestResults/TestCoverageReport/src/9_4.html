@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Contracts/Transactions/TransactionFilterParser.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Globalization;
+using ErrorOr;
+using ExpenseTrackerAPI.Domain.Entities;
+
+namespace ExpenseTrackerAPI.Contracts.Transactions;
+
+/// &lt;summary&gt;
+/// Parser and validator for transaction filter requests.
+/// Converts &lt;see cref=&quot;TransactionFilterRequest&quot;/&gt; to validated &lt;see cref=&quot;TransactionFilter&quot;/&gt;.
+/// &lt;/summary&gt;
+public static class TransactionFilterParser
+{
+    private const string DateFormat = &quot;yyyy-MM-dd&quot;;
+    private const int MaxPageSize = 100;
+    private const int DefaultPageSize = 20;
+
+    /// &lt;summary&gt;
+    /// Parses and validates a &lt;see cref=&quot;TransactionFilterRequest&quot;/&gt; into a &lt;see cref=&quot;TransactionFilter&quot;/&gt;.
+    /// Returns validation errors if the request contains invalid values.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;request&quot;&gt;The filter request to parse. Can be null for default filtering.&lt;/param&gt;
+    /// &lt;returns&gt;A validated &lt;see cref=&quot;TransactionFilter&quot;/&gt; or validation errors.&lt;/returns&gt;
+    public static ErrorOr&lt;TransactionFilter&gt; Parse(TransactionFilterRequest? request)
+    {
+        if (request is null)
+        {
+            return new TransactionFilter();
+        }
+
+        var errors = new List&lt;Error&gt;();
+
+        // Parse transaction type
+        TransactionType? transactionType = null;
+        if (!string.IsNullOrWhiteSpace(request.TransactionType))
+        {
+            var typeResult = ParseTransactionType(request.TransactionType);
+            if (typeResult.IsError)
+            {
+                errors.AddRange(typeResult.Errors);
+            }
+            else
+            {
+                transactionType = typeResult.Value;
+            }
+        }
+
+        // Validate amount range
+        if (request.MinAmount.HasValue &amp;&amp; request.MinAmount.Value &lt; 0)
+        {
+            errors.Add(Error.Validation(&quot;MinAmount&quot;, &quot;Minimum amount cannot be negative.&quot;));
+        }
+
+        if (request.MaxAmount.HasValue &amp;&amp; request.MaxAmount.Value &lt; 0)
+        {
+            errors.Add(Error.Validation(&quot;MaxAmount&quot;, &quot;Maximum amount cannot be negative.&quot;));
+        }
+
+        if (request.MinAmount.HasValue &amp;&amp; request.MaxAmount.HasValue &amp;&amp; request.MinAmount.Value &gt; request.MaxAmount.Value)
+        {
+            errors.Add(Error.Validation(&quot;AmountRange&quot;, &quot;Minimum amount cannot be greater than maximum amount.&quot;));
+        }
+
+        // Parse dates
+        DateOnly? dateFrom = null;
+        DateOnly? dateTo = null;
+
+        if (!string.IsNullOrWhiteSpace(request.DateFrom))
+        {
+            var dateResult = ParseDate(request.DateFrom, &quot;DateFrom&quot;);
+            if (dateResult.IsError)
+            {
+                errors.AddRange(dateResult.Errors);
+            }
+            else
+            {
+                dateFrom = dateResult.Value;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.DateTo))
+        {
+            var dateResult = ParseDate(request.DateTo, &quot;DateTo&quot;);
+            if (dateResult.IsError)
+            {
+                errors.AddRange(dateResult.Errors);
+            }
+            else
+            {
+                dateTo = dateResult.Value;
+            }
+        }
+
+        if (dateFrom.HasValue &amp;&amp; dateTo.HasValue &amp;&amp; dateFrom.Value &gt; dateTo.Value)
+        {
+            errors.Add(Error.Validation(&quot;DateRange&quot;, &quot;DateFrom cannot be after DateTo.&quot;));
+        }
+
+        // Parse payment methods
+        IReadOnlyList&lt;PaymentMethod&gt;? paymentMethods = null;
+        if (request.PaymentMethods is { Length: &gt; 0 })
+        {
+            var paymentMethodsResult = ParsePaymentMethods(request.PaymentMethods);
+            if (paymentMethodsResult.IsError)
+            {
+                errors.AddRange(paymentMethodsResult.Errors);
+            }
+            else
+            {
+                paymentMethods = paymentMethodsResult.Value;
+            }
+        }
+
+        // Validate category IDs
+        if (request.CategoryIds is { Length: &gt; 0 })
+        {
+            foreach (var categoryId in request.CategoryIds)
+            {
+                if (categoryId &lt;= 0)
+                {
+                    errors.Add(Error.Validation(&quot;CategoryIds&quot;, $&quot;Invalid category ID: {categoryId}. Category IDs must be positive integers.&quot;));
+                    break;
+                }
+            }
+        }
+
+        // Validate transaction group IDs
+        if (request.TransactionGroupIds is { Length: &gt; 0 })
+        {
+            foreach (var groupId in request.TransactionGroupIds)
+            {
+                if (groupId &lt;= 0)
+                {
+                    errors.Add(Error.Validation(&quot;TransactionGroupIds&quot;, $&quot;Invalid transaction group ID: {groupId}. Group IDs must be positive integers.&quot;));
+                    break;
+                }
+            }
+        }
+
+        // Parse sort field
+        var sortBy = TransactionSortField.Date;
+        if (!string.IsNullOrWhiteSpace(request.SortBy))
+        {
+            var sortResult = ParseSortField(request.SortBy);
+            if (sortResult.IsError)
+            {
+                errors.AddRange(sortResult.Errors);
+            }
+            else
+            {
+                sortBy = sortResult.Value;
+            }
+        }
+
+        // Parse sort direction
+        var sortDescending = true;
+        if (!string.IsNullOrWhiteSpace(request.SortDirection))
+        {
+            var directionResult = ParseSortDirection(request.SortDirection);
+            if (directionResult.IsError)
+            {
+                errors.AddRange(directionResult.Errors);
+            }
+            else
+            {
+                sortDescending = directionResult.Value;
+            }
+        }
+
+        // Validate pagination
+        var page = request.Page ?? 1;
+        var pageSize = request.PageSize ?? DefaultPageSize;
+
+        if (page &lt; 1)
+        {
+            errors.Add(Error.Validation(&quot;Page&quot;, &quot;Page number must be at least 1.&quot;));
+        }
+
+        if (pageSize &lt; 1)
+        {
+            errors.Add(Error.Validation(&quot;PageSize&quot;, &quot;Page size must be at least 1.&quot;));
+        }
+        else if (pageSize &gt; MaxPageSize)
+        {
+            errors.Add(Error.Validation(&quot;PageSize&quot;, $&quot;Page size cannot exceed {MaxPageSize}.&quot;));
+        }
+
+        // Return errors if any
+        if (errors.Count &gt; 0)
+        {
+            return errors;
+        }
+
+        // Build validated filter
+        return new TransactionFilter
+        {
+            TransactionType = transactionType,
+            MinAmount = request.MinAmount,
+            MaxAmount = request.MaxAmount,
+            DateFrom = dateFrom,
+            DateTo = dateTo,
+            SubjectContains = string.IsNullOrWhiteSpace(request.SubjectContains) ? null : request.SubjectContains.Trim(),
+            NotesContains = string.IsNullOrWhiteSpace(request.NotesContains) ? null : request.NotesContains.Trim(),
+            PaymentMethods = paymentMethods,
+            CategoryIds = request.CategoryIds is { Length: &gt; 0 } ? request.CategoryIds.ToList().AsReadOnly() : null,
+            Uncategorized = request.Uncategorized ?? false,
+            TransactionGroupIds = request.TransactionGroupIds is { Length: &gt; 0 } ? request.TransactionGroupIds.ToList().AsReadOnly() : null,
+            Ungrouped = request.Ungrouped ?? false,
+            SortBy = sortBy,
+            SortDescending = sortDescending,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
+    private static ErrorOr&lt;TransactionType&gt; ParseTransactionType(string value)
+    {
+        var normalized = value.Trim().ToUpperInvariant();
+        return normalized switch
+        {
+            &quot;EXPENSE&quot; =&gt; TransactionType.EXPENSE,
+            &quot;INCOME&quot; =&gt; TransactionType.INCOME,
+            _ =&gt; Error.Validation(&quot;TransactionType&quot;, $&quot;Invalid transaction type: &#39;{value}&#39;. Valid values are: EXPENSE, INCOME.&quot;)
+        };
+    }
+
+    private static ErrorOr&lt;DateOnly&gt; ParseDate(string value, string fieldName)
+    {
+        if (DateOnly.TryParseExact(value.Trim(), DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            return date;
+        }
+
+        return Error.Validation(fieldName, $&quot;Invalid date format for {fieldName}: &#39;{value}&#39;. Expected format: {DateFormat}.&quot;);
+    }
+
+    private static ErrorOr&lt;IReadOnlyList&lt;PaymentMethod&gt;&gt; ParsePaymentMethods(string[] values)
+    {
+        var paymentMethods = new List&lt;PaymentMethod&gt;();
+        var invalidValues = new List&lt;string&gt;();
+
+        foreach (var value in values)
+        {
+            var normalized = value.Trim().ToUpperInvariant();
+            if (Enum.TryParse&lt;PaymentMethod&gt;(normalized, ignoreCase: true, out var method))
+            {
+                if (!paymentMethods.Contains(method))
+                {
+                    paymentMethods.Add(method);
+                }
+            }
+            else
+            {
+                invalidValues.Add(value);
+            }
+        }
+
+        if (invalidValues.Count &gt; 0)
+        {
+            var validValues = string.Join(&quot;, &quot;, Enum.GetNames&lt;PaymentMethod&gt;());
+            return Error.Validation(
+                &quot;PaymentMethods&quot;,
+                $&quot;Invalid payment method(s): {string.Join(&quot;, &quot;, invalidValues)}. Valid values are: {validValues}.&quot;);
+        }
+
+        return paymentMethods.AsReadOnly();
+    }
+
+    private static ErrorOr&lt;TransactionSortField&gt; ParseSortField(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            &quot;date&quot; =&gt; TransactionSortField.Date,
+            &quot;amount&quot; =&gt; TransactionSortField.Amount,
+            &quot;subject&quot; =&gt; TransactionSortField.Subject,
+            &quot;paymentmethod&quot; or &quot;payment_method&quot; =&gt; TransactionSortField.PaymentMethod,
+            &quot;createdat&quot; or &quot;created_at&quot; =&gt; TransactionSortField.CreatedAt,
+            &quot;updatedat&quot; or &quot;updated_at&quot; =&gt; TransactionSortField.UpdatedAt,
+            _ =&gt; Error.Validation(&quot;SortBy&quot;, $&quot;Invalid sort field: &#39;{value}&#39;. Valid values are: date, amount, subject, paymentMethod, createdAt, updatedAt.&quot;)
+        };
+    }
+
+    private static ErrorOr&lt;bool&gt; ParseSortDirection(string value)
+    {
+        var normalized = value.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            &quot;asc&quot; or &quot;ascending&quot; =&gt; false,
+            &quot;desc&quot; or &quot;descending&quot; =&gt; true,
+            _ =&gt; Error.Validation(&quot;SortDirection&quot;, $&quot;Invalid sort direction: &#39;{value}&#39;. Valid values are: asc, desc.&quot;)
+        };
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[24,5,24,6,1],[25,9,25,29,1],[26,9,26,10,1],[27,13,27,44,1],[30,9,30,40,1],[33,9,33,49,1],[34,9,34,65,1],[35,9,35,10,1],[36,13,36,76,1],[37,13,37,36,1],[38,13,38,14,1],[39,17,39,52,1],[40,13,40,14,1],[42,13,42,14,1],[43,17,43,52,1],[44,13,44,14,1],[45,9,45,10,1],[48,9,48,71,1],[49,9,49,10,1],[50,13,50,93,1],[51,9,51,10,1],[53,9,53,71,1],[54,9,54,10,1],[55,13,55,93,1],[56,9,56,10,1],[58,9,58,123,1],[59,9,59,10,1],[60,13,60,114,1],[61,9,61,10,1],[64,9,64,35,1],[65,9,65,33,1],[67,9,67,58,1],[68,9,68,10,1],[69,13,69,70,1],[70,13,70,36,1],[71,13,71,14,1],[72,17,72,52,1],[73,13,73,14,1],[75,13,75,14,1],[76,17,76,45,1],[77,13,77,14,1],[78,9,78,10,1],[80,9,80,56,1],[81,9,81,10,1],[82,13,82,66,1],[83,13,83,36,1],[84,13,84,14,1],[85,17,85,52,1],[86,13,86,14,1],[88,13,88,14,1],[89,17,89,43,1],[90,13,90,14,1],[91,9,91,10,1],[93,9,93,83,1],[94,9,94,10,1],[95,13,95,91,1],[96,9,96,10,1],[99,9,99,61,1],[100,9,100,55,1],[101,9,101,10,1],[102,13,102,84,1],[103,13,103,46,1],[104,13,104,14,1],[105,17,105,62,1],[106,13,106,14,1],[108,13,108,14,1],[109,17,109,61,1],[110,13,110,14,1],[111,9,111,10,1],[114,9,114,52,1],[115,9,115,10,1],[116,13,116,20,1],[116,22,116,36,1],[116,37,116,39,1],[116,40,116,59,1],[117,13,117,14,1],[118,17,118,37,1],[119,17,119,18,1],[120,21,120,144,1],[121,21,121,27,1],[123,13,123,14,1],[124,9,124,10,1],[127,9,127,60,1],[128,9,128,10,1],[129,13,129,20,1],[129,22,129,33,1],[129,34,129,36,1],[129,37,129,64,1],[130,13,130,14,1],[131,17,131,34,1],[132,17,132,18,1],[133,21,133,155,1],[134,21,134,27,1],[136,13,136,14,1],[137,9,137,10,1],[140,9,140,48,1],[141,9,141,56,1],[142,9,142,10,1],[143,13,143,61,1],[144,13,144,36,1],[145,13,145,14,1],[146,17,146,52,1],[147,13,147,14,1],[149,13,149,14,1],[150,17,150,43,1],[151,13,151,14,1],[152,9,152,10,1],[155,9,155,35,1],[156,9,156,63,1],[157,9,157,10,1],[158,13,158,77,1],[159,13,159,41,1],[160,13,160,14,1],[161,17,161,57,1],[162,13,162,14,1],[164,13,164,14,1],[165,17,165,56,1],[166,13,166,14,1],[167,9,167,10,1],[170,9,170,38,1],[171,9,171,60,1],[173,9,173,22,1],[174,9,174,10,1],[175,13,175,85,1],[176,9,176,10,1],[178,9,178,26,1],[179,9,179,10,1],[180,13,180,87,1],[181,9,181,10,1],[182,14,182,41,1],[183,9,183,10,1],[184,13,184,97,1],[185,9,185,10,1],[188,9,188,30,1],[189,9,189,10,1],[190,13,190,27,1],[194,9,212,11,1],[213,5,213,6,1],[216,5,216,6,1],[217,9,217,58,1],[218,9,220,26,1],[220,26,220,49,1],[220,49,221,25,1],[221,25,221,47,1],[221,47,222,18,1],[222,18,222,129,1],[222,129,223,11,1],[224,5,224,6,1],[227,5,227,6,1],[228,9,228,127,1],[229,9,229,10,1],[230,13,230,25,1],[233,9,233,127,1],[234,5,234,6,1],[237,5,237,6,1],[238,9,238,56,1],[239,9,239,48,1],[241,9,241,16,1],[241,18,241,27,1],[241,28,241,30,1],[241,31,241,37,1],[242,9,242,10,1],[243,13,243,62,1],[244,13,244,92,1],[245,13,245,14,1],[246,17,246,54,1],[247,17,247,18,1],[248,21,248,48,1],[249,17,249,18,1],[250,13,250,14,1],[252,13,252,14,1],[253,17,253,42,1],[254,13,254,14,1],[255,9,255,10,1],[257,9,257,37,1],[258,9,258,10,1],[259,13,259,81,1],[260,13,262,117,1],[265,9,265,44,1],[266,5,266,6,1],[269,5,269,6,1],[270,9,270,58,1],[271,9,273,23,1],[273,23,273,48,1],[273,48,274,25,1],[274,25,274,52,1],[274,52,275,26,1],[275,26,275,54,1],[275,54,276,52,1],[276,52,276,86,1],[276,86,277,44,1],[277,44,277,74,1],[277,74,278,44,1],[278,44,278,74,0],[278,74,279,18,1],[279,18,279,157,1],[279,157,280,11,1],[281,5,281,6,1],[284,5,284,6,1],[285,9,285,58,1],[286,9,288,37,1],[288,37,288,42,1],[288,42,289,39,1],[289,39,289,43,1],[289,43,290,18,1],[290,18,290,119,1],[290,119,291,11,1],[292,5,292,6,1]]);
+    </script>
+  </body>
+</html>

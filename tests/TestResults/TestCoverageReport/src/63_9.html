@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/Common/BaseE2ETest.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using ExpenseTrackerAPI.Contracts.Users;
+using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.Common;
+
+/// &lt;summary&gt;
+/// Base class for E2E tests that require real authentication (not mocked).
+/// Provides helpers for user registration, login, and authenticated requests.
+/// &lt;/summary&gt;
+public abstract class BaseE2ETest : IClassFixture&lt;ExpenseTrackerApiFactory&gt;
+{
+    protected readonly HttpClient Client;
+    protected readonly ExpenseTrackerApiFactory Factory;
+
+    protected BaseE2ETest(ExpenseTrackerApiFactory factory)
+    {
+        Factory = factory;
+        Client = factory.CreateClient();
+    }
+
+    /// &lt;summary&gt;
+    /// Creates a new HttpClient without the default test auth handler.
+    /// Use this for tests that need to test real authentication flows.
+    /// &lt;/summary&gt;
+    protected HttpClient CreateUnauthenticatedClient()
+    {
+        return Factory.CreateClient();
+    }
+
+    /// &lt;summary&gt;
+    /// Register a new user and return the response.
+    /// &lt;/summary&gt;
+    protected async Task&lt;HttpResponseMessage&gt; RegisterUserAsync(
+        string name,
+        string email,
+        string password,
+        decimal? initialBalance = null)
+    {
+        var request = new RegisterRequest(name, email, password, initialBalance);
+        return await Client.PostAsJsonAsync(TestConstants.Routes.AuthRegister, request);
+    }
+
+    /// &lt;summary&gt;
+    /// Login with credentials and return the response.
+    /// &lt;/summary&gt;
+    protected async Task&lt;HttpResponseMessage&gt; LoginAsync(string email, string password)
+    {
+        var request = new LoginRequest(email, password);
+        return await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, request);
+    }
+
+    /// &lt;summary&gt;
+    /// Login and return the JWT token.
+    /// &lt;/summary&gt;
+    protected async Task&lt;string?&gt; GetAuthTokenAsync(string email, string password)
+    {
+        var response = await LoginAsync(email, password);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var loginResponse = await response.Content.ReadFromJsonAsync&lt;LoginResponse&gt;();
+        return loginResponse?.Token;
+    }
+
+    /// &lt;summary&gt;
+    /// Creates an HttpClient with the Bearer token set for authenticated requests.
+    /// &lt;/summary&gt;
+    protected HttpClient CreateAuthenticatedClient(string token)
+    {
+        var client = Factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(&quot;Bearer&quot;, token);
+        return client;
+    }
+
+    /// &lt;summary&gt;
+    /// Register a user, login, and return an authenticated client.
+    /// Useful for tests that need a fresh user with real auth.
+    /// &lt;/summary&gt;
+    protected async Task&lt;(HttpClient Client, LoginResponse User)?&gt; RegisterAndLoginAsync(
+        string name,
+        string email,
+        string password,
+        decimal? initialBalance = null)
+    {
+        // Register
+        var registerResponse = await RegisterUserAsync(name, email, password, initialBalance);
+        if (!registerResponse.IsSuccessStatusCode)
+            return null;
+
+        // Login
+        var loginResponse = await LoginAsync(email, password);
+        if (!loginResponse.IsSuccessStatusCode)
+            return null;
+
+        var user = await loginResponse.Content.ReadFromJsonAsync&lt;LoginResponse&gt;();
+        if (user == null)
+            return null;
+
+        // Create authenticated client
+        var client = CreateAuthenticatedClient(user.Token);
+        return (client, user);
+    }
+
+    /// &lt;summary&gt;
+    /// Generates a unique email for test isolation.
+    /// &lt;/summary&gt;
+    protected static string GenerateUniqueEmail(string prefix = &quot;test&quot;)
+    {
+        return $&quot;{prefix}.{Guid.NewGuid():N}@expense-tracker-test.local&quot;;
+    }
+
+    /// &lt;summary&gt;
+    /// Generates a unique username for test isolation.
+    /// &lt;/summary&gt;
+    protected static string GenerateUniqueName(string prefix = &quot;Test User&quot;)
+    {
+        return $&quot;{prefix} {Guid.NewGuid().ToString(&quot;N&quot;)[..8]}&quot;;
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[17,5,17,60,1],[18,5,18,6,1],[19,9,19,27,1],[20,9,20,41,1],[21,5,21,6,1],[28,5,28,6,0],[29,9,29,39,0],[30,5,30,6,0],[40,5,40,6,1],[41,9,41,82,1],[42,9,42,89,1],[43,5,43,6,1],[49,5,49,6,1],[50,9,50,57,1],[51,9,51,86,1],[52,5,52,6,1],[58,5,58,6,0],[59,9,59,58,0],[60,9,60,43,0],[61,13,61,25,0],[63,9,63,87,0],[64,9,64,37,0],[65,5,65,6,0],[71,5,71,6,1],[72,9,72,45,1],[73,9,73,101,1],[74,9,74,23,1],[75,5,75,6,1],[86,5,86,6,1],[88,9,88,95,1],[89,9,89,51,1],[90,13,90,25,0],[93,9,93,63,1],[94,9,94,48,1],[95,13,95,25,0],[97,9,97,83,1],[98,9,98,26,1],[99,13,99,25,0],[102,9,102,60,1],[103,9,103,31,1],[104,5,104,6,1],[110,5,110,6,1],[111,9,111,74,1],[112,5,112,6,1],[118,5,118,6,0],[119,9,119,64,0],[120,5,120,6,0]]);
+    </script>
+  </body>
+</html>

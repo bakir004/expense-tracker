@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Application/TransactionGroups/TransactionGroupService.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ErrorOr;
+using ExpenseTrackerAPI.Application.TransactionGroups.Interfaces.Application;
+using ExpenseTrackerAPI.Application.TransactionGroups.Interfaces.Infrastructure;
+using ExpenseTrackerAPI.Domain.Entities;
+using ExpenseTrackerAPI.Domain.Errors;
+
+namespace ExpenseTrackerAPI.Application.TransactionGroups;
+
+/// &lt;summary&gt;
+/// Application service for transaction group operations.
+/// Handles authorization checks to ensure users can only access their own transaction groups.
+/// &lt;/summary&gt;
+public class TransactionGroupService : ITransactionGroupService
+{
+    private readonly ITransactionGroupRepository _transactionGroupRepository;
+
+    public TransactionGroupService(ITransactionGroupRepository transactionGroupRepository)
+    {
+        _transactionGroupRepository = transactionGroupRepository ?? throw new ArgumentNullException(nameof(transactionGroupRepository));
+    }
+
+    /// &lt;inheritdoc /&gt;
+    public async Task&lt;ErrorOr&lt;TransactionGroup&gt;&gt; GetByIdAsync(int id, int userId, CancellationToken cancellationToken)
+    {
+        var result = await _transactionGroupRepository.GetByIdAsync(id, cancellationToken);
+
+        if (result.IsError)
+        {
+            return result.Errors;
+        }
+
+        var transactionGroup = result.Value;
+
+        // Authorization check: ensure the transaction group belongs to the user
+        if (transactionGroup.UserId != userId)
+        {
+            return TransactionGroupErrors.NotFound;
+        }
+
+        return transactionGroup;
+    }
+
+    /// &lt;inheritdoc /&gt;
+    public async Task&lt;ErrorOr&lt;List&lt;TransactionGroup&gt;&gt;&gt; GetByUserIdAsync(int userId, CancellationToken cancellationToken)
+    {
+        return await _transactionGroupRepository.GetByUserIdAsync(userId, cancellationToken);
+    }
+
+    /// &lt;inheritdoc /&gt;
+    public async Task&lt;ErrorOr&lt;TransactionGroup&gt;&gt; CreateAsync(
+        int userId,
+        string name,
+        string? description,
+        CancellationToken cancellationToken)
+    {
+        // Validate name
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return TransactionGroupErrors.InvalidName;
+        }
+
+        var trimmedName = name.Trim();
+        if (trimmedName.Length &gt; 255)
+        {
+            return TransactionGroupErrors.InvalidName;
+        }
+
+        var transactionGroup = new TransactionGroup
+        {
+            Name = trimmedName,
+            Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            UserId = userId,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        return await _transactionGroupRepository.CreateAsync(transactionGroup, cancellationToken);
+    }
+
+    /// &lt;inheritdoc /&gt;
+    public async Task&lt;ErrorOr&lt;TransactionGroup&gt;&gt; UpdateAsync(
+        int id,
+        int userId,
+        string name,
+        string? description,
+        CancellationToken cancellationToken)
+    {
+        // First get the existing transaction group
+        var existingResult = await _transactionGroupRepository.GetByIdAsync(id, cancellationToken);
+
+        if (existingResult.IsError)
+        {
+            return existingResult.Errors;
+        }
+
+        var existingGroup = existingResult.Value;
+
+        // Authorization check: ensure the transaction group belongs to the user
+        if (existingGroup.UserId != userId)
+        {
+            return TransactionGroupErrors.NotFound;
+        }
+
+        // Validate name
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return TransactionGroupErrors.InvalidName;
+        }
+
+        var trimmedName = name.Trim();
+        if (trimmedName.Length &gt; 255)
+        {
+            return TransactionGroupErrors.InvalidName;
+        }
+
+        // Update the entity
+        existingGroup.Name = trimmedName;
+        existingGroup.Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+
+        return await _transactionGroupRepository.UpdateAsync(existingGroup, cancellationToken);
+    }
+
+    /// &lt;inheritdoc /&gt;
+    public async Task&lt;ErrorOr&lt;Deleted&gt;&gt; DeleteAsync(int id, int userId, CancellationToken cancellationToken)
+    {
+        // First get the existing transaction group
+        var existingResult = await _transactionGroupRepository.GetByIdAsync(id, cancellationToken);
+
+        if (existingResult.IsError)
+        {
+            return existingResult.Errors;
+        }
+
+        var existingGroup = existingResult.Value;
+
+        // Authorization check: ensure the transaction group belongs to the user
+        if (existingGroup.UserId != userId)
+        {
+            return TransactionGroupErrors.NotFound;
+        }
+
+        return await _transactionGroupRepository.DeleteAsync(id, cancellationToken);
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[17,5,17,91,1],[18,5,18,6,1],[19,9,19,137,1],[20,5,20,6,1],[24,5,24,6,1],[25,9,25,92,1],[27,9,27,28,1],[28,9,28,10,1],[29,13,29,34,1],[32,9,32,45,1],[35,9,35,47,1],[36,9,36,10,1],[37,13,37,52,1],[40,9,40,33,1],[41,5,41,6,1],[45,5,45,6,1],[46,9,46,94,1],[47,5,47,6,1],[55,5,55,6,1],[57,9,57,45,1],[58,9,58,10,1],[59,13,59,55,1],[62,9,62,39,1],[63,9,63,38,1],[64,9,64,10,1],[65,13,65,55,1],[68,9,74,11,1],[76,9,76,99,1],[77,5,77,6,1],[86,5,86,6,1],[88,9,88,100,1],[90,9,90,36,1],[91,9,91,10,1],[92,13,92,42,1],[95,9,95,50,1],[98,9,98,44,1],[99,9,99,10,1],[100,13,100,52,1],[104,9,104,45,1],[105,9,105,10,1],[106,13,106,55,1],[109,9,109,39,1],[110,9,110,38,1],[111,9,111,10,1],[112,13,112,55,1],[116,9,116,42,1],[117,9,117,104,1],[119,9,119,96,1],[120,5,120,6,1],[124,5,124,6,1],[126,9,126,100,1],[128,9,128,36,1],[129,9,129,10,1],[130,13,130,42,1],[133,9,133,50,1],[136,9,136,44,1],[137,9,137,10,1],[138,13,138,52,1],[141,9,141,85,1],[142,5,142,6,1]]);
+    </script>
+  </body>
+</html>

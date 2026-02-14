@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Infrastructure/Persistence/ApplicationDbContext.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using Microsoft.EntityFrameworkCore;
+using ExpenseTrackerAPI.Domain.Entities;
+
+namespace ExpenseTrackerAPI.Infrastructure.Persistence;
+
+public class ApplicationDbContext : DbContext
+{
+    public ApplicationDbContext(DbContextOptions&lt;ApplicationDbContext&gt; options)
+        : base(options)
+    {
+    }
+
+    public DbSet&lt;User&gt; Users { get; set; }
+    public DbSet&lt;Category&gt; Categories { get; set; }
+    public DbSet&lt;Transaction&gt; Transactions { get; set; }
+    public DbSet&lt;TransactionGroup&gt; TransactionGroups { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
+
+        modelBuilder.HasDefaultSchema(&quot;public&quot;);
+
+        modelBuilder.Entity&lt;Transaction&gt;()
+            .Property(t =&gt; t.TransactionType)
+            .HasConversion&lt;string&gt;();
+
+        modelBuilder.Entity&lt;Transaction&gt;()
+            .Property(t =&gt; t.PaymentMethod)
+            .HasConversion&lt;string&gt;();
+    }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            optionsBuilder.UseNpgsql();
+        }
+
+        optionsBuilder.UseNpgsql(options =&gt;
+        {
+            options.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(10),
+                errorCodesToAdd: null);
+        });
+
+        if (Environment.GetEnvironmentVariable(&quot;ASPNETCORE_ENVIRONMENT&quot;) == &quot;Development&quot;)
+        {
+            optionsBuilder.EnableSensitiveDataLogging();
+            optionsBuilder.EnableDetailedErrors();
+        }
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[9,11,9,24,1],[10,5,10,6,1],[11,5,11,6,1],[19,5,19,6,1],[20,9,20,44,1],[22,9,22,93,1],[24,9,24,49,1],[26,9,28,38,1],[30,9,32,38,1],[33,5,33,6,1],[36,5,36,6,1],[37,9,37,42,1],[38,9,38,10,0],[39,13,39,40,0],[40,9,40,10,0],[42,9,43,9,1],[43,9,43,10,1],[43,10,44,13,1],[44,13,47,40,1],[47,40,48,9,1],[48,9,48,10,1],[48,10,48,12,1],[50,9,50,91,1],[51,9,51,10,0],[52,13,52,57,0],[53,13,53,51,0],[54,9,54,10,0],[55,5,55,6,1]]);
+    </script>
+  </body>
+</html>

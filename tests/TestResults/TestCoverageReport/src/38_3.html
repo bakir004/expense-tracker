@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.Infrastructure/Persistence/Configurations/UserConfiguration.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using ExpenseTrackerAPI.Domain.Entities;
+
+namespace ExpenseTrackerAPI.Infrastructure.Persistence.Configurations;
+
+public class UserConfiguration : IEntityTypeConfiguration&lt;User&gt;
+{
+    public void Configure(EntityTypeBuilder&lt;User&gt; builder)
+    {
+        builder.ToTable(&quot;Users&quot;);
+
+        builder.HasKey(u =&gt; u.Id);
+
+        builder.Property(u =&gt; u.Id)
+            .HasColumnName(&quot;id&quot;)
+            .ValueGeneratedOnAdd();
+
+        builder.Property(u =&gt; u.Name)
+            .HasColumnName(&quot;name&quot;)
+            .IsRequired()
+            .HasMaxLength(100);
+
+        builder.Property(u =&gt; u.Email)
+            .HasColumnName(&quot;email&quot;)
+            .IsRequired()
+            .HasMaxLength(255);
+
+        builder.Property(u =&gt; u.PasswordHash)
+            .HasColumnName(&quot;password_hash&quot;)
+            .IsRequired()
+            .HasMaxLength(255);
+
+        builder.Property(u =&gt; u.InitialBalance)
+            .HasColumnName(&quot;initial_balance&quot;)
+            .HasPrecision(12, 2)
+            .HasDefaultValue(0);
+
+        builder.Property(u =&gt; u.CreatedAt)
+            .HasColumnName(&quot;created_at&quot;)
+            .HasColumnType(&quot;timestamp with time zone&quot;)
+            .HasDefaultValueSql(&quot;CURRENT_TIMESTAMP&quot;);
+
+        builder.Property(u =&gt; u.UpdatedAt)
+            .HasColumnName(&quot;updated_at&quot;)
+            .HasColumnType(&quot;timestamp with time zone&quot;)
+            .HasDefaultValueSql(&quot;CURRENT_TIMESTAMP&quot;);
+
+        // Unique constraints
+        builder.HasIndex(u =&gt; u.Email)
+            .HasDatabaseName(&quot;idx_users_email&quot;)
+            .IsUnique();
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[10,5,10,6,1],[11,9,11,34,1],[13,9,13,35,1],[15,9,17,36,1],[19,9,22,32,1],[24,9,27,32,1],[29,9,32,32,1],[34,9,37,33,1],[39,9,42,54,1],[44,9,47,54,1],[50,9,52,25,1],[53,5,53,6,1]]);
+    </script>
+  </body>
+</html>

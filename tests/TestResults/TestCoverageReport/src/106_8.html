@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.Infrastructure.Tests/Repositories/CategoryRepositoryTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ExpenseTrackerAPI.Domain.Entities;
+using ExpenseTrackerAPI.Infrastructure.Categories;
+using ExpenseTrackerAPI.Infrastructure.Tests.Fixtures;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+
+namespace ExpenseTrackerAPI.Infrastructure.Tests.Repositories;
+
+[Collection(nameof(DatabaseCollection))]
+public class CategoryRepositoryTests
+{
+    private readonly DatabaseFixture _fixture;
+
+    public CategoryRepositoryTests(DatabaseFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    private async Task&lt;Category&gt; CreateTestCategoryAsync(string name, string? description = null, string icon = &quot;&#128193;&quot;)
+    {
+        var category = new Category
+        {
+            Name = name,
+            Description = description,
+            Icon = icon
+        };
+
+        _fixture.DbContext.Categories.Add(category);
+        await _fixture.DbContext.SaveChangesAsync();
+
+        return category;
+    }
+
+    [Fact]
+    public async Task GetAllAsync_EmptyDatabase_ReturnsEmptyList()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var sut = new CategoryRepository(_fixture.DbContext);
+
+        // Act
+        var result = await sut.GetAllAsync(CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Should().NotBeNull();
+        result.Value.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithCategories_ReturnsCategoriesSortedByName()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var sut = new CategoryRepository(_fixture.DbContext);
+
+        // Create categories in non-alphabetical order
+        await CreateTestCategoryAsync(&quot;Utilities&quot;, &quot;Bills and utilities&quot;, &quot;&#128161;&quot;);
+        await CreateTestCategoryAsync(&quot;Food &amp; Dining&quot;, &quot;Restaurant and groceries&quot;, &quot;&#127828;&quot;);
+        await CreateTestCategoryAsync(&quot;Transportation&quot;, &quot;Travel expenses&quot;, &quot;&#128663;&quot;);
+        await CreateTestCategoryAsync(&quot;Entertainment&quot;, &quot;Fun and games&quot;, &quot;&#127916;&quot;);
+
+        // Clear the change tracker to ensure we read fresh from database
+        _fixture.DbContext.ChangeTracker.Clear();
+
+        // Act
+        var result = await sut.GetAllAsync(CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Should().NotBeNull();
+        result.Value.Should().HaveCount(4);
+
+        // Verify sorted by name ascending
+        result.Value[0].Name.Should().Be(&quot;Entertainment&quot;);
+        result.Value[1].Name.Should().Be(&quot;Food &amp; Dining&quot;);
+        result.Value[2].Name.Should().Be(&quot;Transportation&quot;);
+        result.Value[3].Name.Should().Be(&quot;Utilities&quot;);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithCategories_ReturnsAllCategoryProperties()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var sut = new CategoryRepository(_fixture.DbContext);
+
+        await CreateTestCategoryAsync(&quot;Salary&quot;, &quot;Monthly income&quot;, &quot;&#128176;&quot;);
+        _fixture.DbContext.ChangeTracker.Clear();
+
+        // Act
+        var result = await sut.GetAllAsync(CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Should().HaveCount(1);
+
+        var category = result.Value.First();
+        category.Id.Should().BeGreaterThan(0);
+        category.Name.Should().Be(&quot;Salary&quot;);
+        category.Description.Should().Be(&quot;Monthly income&quot;);
+        category.Icon.Should().Be(&quot;&#128176;&quot;);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithMultipleCategories_ReturnsAllCategories()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var sut = new CategoryRepository(_fixture.DbContext);
+
+        // Create multiple categories
+        var categoryNames = new[] { &quot;Alpha&quot;, &quot;Beta&quot;, &quot;Gamma&quot;, &quot;Delta&quot;, &quot;Epsilon&quot; };
+        foreach (var name in categoryNames)
+        {
+            await CreateTestCategoryAsync(name);
+        }
+
+        _fixture.DbContext.ChangeTracker.Clear();
+
+        // Act
+        var result = await sut.GetAllAsync(CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Should().HaveCount(5);
+
+        // All category names should be present
+        var returnedNames = result.Value.Select(c =&gt; c.Name).ToList();
+        returnedNames.Should().Contain(categoryNames);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithNullDescription_ReturnsCategory()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var sut = new CategoryRepository(_fixture.DbContext);
+
+        await CreateTestCategoryAsync(&quot;Miscellaneous&quot;, null, &quot;&#128230;&quot;);
+        _fixture.DbContext.ChangeTracker.Clear();
+
+        // Act
+        var result = await sut.GetAllAsync(CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Should().HaveCount(1);
+        result.Value.First().Description.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetAllAsync_DoesNotTrackEntities()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var sut = new CategoryRepository(_fixture.DbContext);
+
+        await CreateTestCategoryAsync(&quot;Test Category&quot;);
+        _fixture.DbContext.ChangeTracker.Clear();
+
+        // Act
+        var result = await sut.GetAllAsync(CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+
+        // Verify that the returned entities are not tracked (AsNoTracking was used)
+        var trackedEntities = _fixture.DbContext.ChangeTracker.Entries&lt;Category&gt;().Count();
+        trackedEntities.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_MultipleCalls_ReturnsConsistentResults()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var sut = new CategoryRepository(_fixture.DbContext);
+
+        await CreateTestCategoryAsync(&quot;Category1&quot;);
+        await CreateTestCategoryAsync(&quot;Category2&quot;);
+        _fixture.DbContext.ChangeTracker.Clear();
+
+        // Act
+        var result1 = await sut.GetAllAsync(CancellationToken.None);
+        var result2 = await sut.GetAllAsync(CancellationToken.None);
+
+        // Assert
+        result1.IsError.Should().BeFalse();
+        result2.IsError.Should().BeFalse();
+
+        result1.Value.Should().HaveCount(result2.Value.Count);
+        result1.Value.Select(c =&gt; c.Name).Should().BeEquivalentTo(result2.Value.Select(c =&gt; c.Name));
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[14,5,14,60,1],[15,5,15,6,1],[16,9,16,28,1],[17,5,17,6,1],[20,5,20,6,1],[21,9,26,11,1],[28,9,28,53,1],[29,9,29,53,1],[31,9,31,25,1],[32,5,32,6,1],[36,5,36,6,1],[38,9,38,45,1],[39,9,39,62,1],[42,9,42,68,1],[45,9,45,43,1],[46,9,46,43,1],[47,9,47,41,1],[48,5,48,6,1],[52,5,52,6,1],[54,9,54,45,1],[55,9,55,62,1],[58,9,58,81,1],[59,9,59,90,1],[60,9,60,82,1],[61,9,61,79,1],[64,9,64,50,1],[67,9,67,68,1],[70,9,70,43,1],[71,9,71,43,1],[72,9,72,44,1],[75,9,75,59,1],[76,9,76,59,1],[77,9,77,60,1],[78,9,78,55,1],[79,5,79,6,1],[83,5,83,6,1],[85,9,85,45,1],[86,9,86,62,1],[88,9,88,73,1],[89,9,89,50,1],[92,9,92,68,1],[95,9,95,43,1],[96,9,96,44,1],[98,9,98,45,1],[99,9,99,47,1],[100,9,100,45,1],[101,9,101,60,1],[102,9,102,41,1],[103,5,103,6,1],[107,5,107,6,1],[109,9,109,45,1],[110,9,110,62,1],[113,9,113,84,1],[114,9,114,16,1],[114,18,114,26,1],[114,27,114,29,1],[114,30,114,43,1],[115,9,115,10,1],[116,13,116,49,1],[117,9,117,10,1],[119,9,119,50,1],[122,9,122,68,1],[125,9,125,43,1],[126,9,126,44,1],[129,9,129,54,1],[129,54,129,60,1],[129,60,129,71,1],[130,9,130,55,1],[131,5,131,6,1],[135,5,135,6,1],[137,9,137,45,1],[138,9,138,62,1],[140,9,140,68,1],[141,9,141,50,1],[144,9,144,68,1],[147,9,147,43,1],[148,9,148,44,1],[149,9,149,60,1],[150,5,150,6,1],[154,5,154,6,1],[156,9,156,45,1],[157,9,157,62,1],[159,9,159,56,1],[160,9,160,50,1],[163,9,163,68,1],[166,9,166,43,1],[169,9,169,92,1],[170,9,170,40,1],[171,5,171,6,1],[175,5,175,6,1],[177,9,177,45,1],[178,9,178,62,1],[180,9,180,52,1],[181,9,181,52,1],[182,9,182,50,1],[185,9,185,69,1],[186,9,186,69,1],[189,9,189,44,1],[190,9,190,44,1],[192,9,192,63,1],[193,9,193,35,1],[193,35,193,41,1],[193,41,193,93,1],[193,93,193,99,1],[193,99,193,102,1],[194,5,194,6,1]]);
+    </script>
+  </body>
+</html>

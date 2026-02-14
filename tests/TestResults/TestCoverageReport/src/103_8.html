@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.Infrastructure.Tests/Repositories/TransactionRepositoryTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ExpenseTrackerAPI.Domain.Entities;
+using ExpenseTrackerAPI.Infrastructure.Tests.Fixtures;
+using ExpenseTrackerAPI.Infrastructure.Transactions;
+using ExpenseTrackerAPI.Infrastructure.Users;
+using Microsoft.EntityFrameworkCore;
+
+namespace ExpenseTrackerAPI.Infrastructure.Tests.Repositories;
+
+[Collection(nameof(DatabaseCollection))]
+public class TransactionRepositoryTests
+{
+    private readonly DatabaseFixture _fixture;
+
+    public TransactionRepositoryTests(DatabaseFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    /// &lt;summary&gt;
+    /// Rule: when sorted by Date ascending then CreatedAt ascending,
+    /// CumulativeDelta[i] = (i == 0 ? 0 : CumulativeDelta[i-1]) + SignedAmount[i].
+    /// &lt;/summary&gt;
+    private static void AssertCumulativeDeltaRule(List&lt;Transaction&gt; chronological)
+    {
+        Assert.True(chronological.Count &gt;= 1, &quot;Need at least one transaction to verify the rule.&quot;);
+        decimal previousCumulative = 0;
+        for (var i = 0; i &lt; chronological.Count; i++)
+        {
+            var current = chronological[i];
+            var expectedCumulative = previousCumulative + current.SignedAmount;
+            Assert.True(current.CumulativeDelta == expectedCumulative,
+                $&quot;At index {i} (Date={current.Date}, CreatedAt={current.CreatedAt}): expected CumulativeDelta = {expectedCumulative} (previous {previousCumulative} + signed {current.SignedAmount}), but was {current.CumulativeDelta}.&quot;);
+            previousCumulative = current.CumulativeDelta;
+        }
+    }
+
+    private static List&lt;Transaction&gt; ChronologicalForUser(List&lt;Transaction&gt; forUser)
+    {
+        return forUser
+            .OrderBy(t =&gt; t.Date)
+            .ThenBy(t =&gt; t.CreatedAt)
+            .ToList();
+    }
+
+    private async Task&lt;User&gt; CreateTestUserAsync()
+    {
+        var userRepo = new UserRepository(_fixture.DbContext);
+        var user = new User(
+            name: &quot;Integration Test User&quot;,
+            email: $&quot;test-{Guid.NewGuid():N}@integration.test&quot;,
+            passwordHash: &quot;hashed_password&quot;,
+            initialBalance: 0
+        );
+        var result = await userRepo.CreateAsync(user, CancellationToken.None);
+        Assert.False(result.IsError);
+        return result.Value;
+    }
+
+    private static Transaction NewTransaction(int userId, decimal signedAmount, DateOnly date, DateTime createdAt)
+    {
+        var amount = Math.Abs(signedAmount);
+        var transactionType = signedAmount &gt;= 0 ? TransactionType.INCOME : TransactionType.EXPENSE;
+
+        return new Transaction(
+            userId: userId,
+            transactionType: transactionType,
+            amount: amount,
+            date: date,
+            subject: &quot;Integration test transaction&quot;,
+            paymentMethod: PaymentMethod.CASH,
+            notes: null,
+            categoryId: null,
+            transactionGroupId: null,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        );
+    }
+
+    [Fact]
+    public async Task CreateAsync_NewTransactions_CumulativeDeltasFollowRule_ChronologicalOrder()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day1 = DateOnly.FromDateTime(baseTime).AddDays(-10);
+        var day2 = day1.AddDays(1);
+        var day3 = day2.AddDays(1);
+
+        var t1 = NewTransaction(user.Id, 100m, day1, baseTime);
+        var t2 = NewTransaction(user.Id, -30m, day2, baseTime.AddSeconds(1));
+        var t3 = NewTransaction(user.Id, 50m, day3, baseTime.AddSeconds(2));
+
+        // Act
+        var r1 = await sut.CreateAsync(t1, CancellationToken.None);
+        var r2 = await sut.CreateAsync(t2, CancellationToken.None);
+        var r3 = await sut.CreateAsync(t3, CancellationToken.None);
+
+        // Assert
+        r1.IsError.Should().BeFalse();
+        r2.IsError.Should().BeFalse();
+        r3.IsError.Should().BeFalse();
+
+        var transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user.Id)
+            .ToListAsync();
+        var chronological = ChronologicalForUser(transactions);
+        AssertCumulativeDeltaRule(chronological);
+
+        // Verify specific cumulative deltas
+        chronological[0].CumulativeDelta.Should().Be(100m);  // 0 + 100
+        chronological[1].CumulativeDelta.Should().Be(70m);   // 100 - 30
+        chronological[2].CumulativeDelta.Should().Be(120m);  // 70 + 50
+    }
+
+    [Fact]
+    public async Task CreateAsync_SameDateDifferentCreatedAt_CumulativeDeltasFollowRule()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var sameDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-5);
+        var baseTime = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day, 10, 0, 0, DateTimeKind.Utc);
+
+        var t1 = NewTransaction(user.Id, 200m, sameDay, baseTime);
+        var t2 = NewTransaction(user.Id, -50m, sameDay, baseTime.AddMinutes(1));
+        var t3 = NewTransaction(user.Id, -25m, sameDay, baseTime.AddMinutes(2));
+
+        // Act
+        await sut.CreateAsync(t1, CancellationToken.None);
+        await sut.CreateAsync(t2, CancellationToken.None);
+        await sut.CreateAsync(t3, CancellationToken.None);
+
+        // Assert
+        var queryContext = _fixture.CreateNewContext();
+        var transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user.Id)
+            .ToListAsync();
+        var chronological = ChronologicalForUser(transactions);
+        AssertCumulativeDeltaRule(chronological);
+
+        chronological[0].CumulativeDelta.Should().Be(200m);   // 0 + 200
+        chronological[1].CumulativeDelta.Should().Be(150m);   // 200 - 50
+        chronological[2].CumulativeDelta.Should().Be(125m);   // 150 - 25
+    }
+
+    [Fact]
+    public async Task DeleteAsync_AfterDelete_RemainingTransactionsFollowRule()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day1 = DateOnly.FromDateTime(baseTime).AddDays(-20);
+        var day2 = day1.AddDays(1);
+        var day3 = day2.AddDays(1);
+
+        var t1 = await sut.CreateAsync(NewTransaction(user.Id, 100m, day1, baseTime), CancellationToken.None);
+        var t2 = await sut.CreateAsync(NewTransaction(user.Id, -40m, day2, baseTime.AddSeconds(1)), CancellationToken.None);
+        var t3 = await sut.CreateAsync(NewTransaction(user.Id, 60m, day3, baseTime.AddSeconds(2)), CancellationToken.None);
+
+        t1.IsError.Should().BeFalse();
+        t2.IsError.Should().BeFalse();
+        t3.IsError.Should().BeFalse();
+
+        // Verify rule before deletion
+        var listBefore = await _fixture.DbContext.Transactions.Where(t =&gt; t.UserId == user.Id).ToListAsync();
+        AssertCumulativeDeltaRule(ChronologicalForUser(listBefore));
+
+        // Act - Delete middle transaction
+        var deleted = await sut.DeleteAsync(t2.Value.Id, CancellationToken.None);
+
+        // Assert
+        deleted.IsError.Should().BeFalse();
+
+        // Clear change tracker to get fresh data from database
+        _fixture.DbContext.ChangeTracker.Clear();
+        var transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user.Id)
+            .ToListAsync();
+        var chronological = ChronologicalForUser(transactions);
+        AssertCumulativeDeltaRule(chronological);
+
+        chronological.Should().HaveCount(2);
+        chronological[0].CumulativeDelta.Should().Be(100m);  // 0 + 100
+        chronological[1].CumulativeDelta.Should().Be(160m);  // 100 + 60 (middle transaction removed)
+    }
+
+    [Fact]
+    public async Task UpdateAsync_AmountOnly_AfterUpdate_RuleHeld()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day1 = DateOnly.FromDateTime(baseTime).AddDays(-25);
+        var day2 = day1.AddDays(1);
+        var day3 = day2.AddDays(1);
+
+        await sut.CreateAsync(NewTransaction(user.Id, 100m, day1, baseTime), CancellationToken.None);
+        var r2 = await sut.CreateAsync(NewTransaction(user.Id, -20m, day2, baseTime.AddSeconds(1)), CancellationToken.None);
+        await sut.CreateAsync(NewTransaction(user.Id, 50m, day3, baseTime.AddSeconds(2)), CancellationToken.None);
+
+        r2.IsError.Should().BeFalse();
+        var oldTransaction = r2.Value;
+
+        var list0 = await _fixture.DbContext.Transactions.Where(t =&gt; t.UserId == user.Id).ToListAsync();
+        AssertCumulativeDeltaRule(ChronologicalForUser(list0));
+
+        // Act - Update amount
+        var updatedTransaction = new Transaction(
+            userId: oldTransaction.UserId,
+            transactionType: oldTransaction.TransactionType,
+            amount: 35m,
+            date: oldTransaction.Date,
+            subject: oldTransaction.Subject,
+            paymentMethod: oldTransaction.PaymentMethod,
+            notes: oldTransaction.Notes,
+            categoryId: oldTransaction.CategoryId,
+            transactionGroupId: oldTransaction.TransactionGroupId,
+            createdAt: oldTransaction.CreatedAt,
+            updatedAt: DateTime.UtcNow
+        );
+        updatedTransaction.UpdateId(oldTransaction.Id);
+
+        var result = await sut.UpdateAsync(oldTransaction, updatedTransaction, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+
+        // Clear change tracker to get fresh data from database
+        _fixture.DbContext.ChangeTracker.Clear();
+        var transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user.Id)
+            .ToListAsync();
+        var chronological = ChronologicalForUser(transactions);
+        AssertCumulativeDeltaRule(chronological);
+
+        chronological[0].CumulativeDelta.Should().Be(100m);  // 0 + 100
+        chronological[1].CumulativeDelta.Should().Be(65m);   // 100 - 35 (updated from -20)
+        chronological[2].CumulativeDelta.Should().Be(115m);  // 65 + 50
+    }
+
+    [Fact]
+    public async Task UpdateAsync_DateOnly_AfterUpdate_RuleHeld()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day1 = DateOnly.FromDateTime(baseTime).AddDays(-30);
+        var day2 = day1.AddDays(1);
+        var day3 = day2.AddDays(1);
+        var day4 = day3.AddDays(1);
+
+        await sut.CreateAsync(NewTransaction(user.Id, 80m, day1, baseTime), CancellationToken.None);
+        var r2 = await sut.CreateAsync(NewTransaction(user.Id, -25m, day2, baseTime.AddSeconds(1)), CancellationToken.None);
+        await sut.CreateAsync(NewTransaction(user.Id, 40m, day3, baseTime.AddSeconds(2)), CancellationToken.None);
+
+        r2.IsError.Should().BeFalse();
+        var oldTransaction = r2.Value;
+
+        AssertCumulativeDeltaRule(ChronologicalForUser((await _fixture.DbContext.Transactions.Where(t =&gt; t.UserId == user.Id).ToListAsync())));
+
+        // Act - Update date
+        var updatedTransaction = new Transaction(
+            userId: oldTransaction.UserId,
+            transactionType: oldTransaction.TransactionType,
+            amount: oldTransaction.Amount,
+            date: day4,
+            subject: oldTransaction.Subject,
+            paymentMethod: oldTransaction.PaymentMethod,
+            notes: oldTransaction.Notes,
+            categoryId: oldTransaction.CategoryId,
+            transactionGroupId: oldTransaction.TransactionGroupId,
+            createdAt: oldTransaction.CreatedAt,
+            updatedAt: DateTime.UtcNow
+        );
+        updatedTransaction.UpdateId(oldTransaction.Id);
+
+        var updated = await sut.UpdateAsync(oldTransaction, updatedTransaction, CancellationToken.None);
+
+        // Assert
+        updated.IsError.Should().BeFalse();
+        // Clear change tracker to get fresh data from database
+        _fixture.DbContext.ChangeTracker.Clear();
+        AssertCumulativeDeltaRule(ChronologicalForUser((await _fixture.DbContext.Transactions.Where(t =&gt; t.UserId == user.Id).ToListAsync())));
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ExistingTransaction_ReturnsTransaction()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var transaction = NewTransaction(user.Id, 75.25m, DateOnly.FromDateTime(DateTime.UtcNow), DateTime.UtcNow);
+        var createResult = await sut.CreateAsync(transaction, CancellationToken.None);
+        var transactionId = createResult.Value.Id;
+
+        // Act
+        var result = await sut.GetByIdAsync(transactionId, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Should().NotBeNull();
+        result.Value.Id.Should().Be(transactionId);
+        result.Value.SignedAmount.Should().Be(75.25m);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_NonExistentTransaction_ReturnsError()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var nonExistentId = 99999;
+
+        // Act
+        var result = await sut.GetByIdAsync(nonExistentId, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Code.Should().Be(&quot;Transaction&quot;);
+    }
+
+    [Fact]
+    public async Task CreateAsync_SingleTransaction_FirstCumulativeEqualsSignedAmount()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day = DateOnly.FromDateTime(baseTime).AddDays(-2);
+        var transaction = NewTransaction(user.Id, 1000m, day, baseTime);
+
+        // Act
+        var created = await sut.CreateAsync(transaction, CancellationToken.None);
+
+        // Assert
+        created.IsError.Should().BeFalse();
+        created.Value.CumulativeDelta.Should().Be(1000m);
+        created.Value.SignedAmount.Should().Be(1000m);
+
+        var transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user.Id)
+            .ToListAsync();
+        AssertCumulativeDeltaRule(ChronologicalForUser(transactions));
+    }
+
+    [Fact]
+    public async Task CreateAsync_OnlyExpenses_NegativeCumulative_RuleHeld()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day1 = DateOnly.FromDateTime(baseTime).AddDays(-3);
+        var day2 = day1.AddDays(1);
+
+        // Act
+        await sut.CreateAsync(NewTransaction(user.Id, -100m, day1, baseTime), CancellationToken.None);
+        await sut.CreateAsync(NewTransaction(user.Id, -50m, day2, baseTime.AddSeconds(1)), CancellationToken.None);
+
+        // Assert
+        var transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user.Id)
+            .OrderBy(t =&gt; t.Date)
+            .ToListAsync();
+
+        AssertCumulativeDeltaRule(ChronologicalForUser(transactions));
+        transactions.First().CumulativeDelta.Should().Be(-100m);
+        transactions.Last().CumulativeDelta.Should().Be(-150m);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_NonExistentTransaction_ReturnsError()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var nonExistentId = 99999;
+
+        // Act
+        var result = await sut.DeleteAsync(nonExistentId, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Code.Should().Be(&quot;Transaction&quot;);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_DeleteFirstTransaction_RemainingRuleHeld()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day1 = DateOnly.FromDateTime(baseTime).AddDays(-12);
+        var day2 = day1.AddDays(1);
+        var day3 = day2.AddDays(1);
+
+        var r1 = await sut.CreateAsync(NewTransaction(user.Id, 80m, day1, baseTime), CancellationToken.None);
+        await sut.CreateAsync(NewTransaction(user.Id, -20m, day2, baseTime.AddSeconds(1)), CancellationToken.None);
+        await sut.CreateAsync(NewTransaction(user.Id, 10m, day3, baseTime.AddSeconds(2)), CancellationToken.None);
+
+        r1.IsError.Should().BeFalse();
+
+        // Act - Delete first transaction
+        var deleted = await sut.DeleteAsync(r1.Value.Id, CancellationToken.None);
+
+        // Assert
+        deleted.IsError.Should().BeFalse();
+
+        // Clear change tracker to get fresh data from database
+        _fixture.DbContext.ChangeTracker.Clear();
+        var transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user.Id)
+            .ToListAsync();
+
+        transactions.Should().HaveCount(2);
+        var chronological = ChronologicalForUser(transactions);
+        AssertCumulativeDeltaRule(chronological);
+
+        chronological[0].CumulativeDelta.Should().Be(-20m);  // First transaction now
+        chronological[1].CumulativeDelta.Should().Be(-10m);  // -20 + 10
+    }
+
+    [Fact]
+    public async Task DeleteAsync_DeleteLastTransaction_RemainingRuleHeld()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day1 = DateOnly.FromDateTime(baseTime).AddDays(-14);
+        var day2 = day1.AddDays(1);
+        var day3 = day2.AddDays(1);
+
+        await sut.CreateAsync(NewTransaction(user.Id, 60m, day1, baseTime), CancellationToken.None);
+        await sut.CreateAsync(NewTransaction(user.Id, -15m, day2, baseTime.AddSeconds(1)), CancellationToken.None);
+        var r3 = await sut.CreateAsync(NewTransaction(user.Id, 5m, day3, baseTime.AddSeconds(2)), CancellationToken.None);
+
+        r3.IsError.Should().BeFalse();
+
+        // Act - Delete last transaction
+        var deleted = await sut.DeleteAsync(r3.Value.Id, CancellationToken.None);
+
+        // Assert
+        deleted.IsError.Should().BeFalse();
+
+        var transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user.Id)
+            .ToListAsync();
+
+        transactions.Should().HaveCount(2);
+        var chronological = ChronologicalForUser(transactions);
+        AssertCumulativeDeltaRule(chronological);
+
+        chronological[0].CumulativeDelta.Should().Be(60m);
+        chronological[1].CumulativeDelta.Should().Be(45m);  // Last cumulative delta
+    }
+
+    [Fact]
+    public async Task CreateThenDeleteAll_UserHasZeroTransactions()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day = DateOnly.FromDateTime(baseTime).AddDays(-1);
+        var transaction = NewTransaction(user.Id, 99m, day, baseTime);
+
+        var created = await sut.CreateAsync(transaction, CancellationToken.None);
+        created.IsError.Should().BeFalse();
+
+        // Act
+        var deleted = await sut.DeleteAsync(created.Value.Id, CancellationToken.None);
+
+        // Assert
+        deleted.IsError.Should().BeFalse();
+
+        var transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user.Id)
+            .ToListAsync();
+
+        transactions.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithDifferentPaymentMethods_ShouldCreateSuccessfully()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day = DateOnly.FromDateTime(baseTime);
+
+        var paymentMethods = new[]
+        {
+            PaymentMethod.CASH,
+            PaymentMethod.CREDIT_CARD,
+            PaymentMethod.DEBIT_CARD,
+            PaymentMethod.BANK_TRANSFER,
+            PaymentMethod.MOBILE_PAYMENT,
+            PaymentMethod.OTHER
+        };
+
+        // Act &amp; Assert
+        foreach (var paymentMethod in paymentMethods)
+        {
+            var transaction = new Transaction(
+                userId: user.Id,
+                transactionType: TransactionType.INCOME,
+                amount: 10.00m,
+                date: day,
+                subject: $&quot;Test {paymentMethod}&quot;,
+                paymentMethod: paymentMethod
+            );
+
+            var result = await sut.CreateAsync(transaction, CancellationToken.None);
+
+            result.IsError.Should().BeFalse();
+            result.Value.PaymentMethod.Should().Be(paymentMethod);
+        }
+    }
+
+    [Fact]
+    public async Task CreateAsync_WithDifferentUsers_ShouldMaintainSeparateCumulativeDeltas()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user1 = await CreateTestUserAsync();
+        var user2 = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day = DateOnly.FromDateTime(baseTime);
+
+        // Act
+        var transaction1 = NewTransaction(user1.Id, 500.00m, day, baseTime);
+        var result1 = await sut.CreateAsync(transaction1, CancellationToken.None);
+
+        var transaction2 = NewTransaction(user2.Id, 300.00m, day, baseTime);
+        var result2 = await sut.CreateAsync(transaction2, CancellationToken.None);
+
+        // Assert
+        result1.IsError.Should().BeFalse();
+        result1.Value.CumulativeDelta.Should().Be(500.00m);
+
+        result2.IsError.Should().BeFalse();
+        result2.Value.CumulativeDelta.Should().Be(300.00m);
+
+        // Verify each user has their own transactions
+        var user1Transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user1.Id)
+            .ToListAsync();
+        user1Transactions.Should().HaveCount(1);
+
+        var user2Transactions = await _fixture.DbContext.Transactions
+            .Where(t =&gt; t.UserId == user2.Id)
+            .ToListAsync();
+        user2Transactions.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task Create_Update_Delete_Combine_RuleAlwaysHeld()
+    {
+        // Arrange
+        await _fixture.ResetDatabaseAsync();
+        var user = await CreateTestUserAsync();
+        var sut = new TransactionRepository(_fixture.DbContext);
+        var baseTime = DateTime.UtcNow;
+        var day1 = DateOnly.FromDateTime(baseTime).AddDays(-45);
+        var day2 = day1.AddDays(1);
+        var day3 = day2.AddDays(1);
+
+        var r1 = await sut.CreateAsync(NewTransaction(user.Id, 150m, day1, baseTime), CancellationToken.None);
+        var r2 = await sut.CreateAsync(NewTransaction(user.Id, -50m, day2, baseTime.AddSeconds(1)), CancellationToken.None);
+        var r3 = await sut.CreateAsync(NewTransaction(user.Id, 30m, day3, baseTime.AddSeconds(2)), CancellationToken.None);
+
+        r1.IsError.Should().BeFalse();
+        r2.IsError.Should().BeFalse();
+        r3.IsError.Should().BeFalse();
+
+        // Verify initial state
+        var transactions1 = await _fixture.DbContext.Transactions.Where(t =&gt; t.UserId == user.Id).ToListAsync();
+        AssertCumulativeDeltaRule(ChronologicalForUser(transactions1));
+
+        // Act - Update middle transaction
+        var oldTransaction = r2.Value;
+        var updatedTransaction = new Transaction(
+            userId: oldTransaction.UserId,
+            transactionType: oldTransaction.TransactionType,
+            amount: 40m,
+            date: oldTransaction.Date,
+            subject: oldTransaction.Subject,
+            paymentMethod: oldTransaction.PaymentMethod,
+            notes: oldTransaction.Notes,
+            categoryId: oldTransaction.CategoryId,
+            transactionGroupId: oldTransaction.TransactionGroupId,
+            createdAt: oldTransaction.CreatedAt,
+            updatedAt: DateTime.UtcNow
+        );
+        updatedTransaction.UpdateId(oldTransaction.Id);
+
+        var updateResult = await sut.UpdateAsync(oldTransaction, updatedTransaction, CancellationToken.None);
+        updateResult.IsError.Should().BeFalse();
+
+        // Clear change tracker to get fresh data from database
+        _fixture.DbContext.ChangeTracker.Clear();
+        var transactions2 = await _fixture.DbContext.Transactions.Where(t =&gt; t.UserId == user.Id).ToListAsync();
+        AssertCumulativeDeltaRule(ChronologicalForUser(transactions2));
+
+        // Act - Delete last transaction
+        var deleteResult = await sut.DeleteAsync(r3.Value.Id, CancellationToken.None);
+        deleteResult.IsError.Should().BeFalse();
+
+        // Clear change tracker to get fresh data from database
+        _fixture.DbContext.ChangeTracker.Clear();
+        var transactions3 = await _fixture.DbContext.Transactions.Where(t =&gt; t.UserId == user.Id).ToListAsync();
+        AssertCumulativeDeltaRule(ChronologicalForUser(transactions3));
+
+        // Act - Create new transaction
+        await sut.CreateAsync(NewTransaction(user.Id, 25m, day3.AddDays(1), baseTime.AddSeconds(3)), CancellationToken.None);
+
+        // Final verification
+        // Clear change tracker to get fresh data from database
+        _fixture.DbContext.ChangeTracker.Clear();
+        var transactionsFinal = await _fixture.DbContext.Transactions.Where(t =&gt; t.UserId == user.Id).ToListAsync();
+        AssertCumulativeDeltaRule(ChronologicalForUser(transactionsFinal));
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[14,5,14,63,1],[15,5,15,6,1],[16,9,16,28,1],[17,5,17,6,1],[24,5,24,6,1],[25,9,25,100,1],[26,9,26,40,1],[27,14,27,23,1],[27,25,27,48,1],[27,50,27,53,1],[28,9,28,10,1],[29,13,29,44,1],[30,13,30,80,1],[31,13,32,236,1],[33,13,33,58,1],[34,9,34,10,1],[35,5,35,6,1],[38,5,38,6,1],[39,9,40,27,1],[40,27,40,33,1],[40,33,41,26,1],[41,26,41,37,1],[41,37,42,23,1],[43,5,43,6,1],[46,5,46,6,1],[47,9,47,63,1],[48,9,53,11,1],[54,9,54,79,1],[55,9,55,38,1],[56,9,56,29,1],[57,5,57,6,1],[60,5,60,6,1],[61,9,61,45,1],[62,9,62,100,1],[64,9,76,11,1],[77,5,77,6,1],[81,5,81,6,1],[83,9,83,45,1],[84,9,84,48,1],[85,9,85,65,1],[86,9,86,40,1],[87,9,87,65,1],[88,9,88,36,1],[89,9,89,36,1],[91,9,91,64,1],[92,9,92,78,1],[93,9,93,77,1],[96,9,96,68,1],[97,9,97,68,1],[98,9,98,68,1],[101,9,101,39,1],[102,9,102,39,1],[103,9,103,39,1],[105,9,107,28,1],[108,9,108,64,1],[109,9,109,50,1],[112,9,112,60,1],[113,9,113,59,1],[114,9,114,60,1],[115,5,115,6,1],[119,5,119,6,1],[121,9,121,45,1],[122,9,122,48,1],[123,9,123,65,1],[124,9,124,74,1],[125,9,125,131,1],[127,9,127,67,1],[128,9,128,81,1],[129,9,129,81,1],[132,9,132,59,1],[133,9,133,59,1],[134,9,134,59,1],[137,9,137,56,1],[138,9,140,28,1],[141,9,141,64,1],[142,9,142,50,1],[144,9,144,60,1],[145,9,145,60,1],[146,9,146,60,1],[147,5,147,6,1],[151,5,151,6,1],[153,9,153,45,1],[154,9,154,48,1],[155,9,155,65,1],[156,9,156,40,1],[157,9,157,65,1],[158,9,158,36,1],[159,9,159,36,1],[161,9,161,111,1],[162,9,162,125,1],[163,9,163,124,1],[165,9,165,39,1],[166,9,166,39,1],[167,9,167,39,1],[170,9,170,110,1],[171,9,171,69,1],[174,9,174,82,1],[177,9,177,44,1],[180,9,180,50,1],[181,9,183,28,1],[184,9,184,64,1],[185,9,185,50,1],[187,9,187,45,1],[188,9,188,60,1],[189,9,189,60,1],[190,5,190,6,1],[194,5,194,6,1],[196,9,196,45,1],[197,9,197,48,1],[198,9,198,65,1],[199,9,199,40,1],[200,9,200,65,1],[201,9,201,36,1],[202,9,202,36,1],[204,9,204,102,1],[205,9,205,125,1],[206,9,206,115,1],[208,9,208,39,1],[209,9,209,39,1],[211,9,211,105,1],[212,9,212,64,1],[215,9,227,11,1],[228,9,228,56,1],[230,9,230,104,1],[233,9,233,43,1],[236,9,236,50,1],[237,9,239,28,1],[240,9,240,64,1],[241,9,241,50,1],[243,9,243,60,1],[244,9,244,59,1],[245,9,245,60,1],[246,5,246,6,1],[250,5,250,6,1],[252,9,252,45,1],[253,9,253,48,1],[254,9,254,65,1],[255,9,255,40,1],[256,9,256,65,1],[257,9,257,36,1],[258,9,258,36,1],[259,9,259,36,1],[261,9,261,101,1],[262,9,262,125,1],[263,9,263,115,1],[265,9,265,39,1],[266,9,266,39,1],[268,9,268,144,1],[271,9,283,11,1],[284,9,284,56,1],[286,9,286,105,1],[289,9,289,44,1],[291,9,291,50,1],[292,9,292,144,1],[293,5,293,6,1],[297,5,297,6,1],[299,9,299,45,1],[300,9,300,48,1],[301,9,301,65,1],[302,9,302,116,1],[303,9,303,87,1],[304,9,304,51,1],[307,9,307,84,1],[310,9,310,43,1],[311,9,311,43,1],[312,9,312,52,1],[313,9,313,55,1],[314,5,314,6,1],[318,5,318,6,1],[320,9,320,45,1],[321,9,321,65,1],[322,9,322,35,1],[325,9,325,84,1],[328,9,328,42,1],[329,9,329,59,1],[330,5,330,6,1],[334,5,334,6,1],[336,9,336,45,1],[337,9,337,48,1],[338,9,338,65,1],[339,9,339,40,1],[340,9,340,63,1],[341,9,341,73,1],[344,9,344,82,1],[347,9,347,44,1],[348,9,348,58,1],[349,9,349,55,1],[351,9,353,28,1],[354,9,354,71,1],[355,5,355,6,1],[359,5,359,6,1],[361,9,361,45,1],[362,9,362,48,1],[363,9,363,65,1],[364,9,364,40,1],[365,9,365,64,1],[366,9,366,36,1],[369,9,369,103,1],[370,9,370,116,1],[373,9,376,28,1],[378,9,378,71,1],[379,9,379,65,1],[380,9,380,64,1],[381,5,381,6,1],[385,5,385,6,1],[387,9,387,45,1],[388,9,388,65,1],[389,9,389,35,1],[392,9,392,83,1],[395,9,395,42,1],[396,9,396,59,1],[397,5,397,6,1],[401,5,401,6,1],[403,9,403,45,1],[404,9,404,48,1],[405,9,405,65,1],[406,9,406,40,1],[407,9,407,65,1],[408,9,408,36,1],[409,9,409,36,1],[411,9,411,110,1],[412,9,412,116,1],[413,9,413,115,1],[415,9,415,39,1],[418,9,418,82,1],[421,9,421,44,1],[424,9,424,50,1],[425,9,427,28,1],[429,9,429,44,1],[430,9,430,64,1],[431,9,431,50,1],[433,9,433,60,1],[434,9,434,60,1],[435,5,435,6,1],[439,5,439,6,1],[441,9,441,45,1],[442,9,442,48,1],[443,9,443,65,1],[444,9,444,40,1],[445,9,445,65,1],[446,9,446,36,1],[447,9,447,36,1],[449,9,449,101,1],[450,9,450,116,1],[451,9,451,123,1],[453,9,453,39,1],[456,9,456,82,1],[459,9,459,44,1],[461,9,463,28,1],[465,9,465,44,1],[466,9,466,64,1],[467,9,467,50,1],[469,9,469,59,1],[470,9,470,59,1],[471,5,471,6,1],[475,5,475,6,1],[477,9,477,45,1],[478,9,478,48,1],[479,9,479,65,1],[480,9,480,40,1],[481,9,481,63,1],[482,9,482,71,1],[484,9,484,82,1],[485,9,485,44,1],[488,9,488,87,1],[491,9,491,44,1],[493,9,495,28,1],[497,9,497,41,1],[498,5,498,6,1],[502,5,502,6,1],[504,9,504,45,1],[505,9,505,48,1],[506,9,506,65,1],[507,9,507,40,1],[508,9,508,51,1],[510,9,518,11,1],[521,9,521,16,1],[521,18,521,35,1],[521,36,521,38,1],[521,39,521,53,1],[522,9,522,10,1],[523,13,530,15,1],[532,13,532,85,1],[534,13,534,47,1],[535,13,535,67,1],[536,9,536,10,1],[537,5,537,6,1],[541,5,541,6,1],[543,9,543,45,1],[544,9,544,49,1],[545,9,545,49,1],[546,9,546,65,1],[547,9,547,40,1],[548,9,548,51,1],[551,9,551,77,1],[552,9,552,83,1],[554,9,554,77,1],[555,9,555,83,1],[558,9,558,44,1],[559,9,559,60,1],[561,9,561,44,1],[562,9,562,60,1],[565,9,567,28,1],[568,9,568,49,1],[570,9,572,28,1],[573,9,573,49,1],[574,5,574,6,1],[578,5,578,6,1],[580,9,580,45,1],[581,9,581,48,1],[582,9,582,65,1],[583,9,583,40,1],[584,9,584,65,1],[585,9,585,36,1],[586,9,586,36,1],[588,9,588,111,1],[589,9,589,125,1],[590,9,590,124,1],[592,9,592,39,1],[593,9,593,39,1],[594,9,594,39,1],[597,9,597,113,1],[598,9,598,72,1],[601,9,601,39,1],[602,9,614,11,1],[615,9,615,56,1],[617,9,617,110,1],[618,9,618,49,1],[621,9,621,50,1],[622,9,622,113,1],[623,9,623,72,1],[626,9,626,87,1],[627,9,627,49,1],[630,9,630,50,1],[631,9,631,113,1],[632,9,632,72,1],[635,9,635,126,1],[639,9,639,50,1],[640,9,640,117,1],[641,9,641,76,1],[642,5,642,6,1]]);
+    </script>
+  </body>
+</html>

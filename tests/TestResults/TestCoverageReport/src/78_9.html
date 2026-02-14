@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/Fixtures/ExpenseTrackerApiFactory.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ExpenseTrackerAPI.Infrastructure.Persistence;
+using ExpenseTrackerAPI.Infrastructure.Shared;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Testcontainers.PostgreSql;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+
+public class ExpenseTrackerApiFactory : WebApplicationFactory&lt;Program&gt;, IAsyncLifetime
+{
+    // Spins up a REAL Postgres 16 instance in Docker
+    private readonly PostgreSqlContainer _dbContainer = new PostgreSqlBuilder(&quot;postgres:16-alpine&quot;)
+        .WithDatabase(&quot;expense_tracker_test&quot;)
+        .Build();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureTestServices(services =&gt;
+        {
+            // Remove the production DB registration
+            var descriptor = services.SingleOrDefault(d =&gt;
+                d.ServiceType == typeof(DbContextOptions&lt;ApplicationDbContext&gt;));
+            if (descriptor != null)
+            {
+                services.Remove(descriptor);
+            }
+
+            // Connect the API to the REAL Postgres container
+            services.AddDbContext&lt;ApplicationDbContext&gt;(options =&gt;
+            {
+                options.UseNpgsql(_dbContainer.GetConnectionString());
+            });
+
+            // Override authentication for tests
+            services.AddAuthentication(options =&gt;
+                {
+                    options.DefaultAuthenticateScheme = TestAuthDefaults.AuthenticationScheme;
+                    options.DefaultChallengeScheme = TestAuthDefaults.AuthenticationScheme;
+                })
+                .AddScheme&lt;AuthenticationSchemeOptions, TestAuthHandler&gt;(TestAuthDefaults.AuthenticationScheme, _ =&gt; { });
+
+            services.AddAuthorization();
+        });
+    }
+
+    public async Task InitializeAsync()
+    {
+        await _dbContainer.StartAsync();
+
+        // Ensure the REAL DB schema is created before tests run
+        using var scope = Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        await context.Database.MigrateAsync();
+
+        // Seed users, categories, groups, and transactions
+        await DatabaseSeeder.SeedIfEmptyAsync(context);
+    }
+
+    public new async Task DisposeAsync() =&gt; await _dbContainer.StopAsync();
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[16,5,18,18,1],[21,5,21,6,1],[22,9,47,12,1],[48,5,48,6,1],[51,5,51,6,1],[52,9,52,41,1],[55,9,55,50,1],[56,9,56,88,1],[57,9,57,47,1],[60,9,60,56,1],[61,5,61,6,1],[63,45,63,75,1]]);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/src/ExpenseTrackerAPI.WebApi/Controllers/V1/UserController.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using Microsoft.AspNetCore.Mvc;
+using ExpenseTrackerAPI.Application.Users.Interfaces.Application;
+using ExpenseTrackerAPI.Contracts.Users;
+using Microsoft.AspNetCore.Authorization;
+
+using Asp.Versioning;
+
+namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
+
+/// &lt;summary&gt;
+/// User management endpoints for API version 1.0.
+/// &lt;/summary&gt;
+[ApiController]
+[Route(&quot;api/v{version:apiVersion}/users&quot;)]
+[ApiVersion(&quot;1.0&quot;)]
+[Authorize]
+public class UserController : ApiControllerBase
+{
+    private readonly IUserService _userService;
+    private readonly ILogger&lt;UserController&gt; _logger;
+
+    /// &lt;summary&gt;
+    /// Initializes a new instance of the UserController class.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;userService&quot;&gt;User service&lt;/param&gt;
+    /// &lt;param name=&quot;logger&quot;&gt;Logger instance&lt;/param&gt;
+    public UserController(
+        IUserService userService,
+        ILogger&lt;UserController&gt; logger)
+    {
+        _userService = userService ?? throw new ArgumentNullException(nameof(userService));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// &lt;summary&gt;
+    /// Update the authenticated user&#39;s profile information.
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;request&quot;&gt;User profile update details including current password for verification&lt;/param&gt;
+    /// &lt;param name=&quot;cancellationToken&quot;&gt;Cancellation token&lt;/param&gt;
+    /// &lt;returns&gt;Updated user profile information&lt;/returns&gt;
+    /// &lt;response code=&quot;200&quot;&gt;User profile updated successfully&lt;/response&gt;
+    /// &lt;response code=&quot;400&quot;&gt;Invalid request data or validation errors&lt;/response&gt;
+    /// &lt;response code=&quot;401&quot;&gt;User not authenticated or invalid current password&lt;/response&gt;
+    /// &lt;response code=&quot;409&quot;&gt;Email already exists for another user&lt;/response&gt;
+    [HttpPut(&quot;profile&quot;)]
+    [ProducesResponseType(typeof(UpdateUserResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task&lt;IActionResult&gt; UpdateProfile(
+        [FromBody] UpdateUserRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
+
+        var userId = GetRequiredUserId();
+        var result = await _userService.UpdateAsync(userId, request, cancellationToken);
+
+        if (result.IsError)
+        {
+            _logger.LogWarning(&quot;Failed to update profile for user {UserId}: {Errors}&quot;,
+                userId, string.Join(&quot;, &quot;, result.Errors.Select(e =&gt; e.Description)));
+            return Problem(result.Errors);
+        }
+
+        var response = result.Value;
+        return Ok(response);
+    }
+
+    /// &lt;summary&gt;
+    /// Delete the authenticated user&#39;s account (permanent deletion).
+    /// &lt;/summary&gt;
+    /// &lt;param name=&quot;request&quot;&gt;Delete request with current password verification and confirmation&lt;/param&gt;
+    /// &lt;param name=&quot;cancellationToken&quot;&gt;Cancellation token&lt;/param&gt;
+    /// &lt;returns&gt;Delete confirmation response&lt;/returns&gt;
+    /// &lt;response code=&quot;200&quot;&gt;User account deleted successfully&lt;/response&gt;
+    /// &lt;response code=&quot;400&quot;&gt;Invalid request data or validation errors&lt;/response&gt;
+    /// &lt;response code=&quot;401&quot;&gt;User not authenticated or invalid current password&lt;/response&gt;
+    [HttpDelete(&quot;profile&quot;)]
+    [ProducesResponseType(typeof(DeleteUserResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task&lt;IActionResult&gt; DeleteProfile(
+        [FromBody] DeleteUserRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
+
+        var userId = GetRequiredUserId();
+        var result = await _userService.DeleteAsync(userId, request, cancellationToken);
+
+        if (result.IsError)
+        {
+            _logger.LogWarning(&quot;Failed to delete account for user {UserId}: {Errors}&quot;,
+                userId, string.Join(&quot;, &quot;, result.Errors.Select(e =&gt; e.Description)));
+            return Problem(result.Errors);
+        }
+
+        var response = result.Value;
+        return Ok(response);
+    }
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[27,5,29,40,1],[30,5,30,6,1],[31,9,31,92,1],[32,9,32,77,1],[33,5,33,6,1],[53,5,53,6,1],[54,9,54,53,1],[55,9,55,40,1],[55,41,55,67,0],[57,9,57,42,1],[58,9,58,89,1],[60,9,60,28,1],[61,9,61,10,1],[62,13,63,69,1],[63,69,63,82,1],[63,82,63,86,1],[64,13,64,43,1],[67,9,67,37,1],[68,9,68,29,1],[69,5,69,6,1],[87,5,87,6,1],[88,9,88,53,1],[89,9,89,40,1],[89,41,89,67,0],[91,9,91,42,1],[92,9,92,89,1],[94,9,94,28,1],[95,9,95,10,1],[96,13,97,69,1],[97,69,97,82,1],[97,82,97,86,1],[98,13,98,43,1],[101,9,101,37,0],[102,9,102,29,0],[103,5,103,6,1]]);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.WebApi.Tests/E2E/Users/UserApiTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using System.Net;
+using System.Net.Http.Json;
+using ExpenseTrackerAPI.Contracts.Users;
+using ExpenseTrackerAPI.Infrastructure.Persistence;
+using ExpenseTrackerAPI.WebApi.Tests.Common;
+using ExpenseTrackerAPI.WebApi.Tests.Fixtures;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace ExpenseTrackerAPI.WebApi.Tests.E2E.Users;
+
+/// &lt;summary&gt;
+/// E2E tests for user profile management API endpoints.
+/// Tests profile update and deletion endpoints.
+///
+/// NOTE: These tests use the TestAuthHandler which authenticates all requests as user ID 1
+/// (the first seeded user &quot;John Doe&quot; with email &quot;john.doe@email.com&quot;).
+/// &lt;/summary&gt;
+public class UserApiTests : BaseE2ETest
+{
+    public UserApiTests(ExpenseTrackerApiFactory factory) : base(factory) { }
+
+    #region Update Profile Tests
+
+    [Fact]
+    public async Task UpdateProfile_WithValidData_ShouldUpdateUserSuccessfully()
+    {
+        // Arrange - Use seeded user (test auth handler authenticates as user ID 1)
+        // Get original user data first
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var originalUser = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+        originalUser.Should().NotBeNull();
+
+        var newName = $&quot;Updated Name {Guid.NewGuid().ToString(&quot;N&quot;)[..8]}&quot;;
+
+        // Act - Update profile (we keep the same email since it&#39;s the seeded user)
+        var updateRequest = new UpdateUserRequest(
+            Name: newName,
+            Email: originalUser!.Email, // Keep same email
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: 1000.00m);
+
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updateResponse = await response.Content.ReadFromJsonAsync&lt;UpdateUserResponse&gt;();
+        updateResponse.Should().NotBeNull();
+        updateResponse!.Name.Should().Be(newName);
+        updateResponse.Email.Should().Be(originalUser.Email);
+        updateResponse.InitialBalance.Should().Be(1000.00m);
+
+        // Restore original name for other tests
+        var restoreRequest = new UpdateUserRequest(
+            Name: originalUser.Name,
+            Email: originalUser.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: originalUser.InitialBalance);
+        await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, restoreRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithInvalidCurrentPassword_ShouldReturnUnauthorized()
+    {
+        // Arrange - Use seeded user
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+
+        var updateRequest = new UpdateUserRequest(
+            Name: &quot;New Name&quot;,
+            Email: user!.Email,
+            NewPassword: null,
+            CurrentPassword: &quot;WrongP@ssword123!&quot;, // Wrong password
+            InitialBalance: 0m);
+
+        // Act
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithNewPassword_ShouldUpdatePasswordSuccessfully()
+    {
+        // Arrange - Use seeded user
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+        var oldPassword = TestConstants.TestUsers.SeededUserPassword;
+        var newPassword = &quot;NewP@ssw0rd!123&quot;;
+
+        // Act - Update password
+        var updateRequest = new UpdateUserRequest(
+            Name: user!.Name,
+            Email: user.Email,
+            NewPassword: newPassword,
+            CurrentPassword: oldPassword,
+            InitialBalance: user.InitialBalance);
+
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Verify login with new password works
+        var loginRequest = new LoginRequest(user.Email, newPassword);
+        var loginResponse = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, loginRequest);
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Restore original password for other tests
+        var restoreRequest = new UpdateUserRequest(
+            Name: user.Name,
+            Email: user.Email,
+            NewPassword: oldPassword,
+            CurrentPassword: newPassword,
+            InitialBalance: user.InitialBalance);
+        await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, restoreRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithDuplicateEmail_ShouldReturnConflict()
+    {
+        // Arrange - Try to change to another seeded user&#39;s email
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var currentUser = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+        var otherUserEmail = TestConstants.TestUsers.SeededUser2Email;
+
+        var updateRequest = new UpdateUserRequest(
+            Name: currentUser!.Name,
+            Email: otherUserEmail, // Another user&#39;s email
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: currentUser.InitialBalance);
+
+        // Act
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Theory]
+    [InlineData(&quot;&quot;, &quot;email&quot;, false)] // Empty name
+    [InlineData(&quot;name&quot;, &quot;&quot;, false)] // Empty email
+    [InlineData(&quot;name&quot;, &quot;invalid-email&quot;, false)] // Invalid email format
+    public async Task UpdateProfile_WithInvalidData_ShouldReturnBadRequest(
+        string name, string email, bool useValidEmail)
+    {
+        // Arrange
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+
+        var updateRequest = new UpdateUserRequest(
+            Name: name,
+            Email: useValidEmail ? user!.Email : email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: 0m);
+
+        // Act
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithEmptyCurrentPassword_ShouldReturnBadRequest()
+    {
+        // Arrange
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+
+        var updateRequest = new UpdateUserRequest(
+            Name: user!.Name,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: &quot;&quot;, // Empty current password
+            InitialBalance: 0m);
+
+        // Act
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithWeakNewPassword_ShouldReturnBadRequest()
+    {
+        // Arrange
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+
+        var updateRequest = new UpdateUserRequest(
+            Name: user!.Name,
+            Email: user.Email,
+            NewPassword: &quot;weak&quot;, // Too weak
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: 0m);
+
+        // Act
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_OnlyName_ShouldKeepOtherFieldsUnchanged()
+    {
+        // Arrange
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+        var originalName = user!.Name;
+        var newName = $&quot;Only Name Changed {Guid.NewGuid().ToString(&quot;N&quot;)[..8]}&quot;;
+
+        // Act - Update only name
+        var updateRequest = new UpdateUserRequest(
+            Name: newName,
+            Email: user.Email,
+            NewPassword: null, // No password change
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: user.InitialBalance);
+
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updateResponse = await response.Content.ReadFromJsonAsync&lt;UpdateUserResponse&gt;();
+        updateResponse!.Name.Should().Be(newName);
+        updateResponse.Email.Should().Be(user.Email);
+
+        // Verify login still works with same password
+        var loginRequest = new LoginRequest(user.Email, TestConstants.TestUsers.SeededUserPassword);
+        var loginResponse = await Client.PostAsJsonAsync(TestConstants.Routes.AuthLogin, loginRequest);
+        loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Restore original name
+        var restoreRequest = new UpdateUserRequest(
+            Name: originalName,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: user.InitialBalance);
+        await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, restoreRequest);
+    }
+
+    #endregion
+
+    #region Delete Profile Tests
+
+    [Fact]
+    public async Task DeleteProfile_WithoutConfirmation_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var deleteRequest = new DeleteUserRequest(
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            ConfirmDeletion: false); // No confirmation
+
+        var request = new HttpRequestMessage(HttpMethod.Delete, TestConstants.Routes.UserProfile)
+        {
+            Content = JsonContent.Create(deleteRequest)
+        };
+
+        // Act
+        var response = await Client.SendAsync(request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task DeleteProfile_WithWrongPassword_ShouldReturnUnauthorized()
+    {
+        // Arrange
+        var deleteRequest = new DeleteUserRequest(
+            CurrentPassword: &quot;WrongP@ssw0rd!&quot;,
+            ConfirmDeletion: true);
+
+        var request = new HttpRequestMessage(HttpMethod.Delete, TestConstants.Routes.UserProfile)
+        {
+            Content = JsonContent.Create(deleteRequest)
+        };
+
+        // Act
+        var response = await Client.SendAsync(request);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    // Note: We don&#39;t test successful deletion of the seeded user as it would affect other tests
+    // E2E tests in UserWorkflows cover the full deletion flow with freshly registered users
+
+    #endregion
+
+    #region Edge Cases
+
+    [Fact]
+    public async Task UpdateProfile_WithSameEmail_ShouldSucceed()
+    {
+        // Arrange
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+        var originalName = user!.Name;
+        var newName = $&quot;Same Email User {Guid.NewGuid().ToString(&quot;N&quot;)[..8]}&quot;;
+
+        // Act - Update with same email (just changing name)
+        var updateRequest = new UpdateUserRequest(
+            Name: newName,
+            Email: user.Email, // Same email
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: user.InitialBalance);
+
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updateResponse = await response.Content.ReadFromJsonAsync&lt;UpdateUserResponse&gt;();
+        updateResponse!.Name.Should().Be(newName);
+        updateResponse.Email.Should().Be(user.Email);
+
+        // Restore original name
+        var restoreRequest = new UpdateUserRequest(
+            Name: originalName,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: user.InitialBalance);
+        await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, restoreRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithSpecialCharactersInName_ShouldSucceed()
+    {
+        // Arrange
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+        var originalName = user!.Name;
+
+        // Act
+        var specialName = &quot;Jos&#233; Mar&#237;a O&#39;Brien-Smith &#209;o&#241;o&quot;;
+        var updateRequest = new UpdateUserRequest(
+            Name: specialName,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: user.InitialBalance);
+
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updateResponse = await response.Content.ReadFromJsonAsync&lt;UpdateUserResponse&gt;();
+        updateResponse!.Name.Should().Be(specialName);
+
+        // Restore original name
+        var restoreRequest = new UpdateUserRequest(
+            Name: originalName,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: user.InitialBalance);
+        await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, restoreRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithMaxLengthName_ShouldSucceed()
+    {
+        // Arrange
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+        var originalName = user!.Name;
+
+        // Act
+        var maxLengthName = new string(&#39;A&#39;, 100);
+        var updateRequest = new UpdateUserRequest(
+            Name: maxLengthName,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: user.InitialBalance);
+
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updateResponse = await response.Content.ReadFromJsonAsync&lt;UpdateUserResponse&gt;();
+        updateResponse!.Name.Should().Be(maxLengthName);
+
+        // Restore original name
+        var restoreRequest = new UpdateUserRequest(
+            Name: originalName,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: user.InitialBalance);
+        await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, restoreRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_WithExceedingMaxLengthName_ShouldReturnBadRequest()
+    {
+        // Arrange
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+
+        // Act
+        var tooLongName = new string(&#39;A&#39;, 101);
+        var updateRequest = new UpdateUserRequest(
+            Name: tooLongName,
+            Email: user!.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: user.InitialBalance);
+
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_MultipleTimesSequentially_ShouldAllSucceed()
+    {
+        // Arrange
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+        var originalName = user!.Name;
+        var originalBalance = user.InitialBalance;
+
+        // Act &amp; Assert - Update multiple times
+        for (int i = 1; i &lt;= 5; i++)
+        {
+            var updateRequest = new UpdateUserRequest(
+                Name: $&quot;Update #{i}&quot;,
+                Email: user.Email,
+                NewPassword: null,
+                CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+                InitialBalance: i * 100.00m);
+
+            var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var updateResponse = await response.Content.ReadFromJsonAsync&lt;UpdateUserResponse&gt;();
+            updateResponse!.Name.Should().Be($&quot;Update #{i}&quot;);
+            updateResponse.InitialBalance.Should().Be(i * 100.00m);
+        }
+
+        // Restore original values
+        var restoreRequest = new UpdateUserRequest(
+            Name: originalName,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: originalBalance);
+        await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, restoreRequest);
+    }
+
+    [Fact]
+    public async Task UpdateProfile_UpdateInitialBalance_ShouldPersist()
+    {
+        // Arrange
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService&lt;ApplicationDbContext&gt;();
+        var user = await db.Users.FirstOrDefaultAsync(u =&gt; u.Id == TestAuthHandler.DefaultUserId);
+        var originalBalance = user!.InitialBalance;
+        var newBalance = 9999.99m;
+
+        // Act
+        var updateRequest = new UpdateUserRequest(
+            Name: user.Name,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: newBalance);
+
+        var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, updateRequest);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updateResponse = await response.Content.ReadFromJsonAsync&lt;UpdateUserResponse&gt;();
+        updateResponse!.InitialBalance.Should().Be(newBalance);
+
+        // Restore original balance
+        var restoreRequest = new UpdateUserRequest(
+            Name: user.Name,
+            Email: user.Email,
+            NewPassword: null,
+            CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
+            InitialBalance: originalBalance);
+        await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, restoreRequest);
+    }
+
+    #endregion
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[22,61,22,74,1],[22,75,22,76,1],[22,77,22,78,1],[28,5,28,6,1],[31,9,31,58,1],[32,9,32,83,1],[33,9,33,107,1],[34,9,34,43,1],[36,9,36,75,1],[39,9,44,39,1],[46,9,46,101,1],[49,9,49,60,1],[50,9,50,93,1],[51,9,51,45,1],[52,9,52,51,1],[53,9,53,62,1],[54,9,54,61,1],[57,9,62,58,1],[63,9,63,87,1],[64,5,64,6,1],[68,5,68,6,1],[70,9,70,58,1],[71,9,71,83,1],[72,9,72,99,1],[74,9,79,33,1],[82,9,82,101,1],[85,9,85,70,1],[86,5,86,6,1],[90,5,90,6,1],[92,9,92,58,1],[93,9,93,83,1],[94,9,94,99,1],[95,9,95,70,1],[96,9,96,45,1],[99,9,104,50,1],[106,9,106,101,1],[107,9,107,60,1],[110,9,110,70,1],[111,9,111,104,1],[112,9,112,65,1],[115,9,120,50,1],[121,9,121,87,1],[122,5,122,6,1],[126,5,126,6,1],[128,9,128,58,1],[129,9,129,83,1],[130,9,130,106,1],[131,9,131,71,1],[133,9,138,57,1],[141,9,141,101,1],[144,9,144,66,1],[145,5,145,6,1],[153,5,153,6,1],[155,9,155,58,1],[156,9,156,83,1],[157,9,157,99,1],[159,9,164,33,1],[167,9,167,101,1],[170,9,170,68,1],[171,5,171,6,1],[175,5,175,6,1],[177,9,177,58,1],[178,9,178,83,1],[179,9,179,99,1],[181,9,186,33,1],[189,9,189,101,1],[192,9,192,68,1],[193,5,193,6,1],[197,5,197,6,1],[199,9,199,58,1],[200,9,200,83,1],[201,9,201,99,1],[203,9,208,33,1],[211,9,211,101,1],[214,9,214,68,1],[215,5,215,6,1],[219,5,219,6,1],[221,9,221,58,1],[222,9,222,83,1],[223,9,223,99,1],[224,9,224,39,1],[225,9,225,80,1],[228,9,233,50,1],[235,9,235,101,1],[238,9,238,60,1],[239,9,239,93,1],[240,9,240,51,1],[241,9,241,54,1],[244,9,244,101,1],[245,9,245,104,1],[246,9,246,65,1],[249,9,254,50,1],[255,9,255,87,1],[256,5,256,6,1],[264,5,264,6,1],[266,9,268,37,1],[270,9,273,11,1],[276,9,276,56,1],[279,9,279,68,1],[280,5,280,6,1],[284,5,284,6,1],[286,9,288,36,1],[290,9,293,11,1],[296,9,296,56,1],[299,9,299,70,1],[300,5,300,6,1],[311,5,311,6,1],[313,9,313,58,1],[314,9,314,83,1],[315,9,315,99,1],[316,9,316,39,1],[317,9,317,78,1],[320,9,325,50,1],[327,9,327,101,1],[330,9,330,60,1],[331,9,331,93,1],[332,9,332,51,1],[333,9,333,54,1],[336,9,341,50,1],[342,9,342,87,1],[343,5,343,6,1],[347,5,347,6,1],[349,9,349,58,1],[350,9,350,83,1],[351,9,351,99,1],[352,9,352,39,1],[355,9,355,59,1],[356,9,361,50,1],[363,9,363,101,1],[366,9,366,60,1],[367,9,367,93,1],[368,9,368,55,1],[371,9,376,50,1],[377,9,377,87,1],[378,5,378,6,1],[382,5,382,6,1],[384,9,384,58,1],[385,9,385,83,1],[386,9,386,99,1],[387,9,387,39,1],[390,9,390,50,1],[391,9,396,50,1],[398,9,398,101,1],[401,9,401,60,1],[402,9,402,93,1],[403,9,403,57,1],[406,9,411,50,1],[412,9,412,87,1],[413,5,413,6,1],[417,5,417,6,1],[419,9,419,58,1],[420,9,420,83,1],[421,9,421,99,1],[424,9,424,48,1],[425,9,430,50,1],[432,9,432,101,1],[435,9,435,68,1],[436,5,436,6,1],[440,5,440,6,1],[442,9,442,58,1],[443,9,443,83,1],[444,9,444,99,1],[445,9,445,39,1],[446,9,446,51,1],[449,14,449,23,1],[449,25,449,31,1],[449,33,449,36,1],[450,9,450,10,1],[451,13,456,46,1],[458,13,458,105,1],[459,13,459,64,1],[461,13,461,97,1],[462,13,462,62,1],[463,13,463,68,1],[464,9,464,10,1],[467,9,472,46,1],[473,9,473,87,1],[474,5,474,6,1],[478,5,478,6,1],[480,9,480,58,1],[481,9,481,83,1],[482,9,482,99,1],[483,9,483,52,1],[484,9,484,35,1],[487,9,492,41,1],[494,9,494,101,1],[497,9,497,60,1],[498,9,498,93,1],[499,9,499,64,1],[502,9,507,46,1],[508,9,508,87,1],[509,5,509,6,1]]);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>/home/bax/Desktop/kodecta-academy/expense-tracker/tests/ExpenseTrackerAPI.Application.Tests/Users/UserServiceTests.cs</title>
+    <script type="text/javascript" src="../js/dotcover.sourceview.js"></script>
+    <link rel="stylesheet" type="text/css" href="../css/dotcover.report.css" />
+  </head>
+  <body>
+    <pre id="content" class="source-code">
+using ErrorOr;
+using ExpenseTrackerAPI.Application.Common.Interfaces;
+using ExpenseTrackerAPI.Application.Users;
+using ExpenseTrackerAPI.Application.Users.Interfaces.Infrastructure;
+using ExpenseTrackerAPI.Contracts.Users;
+using ExpenseTrackerAPI.Domain.Entities;
+using ExpenseTrackerAPI.Domain.Errors;
+using FluentAssertions;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Xunit;
+
+namespace ExpenseTrackerAPI.Application.Tests.Users;
+
+public class UserServiceTests
+{
+    private readonly Mock&lt;IUserRepository&gt; _mockUserRepository;
+    private readonly Mock&lt;IJwtTokenGenerator&gt; _mockJwtTokenGenerator;
+    private readonly UserService _userService;
+
+    public UserServiceTests()
+    {
+        _mockUserRepository = new Mock&lt;IUserRepository&gt;();
+        _mockJwtTokenGenerator = new Mock&lt;IJwtTokenGenerator&gt;();
+        _userService = new UserService(_mockUserRepository.Object, _mockJwtTokenGenerator.Object);
+    }
+
+    #region Constructor Tests
+
+    [Fact]
+    public void Constructor_WithNullUserRepository_ShouldThrowArgumentNullException()
+    {
+        // Act &amp; Assert
+        var act = () =&gt; new UserService(null!, _mockJwtTokenGenerator.Object);
+        act.Should().Throw&lt;ArgumentNullException&gt;()
+            .And.ParamName.Should().Be(&quot;userRepository&quot;);
+    }
+
+    [Fact]
+    public void Constructor_WithNullJwtTokenGenerator_ShouldThrowArgumentNullException()
+    {
+        // Act &amp; Assert
+        var act = () =&gt; new UserService(_mockUserRepository.Object, null!);
+        act.Should().Throw&lt;ArgumentNullException&gt;()
+            .And.ParamName.Should().Be(&quot;jwtTokenGenerator&quot;);
+    }
+
+    #endregion
+
+    #region RegisterAsync Tests
+
+    [Fact]
+    public async Task RegisterAsync_WithValidRequest_ShouldReturnSuccessResult()
+    {
+        // Arrange
+        var request = new RegisterRequest(
+            Name: &quot;John Doe&quot;,
+            Email: &quot;john.doe@example.com&quot;,
+            Password: &quot;Password123!&quot;,
+            InitialBalance: 1000m
+        );
+
+        var expectedUser = new User(&quot;John Doe&quot;, &quot;john.doe@example.com&quot;, &quot;hashedPassword&quot;, 1000m);
+        SetUserIdViaReflection(expectedUser, 1);
+
+        _mockUserRepository.Setup(x =&gt; x.CreateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(expectedUser);
+
+        // Act
+        var result = await _userService.RegisterAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Should().NotBeNull();
+        result.Value.Name.Should().Be(request.Name);
+        result.Value.Email.Should().Be(request.Email.ToLowerInvariant());
+        result.Value.InitialBalance.Should().Be(request.InitialBalance ?? 0);
+
+        _mockUserRepository.Verify(x =&gt; x.CreateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WithDefaultInitialBalance_ShouldUseZero()
+    {
+        // Arrange
+        var request = new RegisterRequest(
+            Name: &quot;John Doe&quot;,
+            Email: &quot;john.doe@example.com&quot;,
+            Password: &quot;Password123!&quot;,
+            InitialBalance: null
+        );
+
+        var expectedUser = new User(&quot;John Doe&quot;, &quot;john.doe@example.com&quot;, &quot;hashedPassword&quot;, 0m);
+        SetUserIdViaReflection(expectedUser, 1);
+
+        _mockUserRepository.Setup(x =&gt; x.CreateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(expectedUser);
+
+        // Act
+        var result = await _userService.RegisterAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.InitialBalance.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WithWeakPassword_ShouldSucceed()
+    {
+        // Arrange - weak password should succeed since there&#39;s no password complexity validation in service
+        var request = new RegisterRequest(
+            Name: &quot;John Doe&quot;,
+            Email: &quot;john.doe@example.com&quot;,
+            Password: &quot;weakpassword&quot;, // This will be hashed - no complexity validation in service
+            InitialBalance: 1000m
+        );
+
+        // Mock repository to return success when creating user
+        _mockUserRepository.Setup(x =&gt; x.CreateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync((User user, CancellationToken ct) =&gt; user);
+
+        // Act
+        var result = await _userService.RegisterAsync(request, CancellationToken.None);
+
+        // Assert - Since there&#39;s no password validation in service, this should succeed
+        // The User constructor doesn&#39;t validate password complexity, only that passwordHash isn&#39;t null/empty
+        result.IsError.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WithExistingEmail_ShouldReturnDuplicateEmailErrorFromRepository()
+    {
+        // Arrange
+        var request = new RegisterRequest(
+            Name: &quot;John Doe&quot;,
+            Email: &quot;existing@example.com&quot;,
+            Password: &quot;Password123!&quot;,
+            InitialBalance: 1000m
+        );
+
+        // Mock repository to return duplicate email error when creating user
+        _mockUserRepository.Setup(x =&gt; x.CreateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(UserErrors.DuplicateEmail);
+
+        // Act
+        var result = await _userService.RegisterAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(UserErrors.DuplicateEmail);
+
+        _mockUserRepository.Verify(x =&gt; x.CreateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WhenRepositoryCreateFails_ShouldReturnRepositoryError()
+    {
+        // Arrange
+        var request = CreateValidRegisterRequest();
+        var repositoryError = Error.Failure(&quot;Database.Error&quot;, &quot;Connection failed&quot;);
+
+        _mockUserRepository.Setup(x =&gt; x.CreateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(repositoryError);
+
+        // Act
+        var result = await _userService.RegisterAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(repositoryError);
+    }
+
+    // This test is now covered by RegisterAsync_WhenRepositoryCreateFails_ShouldReturnRepositoryError above
+
+    [Fact]
+    public async Task RegisterAsync_WithInvalidEmailInDomain_ShouldReturnInvalidEmailError()
+    {
+        // Arrange
+        var request = new RegisterRequest(
+            Name: &quot;John Doe&quot;,
+            Email: &quot;invalid-email&quot;, // This will fail domain validation in User constructor
+            Password: &quot;Password123!&quot;,
+            InitialBalance: 1000m
+        );
+
+        // Act
+        var result = await _userService.RegisterAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Type.Should().Be(ErrorType.Failure);
+        result.FirstError.Code.Should().Be(&quot;Registration&quot;);
+        result.FirstError.Description.Should().Contain(&quot;Email format is invalid&quot;);
+    }
+
+    #endregion
+
+    #region LoginAsync Tests
+
+    [Fact]
+    public async Task LoginAsync_WithValidCredentials_ShouldReturnSuccessResult()
+    {
+        // Arrange
+        var request = new LoginRequest(&quot;john.doe@example.com&quot;, &quot;Password123!&quot;);
+        var user = CreateValidUser();
+        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(&quot;Password123!&quot;);
+        user.UpdatePassword(hashedPassword);
+
+        var expectedToken = &quot;jwt.token.here&quot;;
+        var expectedExpirationHours = 24;
+
+        _mockUserRepository.Setup(x =&gt; x.GetByEmailAsync(request.Email, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(user);
+
+        _mockJwtTokenGenerator.Setup(x =&gt; x.GenerateToken(user.Id, user.Email, user.Name))
+            .Returns(expectedToken);
+
+        _mockJwtTokenGenerator.Setup(x =&gt; x.TokenExpirationHours)
+            .Returns(expectedExpirationHours);
+
+        // Act
+        var result = await _userService.LoginAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Should().NotBeNull();
+        result.Value.Id.Should().Be(user.Id);
+        result.Value.Email.Should().Be(user.Email);
+        result.Value.Token.Should().Be(expectedToken);
+        result.Value.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddHours(expectedExpirationHours), TimeSpan.FromMinutes(1));
+
+        _mockUserRepository.Verify(x =&gt; x.GetByEmailAsync(request.Email, It.IsAny&lt;CancellationToken&gt;()), Times.Once);
+        _mockJwtTokenGenerator.Verify(x =&gt; x.GenerateToken(user.Id, user.Email, user.Name), Times.Once);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WithNonExistentUser_ShouldReturnInvalidCredentialsError()
+    {
+        // Arrange
+        var request = new LoginRequest(&quot;nonexistent@example.com&quot;, &quot;Password123!&quot;);
+
+        _mockUserRepository.Setup(x =&gt; x.GetByEmailAsync(request.Email, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(UserErrors.NotFound);
+
+        // Act
+        var result = await _userService.LoginAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(UserErrors.InvalidCredentials);
+
+        _mockJwtTokenGenerator.Verify(x =&gt; x.GenerateToken(It.IsAny&lt;int&gt;(), It.IsAny&lt;string&gt;(), It.IsAny&lt;string&gt;()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WithInvalidPassword_ShouldReturnInvalidCredentialsError()
+    {
+        // Arrange
+        var request = new LoginRequest(&quot;john.doe@example.com&quot;, &quot;WrongPassword!&quot;);
+        var user = CreateValidUser();
+        var correctHashedPassword = BCrypt.Net.BCrypt.HashPassword(&quot;CorrectPassword123!&quot;);
+        user.UpdatePassword(correctHashedPassword);
+
+        _mockUserRepository.Setup(x =&gt; x.GetByEmailAsync(request.Email, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(user);
+
+        // Act
+        var result = await _userService.LoginAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(UserErrors.InvalidCredentials);
+
+        _mockJwtTokenGenerator.Verify(x =&gt; x.GenerateToken(It.IsAny&lt;int&gt;(), It.IsAny&lt;string&gt;(), It.IsAny&lt;string&gt;()), Times.Never);
+    }
+
+    #endregion
+
+    #region UpdateAsync Tests
+
+    [Fact]
+    public async Task UpdateAsync_WithValidRequest_ShouldReturnSuccessResult()
+    {
+        // Arrange
+        var userId = 1;
+        var currentPassword = &quot;CurrentPassword123!&quot;;
+        var hashedCurrentPassword = BCrypt.Net.BCrypt.HashPassword(currentPassword);
+
+        var request = new UpdateUserRequest(
+            Name: &quot;Updated Name&quot;,
+            Email: &quot;updated@example.com&quot;,
+            NewPassword: &quot;NewPassword123!&quot;,
+            CurrentPassword: currentPassword,
+            InitialBalance: 2000m
+        );
+
+        var existingUser = CreateValidUser();
+        existingUser.UpdatePassword(hashedCurrentPassword);
+
+        _mockUserRepository.Setup(x =&gt; x.GetByIdAsync(userId, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(existingUser);
+
+        _mockUserRepository.Setup(x =&gt; x.ExistsByEmailAsync(request.Email, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(false);
+
+        _mockUserRepository.Setup(x =&gt; x.UpdateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync((User user, CancellationToken ct) =&gt; user);
+
+        // Act
+        var result = await _userService.UpdateAsync(userId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Name.Should().Be(request.Name);
+        result.Value.Email.Should().Be(request.Email.ToLowerInvariant());
+        result.Value.InitialBalance.Should().Be(request.InitialBalance);
+
+        _mockUserRepository.Verify(x =&gt; x.GetByIdAsync(userId, It.IsAny&lt;CancellationToken&gt;()), Times.Once);
+        _mockUserRepository.Verify(x =&gt; x.ExistsByEmailAsync(request.Email, It.IsAny&lt;CancellationToken&gt;()), Times.Once);
+        _mockUserRepository.Verify(x =&gt; x.UpdateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithSameEmail_ShouldNotCheckEmailExistence()
+    {
+        // Arrange
+        var userId = 1;
+        var currentPassword = &quot;CurrentPassword123!&quot;;
+        var hashedCurrentPassword = BCrypt.Net.BCrypt.HashPassword(currentPassword);
+        var currentEmail = &quot;john.doe@example.com&quot;;
+
+        var request = new UpdateUserRequest(
+            Name: &quot;Updated Name&quot;,
+            Email: currentEmail, // Same email
+            NewPassword: null,
+            CurrentPassword: currentPassword,
+            InitialBalance: 2000m
+        );
+
+        var existingUser = CreateValidUser();
+        existingUser.UpdatePassword(hashedCurrentPassword);
+
+        _mockUserRepository.Setup(x =&gt; x.GetByIdAsync(userId, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(existingUser);
+
+        _mockUserRepository.Setup(x =&gt; x.UpdateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync((User user, CancellationToken ct) =&gt; user);
+
+        // Act
+        var result = await _userService.UpdateAsync(userId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+
+        _mockUserRepository.Verify(x =&gt; x.ExistsByEmailAsync(It.IsAny&lt;string&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithInvalidUserId_ShouldReturnInvalidUserIdError()
+    {
+        // Arrange
+        var invalidUserId = -1;
+        var request = CreateValidUpdateRequest();
+
+        // Act
+        var result = await _userService.UpdateAsync(invalidUserId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(UserErrors.InvalidUserId);
+
+        _mockUserRepository.Verify(x =&gt; x.GetByIdAsync(It.IsAny&lt;int&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithNonExistentUser_ShouldReturnNotFoundError()
+    {
+        // Arrange
+        var userId = 999;
+        var request = CreateValidUpdateRequest();
+
+        _mockUserRepository.Setup(x =&gt; x.GetByIdAsync(userId, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(UserErrors.NotFound);
+
+        // Act
+        var result = await _userService.UpdateAsync(userId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(UserErrors.NotFound);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithIncorrectCurrentPassword_ShouldReturnInvalidCredentialsError()
+    {
+        // Arrange
+        var userId = 1;
+        var correctPassword = &quot;CorrectPassword123!&quot;;
+        var incorrectPassword = &quot;WrongPassword123!&quot;;
+        var hashedCorrectPassword = BCrypt.Net.BCrypt.HashPassword(correctPassword);
+
+        var request = new UpdateUserRequest(
+            Name: &quot;Updated Name&quot;,
+            Email: &quot;updated@example.com&quot;,
+            NewPassword: null,
+            CurrentPassword: incorrectPassword,
+            InitialBalance: 2000m
+        );
+
+        var existingUser = CreateValidUser();
+        existingUser.UpdatePassword(hashedCorrectPassword);
+
+        _mockUserRepository.Setup(x =&gt; x.GetByIdAsync(userId, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(existingUser);
+
+        // Act
+        var result = await _userService.UpdateAsync(userId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(UserErrors.InvalidCredentials);
+
+        _mockUserRepository.Verify(x =&gt; x.UpdateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithExistingEmail_ShouldReturnDuplicateEmailError()
+    {
+        // Arrange
+        var userId = 1;
+        var currentPassword = &quot;CurrentPassword123!&quot;;
+        var hashedCurrentPassword = BCrypt.Net.BCrypt.HashPassword(currentPassword);
+
+        var request = new UpdateUserRequest(
+            Name: &quot;Updated Name&quot;,
+            Email: &quot;existing@example.com&quot;,
+            NewPassword: null,
+            CurrentPassword: currentPassword,
+            InitialBalance: 2000m
+        );
+
+        var existingUser = CreateValidUser();
+        existingUser.UpdatePassword(hashedCurrentPassword);
+
+        _mockUserRepository.Setup(x =&gt; x.GetByIdAsync(userId, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(existingUser);
+
+        _mockUserRepository.Setup(x =&gt; x.ExistsByEmailAsync(request.Email, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await _userService.UpdateAsync(userId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(UserErrors.DuplicateEmail);
+
+        _mockUserRepository.Verify(x =&gt; x.UpdateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_WithWeakNewPassword_ShouldReturnWeakPasswordError()
+    {
+        // Arrange
+        var userId = 1;
+        var currentPassword = &quot;CurrentPassword123!&quot;;
+        var hashedCurrentPassword = BCrypt.Net.BCrypt.HashPassword(currentPassword);
+
+        var request = new UpdateUserRequest(
+            Name: &quot;Updated Name&quot;,
+            Email: &quot;updated@example.com&quot;,
+            NewPassword: &quot;weakpassword&quot;, // Weak password
+            CurrentPassword: currentPassword,
+            InitialBalance: 2000m
+        );
+
+        var existingUser = CreateValidUser();
+        existingUser.UpdatePassword(hashedCurrentPassword);
+
+        _mockUserRepository.Setup(x =&gt; x.GetByIdAsync(userId, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(existingUser);
+
+        _mockUserRepository.Setup(x =&gt; x.ExistsByEmailAsync(request.Email, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(false);
+
+        // Act
+        var result = await _userService.UpdateAsync(userId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(UserErrors.WeakPassword);
+
+        _mockUserRepository.Verify(x =&gt; x.UpdateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Never);
+    }
+
+    #endregion
+
+    #region DeleteAsync Tests
+
+    [Fact]
+    public async Task DeleteAsync_WithValidRequest_ShouldReturnSuccessResult()
+    {
+        // Arrange
+        var userId = 1;
+        var currentPassword = &quot;CurrentPassword123!&quot;;
+        var hashedCurrentPassword = BCrypt.Net.BCrypt.HashPassword(currentPassword);
+
+        var request = new DeleteUserRequest(
+            CurrentPassword: currentPassword,
+            ConfirmDeletion: true
+        );
+
+        var existingUser = CreateValidUser();
+        existingUser.UpdatePassword(hashedCurrentPassword);
+
+        _mockUserRepository.Setup(x =&gt; x.GetByIdAsync(userId, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(existingUser);
+
+        _mockUserRepository.Setup(x =&gt; x.DeleteAsync(userId, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(Result.Deleted);
+
+        // Act
+        var result = await _userService.DeleteAsync(userId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+        result.Value.Id.Should().Be(existingUser.Id);
+        result.Value.Name.Should().Be(existingUser.Name);
+        result.Value.Email.Should().Be(existingUser.Email);
+        result.Value.Message.Should().Be(&quot;User account has been permanently deleted.&quot;);
+
+        _mockUserRepository.Verify(x =&gt; x.DeleteAsync(userId, It.IsAny&lt;CancellationToken&gt;()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithInvalidUserId_ShouldReturnInvalidUserIdError()
+    {
+        // Arrange
+        var invalidUserId = -1;
+        var request = new DeleteUserRequest(&quot;Password123!&quot;, true);
+
+        // Act
+        var result = await _userService.DeleteAsync(invalidUserId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(UserErrors.InvalidUserId);
+
+        _mockUserRepository.Verify(x =&gt; x.GetByIdAsync(It.IsAny&lt;int&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithoutConfirmation_ShouldReturnValidationError()
+    {
+        // Arrange
+        var userId = 1;
+        var request = new DeleteUserRequest(&quot;Password123!&quot;, false); // Not confirmed
+
+        // Act
+        var result = await _userService.DeleteAsync(userId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Type.Should().Be(ErrorType.Validation);
+        result.FirstError.Description.Should().Contain(&quot;Deletion must be confirmed&quot;);
+
+        _mockUserRepository.Verify(x =&gt; x.GetByIdAsync(It.IsAny&lt;int&gt;(), It.IsAny&lt;CancellationToken&gt;()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithEmptyPassword_ShouldReturnPasswordRequiredError()
+    {
+        // Arrange
+        var userId = 1;
+        var request = new DeleteUserRequest(&quot;&quot;, true);
+
+        // Act
+        var result = await _userService.DeleteAsync(userId, request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Should().Be(UserErrors.PasswordRequired);
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    private static RegisterRequest CreateValidRegisterRequest()
+    {
+        return new RegisterRequest(
+            Name: &quot;John Doe&quot;,
+            Email: &quot;john.doe@example.com&quot;,
+            Password: &quot;Password123!&quot;,
+            InitialBalance: 1000m
+        );
+    }
+
+    private static UpdateUserRequest CreateValidUpdateRequest()
+    {
+        return new UpdateUserRequest(
+            Name: &quot;Updated Name&quot;,
+            Email: &quot;updated@example.com&quot;,
+            NewPassword: &quot;NewPassword123!&quot;,
+            CurrentPassword: &quot;CurrentPassword123!&quot;,
+            InitialBalance: 2000m
+        );
+    }
+
+    private static User CreateValidUser()
+    {
+        var user = new User(
+            name: &quot;John Doe&quot;,
+            email: &quot;john.doe@example.com&quot;,
+            passwordHash: &quot;hashedPassword123&quot;,
+            initialBalance: 1000m
+        );
+
+        SetUserIdViaReflection(user, 1);
+        return user;
+    }
+
+    private static void SetUserIdViaReflection(User user, int id)
+    {
+        var idProperty = typeof(User).GetProperty(&quot;Id&quot;);
+        idProperty?.SetValue(user, id);
+    }
+
+    #endregion
+
+    #region Password Complexity Tests
+
+    [Theory]
+    [InlineData(&quot;Password123!&quot;)] // Valid
+    [InlineData(&quot;MyStr0ng!Pass&quot;)] // Valid
+    [InlineData(&quot;Complex1@Password&quot;)] // Valid
+    public async Task RegisterAsync_WithValidPasswordComplexity_ShouldSucceed(string validPassword)
+    {
+        // Arrange
+        var request = new RegisterRequest(
+            Name: &quot;John Doe&quot;,
+            Email: &quot;john.doe@example.com&quot;,
+            Password: validPassword,
+            InitialBalance: 1000m
+        );
+
+        var expectedUser = new User(&quot;John Doe&quot;, &quot;john.doe@example.com&quot;, &quot;hashedPassword&quot;, 1000m);
+        SetUserIdViaReflection(expectedUser, 1);
+
+        _mockUserRepository.Setup(x =&gt; x.CreateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(expectedUser);
+
+        // Act
+        var result = await _userService.RegisterAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(&quot;password123!&quot;)] // Any password will be hashed
+    [InlineData(&quot;PASSWORD123!&quot;)] // Any password will be hashed
+    [InlineData(&quot;Password!&quot;)] // Any password will be hashed
+    [InlineData(&quot;Password123&quot;)] // Any password will be hashed
+    [InlineData(&quot;Pass123!&quot;)] // Any password will be hashed
+    public async Task RegisterAsync_WithAnyPassword_ShouldHashAndSucceed(string password)
+    {
+        // Arrange
+        var request = new RegisterRequest(
+            Name: &quot;John Doe&quot;,
+            Email: &quot;john.doe@example.com&quot;,
+            Password: password,
+            InitialBalance: 1000m
+        );
+
+        var expectedUser = new User(&quot;John Doe&quot;, &quot;john.doe@example.com&quot;, &quot;hashedPassword&quot;, 1000m);
+        SetUserIdViaReflection(expectedUser, 1);
+
+        _mockUserRepository.Setup(x =&gt; x.CreateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(expectedUser);
+
+        // Act
+        var result = await _userService.RegisterAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeFalse(); // Service doesn&#39;t validate password complexity
+    }
+
+    #endregion
+
+    #region Exception Handling Tests
+
+    [Fact]
+    public async Task RegisterAsync_WhenExceptionThrown_ShouldReturnFailureError()
+    {
+        // Arrange
+        var request = CreateValidRegisterRequest();
+
+        _mockUserRepository.Setup(x =&gt; x.ExistsByEmailAsync(request.Email, It.IsAny&lt;CancellationToken&gt;()))
+            .ReturnsAsync(false);
+
+        _mockUserRepository.Setup(x =&gt; x.CreateAsync(It.IsAny&lt;User&gt;(), It.IsAny&lt;CancellationToken&gt;()))
+            .ThrowsAsync(new InvalidOperationException(&quot;Database connection failed&quot;));
+
+        // Act
+        var result = await _userService.RegisterAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Type.Should().Be(ErrorType.Failure);
+        result.FirstError.Code.Should().Be(&quot;Registration&quot;);
+        result.FirstError.Description.Should().Contain(&quot;Database connection failed&quot;);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WhenExceptionThrown_ShouldReturnFailureError()
+    {
+        // Arrange
+        var request = new LoginRequest(&quot;test@example.com&quot;, &quot;Password123!&quot;);
+
+        _mockUserRepository.Setup(x =&gt; x.GetByEmailAsync(request.Email, It.IsAny&lt;CancellationToken&gt;()))
+            .ThrowsAsync(new TimeoutException(&quot;Database timeout&quot;));
+
+        // Act
+        var result = await _userService.LoginAsync(request, CancellationToken.None);
+
+        // Assert
+        result.IsError.Should().BeTrue();
+        result.FirstError.Type.Should().Be(ErrorType.Failure);
+        result.FirstError.Code.Should().Be(&quot;Login&quot;);
+        result.FirstError.Description.Should().Contain(&quot;Database timeout&quot;);
+    }
+
+    #endregion
+}
+
+    </pre>
+    <script type="text/javascript">
+      highlightRanges([[21,5,21,30,1],[22,5,22,6,1],[23,9,23,59,1],[24,9,24,65,1],[25,9,25,99,1],[26,5,26,6,1],[32,5,32,6,1],[34,9,34,79,1],[35,9,36,58,1],[37,5,37,6,1],[41,5,41,6,1],[43,9,43,76,1],[44,9,45,61,1],[46,5,46,6,1],[54,5,54,6,1],[56,9,61,11,1],[63,9,63,98,1],[64,9,64,49,1],[66,9,67,41,1],[70,9,70,88,1],[73,9,73,43,1],[74,9,74,43,1],[75,9,75,53,1],[76,9,76,74,1],[77,9,77,78,1],[79,9,79,117,1],[80,5,80,6,1],[84,5,84,6,1],[86,9,91,11,1],[93,9,93,95,1],[94,9,94,49,1],[96,9,97,41,1],[100,9,100,88,1],[103,9,103,43,1],[104,9,104,53,1],[105,5,105,6,1],[109,5,109,6,1],[111,9,116,11,1],[119,9,120,64,1],[120,64,120,68,1],[120,68,120,70,1],[123,9,123,88,1],[127,9,127,43,1],[128,5,128,6,1],[132,5,132,6,1],[134,9,139,11,1],[142,9,143,54,1],[146,9,146,88,1],[149,9,149,42,1],[150,9,150,66,1],[152,9,152,117,1],[153,5,153,6,1],[157,5,157,6,1],[159,9,159,52,1],[160,9,160,84,1],[162,9,163,44,1],[166,9,166,88,1],[169,9,169,42,1],[170,9,170,56,1],[171,5,171,6,1],[177,5,177,6,1],[179,9,184,11,1],[187,9,187,88,1],[190,9,190,42,1],[191,9,191,63,1],[192,9,192,60,1],[193,9,193,83,1],[194,5,194,6,1],[202,5,202,6,1],[204,9,204,80,1],[205,9,205,38,1],[206,9,206,77,1],[207,9,207,45,1],[209,9,209,46,1],[210,9,210,42,1],[212,9,213,33,1],[215,9,216,37,1],[218,9,219,47,1],[222,9,222,85,1],[225,9,225,43,1],[226,9,226,43,1],[227,9,227,46,1],[228,9,228,52,1],[229,9,229,55,1],[230,9,230,127,1],[232,9,232,118,1],[233,9,233,105,1],[234,5,234,6,1],[238,5,238,6,1],[240,9,240,83,1],[242,9,243,48,1],[246,9,246,85,1],[249,9,249,42,1],[250,9,250,70,1],[252,9,252,131,1],[253,5,253,6,1],[257,5,257,6,1],[259,9,259,82,1],[260,9,260,38,1],[261,9,261,91,1],[262,9,262,52,1],[264,9,265,33,1],[268,9,268,85,1],[271,9,271,42,1],[272,9,272,70,1],[274,9,274,131,1],[275,5,275,6,1],[283,5,283,6,1],[285,9,285,24,1],[286,9,286,53,1],[287,9,287,85,1],[289,9,295,11,1],[297,9,297,46,1],[298,9,298,60,1],[300,9,301,41,1],[303,9,304,34,1],[306,9,307,64,1],[307,64,307,68,1],[307,68,307,70,1],[310,9,310,94,1],[313,9,313,43,1],[314,9,314,53,1],[315,9,315,74,1],[316,9,316,73,1],[318,9,318,108,1],[319,9,319,121,1],[320,9,320,117,1],[321,5,321,6,1],[325,5,325,6,1],[327,9,327,24,1],[328,9,328,53,1],[329,9,329,85,1],[330,9,330,51,1],[332,9,338,11,1],[340,9,340,46,1],[341,9,341,60,1],[343,9,344,41,1],[346,9,347,64,1],[347,64,347,68,1],[347,68,347,70,1],[350,9,350,94,1],[353,9,353,43,1],[355,9,355,127,1],[356,5,356,6,1],[360,5,360,6,1],[362,9,362,32,1],[363,9,363,50,1],[366,9,366,101,1],[369,9,369,42,1],[370,9,370,65,1],[372,9,372,118,1],[373,5,373,6,1],[377,5,377,6,1],[379,9,379,26,1],[380,9,380,50,1],[382,9,383,48,1],[386,9,386,94,1],[389,9,389,42,1],[390,9,390,60,1],[391,5,391,6,1],[395,5,395,6,1],[397,9,397,24,1],[398,9,398,53,1],[399,9,399,53,1],[400,9,400,85,1],[402,9,408,11,1],[410,9,410,46,1],[411,9,411,60,1],[413,9,414,41,1],[417,9,417,94,1],[420,9,420,42,1],[421,9,421,70,1],[423,9,423,118,1],[424,5,424,6,1],[428,5,428,6,1],[430,9,430,24,1],[431,9,431,53,1],[432,9,432,85,1],[434,9,440,11,1],[442,9,442,46,1],[443,9,443,60,1],[445,9,446,41,1],[448,9,449,33,1],[452,9,452,94,1],[455,9,455,42,1],[456,9,456,66,1],[458,9,458,118,1],[459,5,459,6,1],[463,5,463,6,1],[465,9,465,24,1],[466,9,466,53,1],[467,9,467,85,1],[469,9,475,11,1],[477,9,477,46,1],[478,9,478,60,1],[480,9,481,41,1],[483,9,484,34,1],[487,9,487,94,1],[490,9,490,42,1],[491,9,491,64,1],[493,9,493,118,1],[494,5,494,6,1],[502,5,502,6,1],[504,9,504,24,1],[505,9,505,53,1],[506,9,506,85,1],[508,9,511,11,1],[513,9,513,46,1],[514,9,514,60,1],[516,9,517,41,1],[519,9,520,43,1],[523,9,523,94,1],[526,9,526,43,1],[527,9,527,54,1],[528,9,528,58,1],[529,9,529,60,1],[530,9,530,88,1],[532,9,532,107,1],[533,5,533,6,1],[537,5,537,6,1],[539,9,539,32,1],[540,9,540,67,1],[543,9,543,101,1],[546,9,546,42,1],[547,9,547,65,1],[549,9,549,118,1],[550,5,550,6,1],[554,5,554,6,1],[556,9,556,24,1],[557,9,557,68,1],[560,9,560,94,1],[563,9,563,42,1],[564,9,564,66,1],[565,9,565,86,1],[567,9,567,118,1],[568,5,568,6,1],[572,5,572,6,1],[574,9,574,24,1],[575,9,575,55,1],[578,9,578,94,1],[581,9,581,42,1],[582,9,582,68,1],[583,5,583,6,1],[590,5,590,6,1],[591,9,596,11,1],[597,5,597,6,1],[600,5,600,6,1],[601,9,607,11,1],[608,5,608,6,1],[611,5,611,6,1],[612,9,617,11,1],[619,9,619,41,1],[620,9,620,21,1],[621,5,621,6,1],[624,5,624,6,1],[625,9,625,57,1],[626,9,626,40,1],[627,5,627,6,1],[638,5,638,6,1],[640,9,645,11,1],[647,9,647,98,1],[648,9,648,49,1],[650,9,651,41,1],[654,9,654,88,1],[657,9,657,43,1],[658,5,658,6,1],[667,5,667,6,1],[669,9,674,11,1],[676,9,676,98,1],[677,9,677,49,1],[679,9,680,41,1],[683,9,683,88,1],[686,9,686,43,1],[687,5,687,6,1],[695,5,695,6,1],[697,9,697,52,1],[699,9,700,34,1],[702,9,703,87,1],[706,9,706,88,1],[709,9,709,42,1],[710,9,710,63,1],[711,9,711,60,1],[712,9,712,86,1],[713,5,713,6,1],[717,5,717,6,1],[719,9,719,76,1],[721,9,722,68,1],[725,9,725,85,1],[728,9,728,42,1],[729,9,729,63,1],[730,9,730,53,1],[731,9,731,76,1],[732,5,732,6,1]]);
+    </script>
+  </body>
+</html>
