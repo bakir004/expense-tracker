@@ -3,6 +3,7 @@ using ExpenseTrackerAPI.Application.TransactionGroups.Interfaces.Application;
 using ExpenseTrackerAPI.Contracts.TransactionGroups;
 using Microsoft.AspNetCore.Authorization;
 using Asp.Versioning;
+using ExpenseTrackerAPI.Domain.Errors;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
 
@@ -80,7 +81,7 @@ public class TransactionGroupController : ApiControllerBase
         if (id <= 0)
         {
             _logger.LogWarning("Invalid transaction group ID {TransactionGroupId} provided by user {UserId}", id, GetUserId());
-            return BadRequest("Transaction group ID must be a positive integer.");
+            return Problem(TransactionGroupErrors.InvalidTransactionGroupId);
         }
 
         var unauthorizedResult = CheckUserContext();
@@ -167,7 +168,7 @@ public class TransactionGroupController : ApiControllerBase
         if (id <= 0)
         {
             _logger.LogWarning("Invalid transaction group ID {TransactionGroupId} provided by user {UserId}", id, GetUserId());
-            return BadRequest("Transaction group ID must be a positive integer.");
+            return Problem(TransactionGroupErrors.InvalidTransactionGroupId);
         }
 
         var unauthorizedResult = CheckUserContext();
@@ -211,7 +212,7 @@ public class TransactionGroupController : ApiControllerBase
         if (id <= 0)
         {
             _logger.LogWarning("Invalid transaction group ID {TransactionGroupId} provided by user {UserId}", id, GetUserId());
-            return BadRequest("Transaction group ID must be a positive integer.");
+            return Problem(TransactionGroupErrors.InvalidTransactionGroupId);
         }
 
         var unauthorizedResult = CheckUserContext();

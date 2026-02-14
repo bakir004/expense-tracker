@@ -10,6 +10,9 @@ public static class TransactionErrors
     public static Error NotFound =>
         Error.NotFound("Transaction", "Transaction not found.");
 
+    public static Error InvalidTransactionId =>
+        Error.Validation("TransactionId", "Transaction ID must be a positive integer.");
+
     public static Error InvalidAmount =>
         Error.Validation("Amount", "Transaction amount must be greater than zero.");
 

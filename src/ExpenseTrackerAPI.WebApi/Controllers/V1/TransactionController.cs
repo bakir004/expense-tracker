@@ -3,6 +3,7 @@ using ExpenseTrackerAPI.Application.Transactions.Interfaces.Application;
 using ExpenseTrackerAPI.Contracts.Transactions;
 using Microsoft.AspNetCore.Authorization;
 using Asp.Versioning;
+using ExpenseTrackerAPI.Domain.Errors;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
 
@@ -146,7 +147,7 @@ public class TransactionController : ApiControllerBase
         if (id <= 0)
         {
             _logger.LogWarning("Invalid transaction ID {TransactionId} provided by user {UserId}", id, GetUserId());
-            return BadRequest("Transaction ID must be a positive integer.");
+            return Problem(TransactionErrors.InvalidTransactionId);
         }
 
         var unauthorizedResult = CheckUserContext();
@@ -244,6 +245,12 @@ public class TransactionController : ApiControllerBase
         [FromBody] UpdateTransactionRequest request,
         CancellationToken cancellationToken = default)
     {
+        if (id <= 0)
+        {
+            _logger.LogWarning("Invalid transaction ID {TransactionId} provided by user {UserId}", id, GetUserId());
+            return Problem(TransactionErrors.InvalidTransactionId);
+        }
+
         var unauthorizedResult = CheckUserContext();
         if (unauthorizedResult != null) return unauthorizedResult;
 
@@ -299,6 +306,12 @@ public class TransactionController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteTransaction(int id, CancellationToken cancellationToken = default)
     {
+        if (id <= 0)
+        {
+            _logger.LogWarning("Invalid transaction ID {TransactionId} provided by user {UserId}", id, GetUserId());
+            return Problem(TransactionErrors.InvalidTransactionId);
+        }
+
         var unauthorizedResult = CheckUserContext();
         if (unauthorizedResult != null) return unauthorizedResult;
 

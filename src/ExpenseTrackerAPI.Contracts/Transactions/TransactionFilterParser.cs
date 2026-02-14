@@ -45,19 +45,19 @@ public static class TransactionFilterParser
         }
 
         // Validate amount range
-        if (request.MinAmount.HasValue && request.MinAmount < 0)
+        if (request.MinAmount.HasValue && request.MinAmount.Value < 0)
         {
-            errors.Add(Error.Validation("Filter.MinAmount", "Minimum amount cannot be negative."));
+            errors.Add(Error.Validation("MinAmount", "Minimum amount cannot be negative."));
         }
 
-        if (request.MaxAmount.HasValue && request.MaxAmount < 0)
+        if (request.MaxAmount.HasValue && request.MaxAmount.Value < 0)
         {
-            errors.Add(Error.Validation("Filter.MaxAmount", "Maximum amount cannot be negative."));
+            errors.Add(Error.Validation("MaxAmount", "Maximum amount cannot be negative."));
         }
 
-        if (request.MinAmount.HasValue && request.MaxAmount.HasValue && request.MinAmount > request.MaxAmount)
+        if (request.MinAmount.HasValue && request.MaxAmount.HasValue && request.MinAmount.Value > request.MaxAmount.Value)
         {
-            errors.Add(Error.Validation("Filter.AmountRange", "Minimum amount cannot be greater than maximum amount."));
+            errors.Add(Error.Validation("AmountRange", "Minimum amount cannot be greater than maximum amount."));
         }
 
         // Parse dates
@@ -90,9 +90,9 @@ public static class TransactionFilterParser
             }
         }
 
-        if (dateFrom.HasValue && dateTo.HasValue && dateFrom > dateTo)
+        if (dateFrom.HasValue && dateTo.HasValue && dateFrom.Value > dateTo.Value)
         {
-            errors.Add(Error.Validation("Filter.DateRange", "DateFrom cannot be after DateTo."));
+            errors.Add(Error.Validation("DateRange", "DateFrom cannot be after DateTo."));
         }
 
         // Parse payment methods
@@ -117,7 +117,7 @@ public static class TransactionFilterParser
             {
                 if (categoryId <= 0)
                 {
-                    errors.Add(Error.Validation("Filter.CategoryIds", $"Invalid category ID: {categoryId}. Category IDs must be positive integers."));
+                    errors.Add(Error.Validation("CategoryIds", $"Invalid category ID: {categoryId}. Category IDs must be positive integers."));
                     break;
                 }
             }
@@ -130,7 +130,7 @@ public static class TransactionFilterParser
             {
                 if (groupId <= 0)
                 {
-                    errors.Add(Error.Validation("Filter.TransactionGroupIds", $"Invalid transaction group ID: {groupId}. Group IDs must be positive integers."));
+                    errors.Add(Error.Validation("TransactionGroupIds", $"Invalid transaction group ID: {groupId}. Group IDs must be positive integers."));
                     break;
                 }
             }
@@ -172,16 +172,16 @@ public static class TransactionFilterParser
 
         if (page < 1)
         {
-            errors.Add(Error.Validation("Filter.Page", "Page number must be at least 1."));
+            errors.Add(Error.Validation("Page", "Page number must be at least 1."));
         }
 
         if (pageSize < 1)
         {
-            errors.Add(Error.Validation("Filter.PageSize", "Page size must be at least 1."));
+            errors.Add(Error.Validation("PageSize", "Page size must be at least 1."));
         }
         else if (pageSize > MaxPageSize)
         {
-            errors.Add(Error.Validation("Filter.PageSize", $"Page size cannot exceed {MaxPageSize}."));
+            errors.Add(Error.Validation("PageSize", $"Page size cannot exceed {MaxPageSize}."));
         }
 
         // Return errors if any
@@ -219,7 +219,7 @@ public static class TransactionFilterParser
         {
             "EXPENSE" => TransactionType.EXPENSE,
             "INCOME" => TransactionType.INCOME,
-            _ => Error.Validation("Filter.TransactionType", $"Invalid transaction type: '{value}'. Valid values are: EXPENSE, INCOME.")
+            _ => Error.Validation("TransactionType", $"Invalid transaction type: '{value}'. Valid values are: EXPENSE, INCOME.")
         };
     }
 
@@ -230,7 +230,7 @@ public static class TransactionFilterParser
             return date;
         }
 
-        return Error.Validation($"Filter.{fieldName}", $"Invalid date format for {fieldName}: '{value}'. Expected format: {DateFormat}.");
+        return Error.Validation(fieldName, $"Invalid date format for {fieldName}: '{value}'. Expected format: {DateFormat}.");
     }
 
     private static ErrorOr<IReadOnlyList<PaymentMethod>> ParsePaymentMethods(string[] values)
@@ -258,7 +258,7 @@ public static class TransactionFilterParser
         {
             var validValues = string.Join(", ", Enum.GetNames<PaymentMethod>());
             return Error.Validation(
-                "Filter.PaymentMethods",
+                "PaymentMethods",
                 $"Invalid payment method(s): {string.Join(", ", invalidValues)}. Valid values are: {validValues}.");
         }
 
@@ -276,7 +276,7 @@ public static class TransactionFilterParser
             "paymentmethod" or "payment_method" => TransactionSortField.PaymentMethod,
             "createdat" or "created_at" => TransactionSortField.CreatedAt,
             "updatedat" or "updated_at" => TransactionSortField.UpdatedAt,
-            _ => Error.Validation("Filter.SortBy", $"Invalid sort field: '{value}'. Valid values are: date, amount, subject, paymentMethod, createdAt, updatedAt.")
+            _ => Error.Validation("SortBy", $"Invalid sort field: '{value}'. Valid values are: date, amount, subject, paymentMethod, createdAt, updatedAt.")
         };
     }
 
@@ -287,7 +287,7 @@ public static class TransactionFilterParser
         {
             "asc" or "ascending" => false,
             "desc" or "descending" => true,
-            _ => Error.Validation("Filter.SortDirection", $"Invalid sort direction: '{value}'. Valid values are: asc, desc.")
+            _ => Error.Validation("SortDirection", $"Invalid sort direction: '{value}'. Valid values are: asc, desc.")
         };
     }
 }
