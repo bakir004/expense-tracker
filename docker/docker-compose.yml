@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: expense-tracker-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: expense_tracker_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ExpenseTracker API
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: expense-tracker-api
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    environment:
+      # Database Configuration
+      - DB_HOST=postgres
+      - DB_NAME=expense_tracker_db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_PORT=5432
+      - DB_SSL_MODE=Disable
+
+      # JWT Configuration
+      - JWT_SECRET_KEY=your_production_jwt_secret_key_at_least_32_characters_long_change_me
+      - JWT_ISSUER=ExpenseTrackerAPI
+      - JWT_AUDIENCE=ExpenseTrackerAPI
+      - JWT_EXPIRY_HOURS=24
+
+      # Application Configuration
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - api-logs:/app/logs
+
+volumes:
+  postgres-data:
+  api-logs:

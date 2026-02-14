@@ -153,7 +153,9 @@ public class TransactionController : ApiControllerBase
         var unauthorizedResult = CheckUserContext();
         if (unauthorizedResult != null) return unauthorizedResult;
         var userId = GetRequiredUserId();
-        var result = await _transactionService.GetByIdAsync(id, cancellationToken);
+
+        var result = await _transactionService.GetByIdAsync(id, userId, cancellationToken);
+
 
         if (result.IsError)
         {

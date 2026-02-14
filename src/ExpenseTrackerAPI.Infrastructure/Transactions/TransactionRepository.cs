@@ -33,12 +33,13 @@ public class TransactionRepository : ITransactionRepository
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<ErrorOr<Transaction>> GetByIdAsync(int id, CancellationToken cancellationToken)
+    public async Task<ErrorOr<Transaction>> GetByIdAsync(int id, int userId, CancellationToken cancellationToken)
     {
         try
         {
             var transaction = await _context.Transactions
                 .AsNoTracking()
+                .Where(t => t.UserId == userId)
                 .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
 
             if (transaction == null)

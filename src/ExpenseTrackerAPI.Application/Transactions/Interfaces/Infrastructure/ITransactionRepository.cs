@@ -10,7 +10,7 @@ namespace ExpenseTrackerAPI.Application.Transactions.Interfaces.Infrastructure;
 /// </summary>
 public interface ITransactionRepository
 {
-    Task<ErrorOr<Transaction>> GetByIdAsync(int id, CancellationToken cancellationToken);
+    Task<ErrorOr<Transaction>> GetByIdAsync(int id, int userId, CancellationToken cancellationToken);
     /// <summary>
     /// Create a new transaction, update balance, and record in history
     /// </summary>

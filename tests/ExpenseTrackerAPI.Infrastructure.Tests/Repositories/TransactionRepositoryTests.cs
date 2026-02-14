@@ -304,7 +304,7 @@ public class TransactionRepositoryTests
         var transactionId = createResult.Value.Id;
 
         // Act
-        var result = await sut.GetByIdAsync(transactionId, CancellationToken.None);
+        var result = await sut.GetByIdAsync(transactionId, user.Id, CancellationToken.None);
 
         // Assert
         result.IsError.Should().BeFalse();
@@ -322,7 +322,7 @@ public class TransactionRepositoryTests
         var nonExistentId = 99999;
 
         // Act
-        var result = await sut.GetByIdAsync(nonExistentId, CancellationToken.None);
+        var result = await sut.GetByIdAsync(nonExistentId, 1, CancellationToken.None);
 
         // Assert
         result.IsError.Should().BeTrue();

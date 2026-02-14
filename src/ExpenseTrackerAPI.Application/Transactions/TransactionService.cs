@@ -25,9 +25,9 @@ public class TransactionService : ITransactionService
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
     }
 
-    public async Task<ErrorOr<Transaction>> GetByIdAsync(int id, CancellationToken cancellationToken)
+    public async Task<ErrorOr<Transaction>> GetByIdAsync(int id, int userId, CancellationToken cancellationToken)
     {
-        return await _transactionRepository.GetByIdAsync(id, cancellationToken);
+        return await _transactionRepository.GetByIdAsync(id, userId, cancellationToken);
     }
 
     public async Task<ErrorOr<Transaction>> CreateAsync(
@@ -78,7 +78,7 @@ public class TransactionService : ITransactionService
     {
         try
         {
-            var oldTransaction = await _transactionRepository.GetByIdAsync(id, cancellationToken);
+            var oldTransaction = await _transactionRepository.GetByIdAsync(id, userId, cancellationToken);
             if (oldTransaction.IsError)
             {
                 return oldTransaction.Errors;
@@ -112,7 +112,7 @@ public class TransactionService : ITransactionService
 
     public async Task<ErrorOr<Deleted>> DeleteAsync(int id, int userId, CancellationToken cancellationToken)
     {
-        var existingTransaction = await _transactionRepository.GetByIdAsync(id, cancellationToken);
+        var existingTransaction = await _transactionRepository.GetByIdAsync(id, userId, cancellationToken);
 
         if (existingTransaction.IsError)
             return existingTransaction.Errors;
