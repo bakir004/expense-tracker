@@ -99,30 +99,30 @@ var app = builder.Build();
 
 app.UseSerilogRequestLogging();
 
-if (app.Environment.IsDevelopment())
+// if (app.Environment.IsDevelopment())
+// {
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
+    var provider = app.Services.GetRequiredService<Asp.Versioning.ApiExplorer.IApiVersionDescriptionProvider>();
+
+    foreach (var description in provider.ApiVersionDescriptions.Reverse())
     {
-        var provider = app.Services.GetRequiredService<Asp.Versioning.ApiExplorer.IApiVersionDescriptionProvider>();
+        c.SwaggerEndpoint(
+            $"/swagger/{description.GroupName}/swagger.json",
+            $"ExpenseTracker API {description.GroupName.ToUpperInvariant()}");
+    }
 
-        foreach (var description in provider.ApiVersionDescriptions.Reverse())
-        {
-            c.SwaggerEndpoint(
-                $"/swagger/{description.GroupName}/swagger.json",
-                $"ExpenseTracker API {description.GroupName.ToUpperInvariant()}");
-        }
+    c.RoutePrefix = "swagger";
+    c.DisplayRequestDuration();
+    c.EnableDeepLinking();
+    c.EnableValidator();
+    c.ShowExtensions();
+    c.EnableFilter();
+});
+// }
 
-        c.RoutePrefix = "swagger";
-        c.DisplayRequestDuration();
-        c.EnableDeepLinking();
-        c.EnableValidator();
-        c.ShowExtensions();
-        c.EnableFilter();
-    });
-}
-
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
