@@ -780,7 +780,6 @@ All errors follow the RFC 7807 Problem Details standard:
 
 ### Deployment & Configuration
 - **[Main README](../../README.md)** - Quickstart guide and setup instructions
-- **[Docker Setup](../../docker/README.md)** - Container configuration and deployment
 - **API Configuration**: `appsettings.json`
 
 ### Testing
