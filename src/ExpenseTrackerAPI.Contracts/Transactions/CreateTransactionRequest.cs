@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ExpenseTrackerAPI.Contracts.Transactions;
 
+/// <summary>
+/// Request contract for creating a new transaction (expense or income).
+/// </summary>
 public class CreateTransactionRequest
 {
     /// <summary>

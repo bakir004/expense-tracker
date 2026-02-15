@@ -35,27 +35,69 @@ public class TransactionController : ApiControllerBase
     /// <summary>
     /// Get transactions for the authenticated user with optional filtering, sorting, and pagination.
     /// </summary>
-    /// <param name="transactionType">Filter by type: EXPENSE or INCOME</param>
-    /// <param name="minAmount">Filter by minimum amount (inclusive)</param>
-    /// <param name="maxAmount">Filter by maximum amount (inclusive)</param>
-    /// <param name="dateFrom">Filter by start date (yyyy-MM-dd format, inclusive)</param>
-    /// <param name="dateTo">Filter by end date (yyyy-MM-dd format, inclusive)</param>
-    /// <param name="subjectContains">Filter by subject containing text (case-insensitive)</param>
-    /// <param name="notesContains">Filter by notes containing text (case-insensitive)</param>
-    /// <param name="paymentMethods">Filter by payment methods (comma-separated: CASH,DEBIT_CARD,CREDIT_CARD,BANK_TRANSFER,MOBILE_PAYMENT,PAYPAL,CRYPTO,OTHER)</param>
-    /// <param name="categoryIds">Filter by category IDs (comma-separated)</param>
-    /// <param name="uncategorized">Filter for uncategorized transactions only</param>
-    /// <param name="transactionGroupIds">Filter by transaction group IDs (comma-separated)</param>
-    /// <param name="ungrouped">Filter for ungrouped transactions only</param>
-    /// <param name="sortBy">Sort field: date, amount, subject, paymentMethod, createdAt, updatedAt (default: date)</param>
-    /// <param name="sortDirection">Sort direction: asc or desc (default: desc)</param>
-    /// <param name="page">Page number, 1-based (default: 1)</param>
-    /// <param name="pageSize">Items per page, max 100 (default: 20)</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Paginated list of transactions matching the filter criteria</returns>
-    /// <response code="200">Transactions retrieved successfully</response>
-    /// <response code="400">Invalid filter parameters</response>
-    /// <response code="401">User not authenticated</response>
+    /// <remarks>
+    /// Retrieves transactions with powerful filtering, sorting, and pagination capabilities. Use this endpoint
+    /// to query expenses and income with various criteria for reporting, budgeting, and analysis.
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **Filtering Options:**
+    /// - **transactionType**: Filter by EXPENSE or INCOME
+    /// - **minAmount/maxAmount**: Filter by amount range (inclusive)
+    /// - **dateFrom/dateTo**: Filter by date range in yyyy-MM-dd format (inclusive)
+    /// - **subjectContains**: Search in transaction subjects (case-insensitive)
+    /// - **notesContains**: Search in transaction notes (case-insensitive)
+    /// - **paymentMethods**: Comma-separated list (CASH, DEBIT_CARD, CREDIT_CARD, BANK_TRANSFER, MOBILE_PAYMENT, PAYPAL, CRYPTO, OTHER)
+    /// - **categoryIds**: Comma-separated category IDs
+    /// - **uncategorized**: Set to true to get only transactions without categories
+    /// - **transactionGroupIds**: Comma-separated transaction group IDs
+    /// - **ungrouped**: Set to true to get only transactions without groups
+    ///
+    /// **Sorting:**
+    /// - **sortBy**: date, amount, subject, paymentMethod, createdAt, updatedAt (default: date)
+    /// - **sortDirection**: asc or desc (default: desc)
+    ///
+    /// **Pagination:**
+    /// - **page**: Page number starting from 1 (default: 1)
+    /// - **pageSize**: Items per page, max 100 (default: 20)
+    ///
+    /// **Response Fields:**
+    /// - **transactions**: Array of transaction objects
+    /// - **totalCount**: Total number of transactions matching filters
+    /// - **page**: Current page number
+    /// - **pageSize**: Items per page
+    /// - **totalPages**: Total number of pages
+    ///
+    /// **Use Cases:**
+    /// - Viewing all expenses for a specific month
+    /// - Filtering transactions by category for budget analysis
+    /// - Searching for specific transactions by subject
+    /// - Generating reports for specific date ranges
+    /// - Tracking cash flow by payment method
+    ///
+    /// **Note:** Only transactions belonging to the authenticated user are returned.
+    /// </remarks>
+    /// <param name="transactionType">Filter by transaction type: EXPENSE or INCOME</param>
+    /// <param name="minAmount">Filter by minimum amount (inclusive, e.g., 10.00)</param>
+    /// <param name="maxAmount">Filter by maximum amount (inclusive, e.g., 1000.00)</param>
+    /// <param name="dateFrom">Filter by start date in yyyy-MM-dd format (inclusive, e.g., 2024-01-01)</param>
+    /// <param name="dateTo">Filter by end date in yyyy-MM-dd format (inclusive, e.g., 2024-12-31)</param>
+    /// <param name="subjectContains">Filter by subject containing this text (case-insensitive)</param>
+    /// <param name="notesContains">Filter by notes containing this text (case-insensitive)</param>
+    /// <param name="paymentMethods">Filter by payment methods as comma-separated values (e.g., CASH,DEBIT_CARD,CREDIT_CARD)</param>
+    /// <param name="categoryIds">Filter by category IDs as comma-separated values (e.g., 1,2,3)</param>
+    /// <param name="uncategorized">Set to true to filter for transactions without a category</param>
+    /// <param name="transactionGroupIds">Filter by transaction group IDs as comma-separated values (e.g., 1,2,3)</param>
+    /// <param name="ungrouped">Set to true to filter for transactions without a transaction group</param>
+    /// <param name="sortBy">Field to sort by: date, amount, subject, paymentMethod, createdAt, updatedAt (default: date)</param>
+    /// <param name="sortDirection">Sort direction: asc for ascending, desc for descending (default: desc)</param>
+    /// <param name="page">Page number starting from 1 (default: 1)</param>
+    /// <param name="pageSize">Number of items per page, maximum 100 (default: 20)</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>Paginated list of transactions matching the filter criteria with pagination metadata</returns>
+    /// <response code="200">Transactions retrieved successfully - returns paginated transaction list</response>
+    /// <response code="400">Invalid filter parameters (e.g., invalid date format, invalid enum values)</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
     [HttpGet]
     [ProducesResponseType(typeof(TransactionFilterResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -131,13 +173,45 @@ public class TransactionController : ApiControllerBase
     /// <summary>
     /// Get a specific transaction by ID.
     /// </summary>
-    /// <param name="id">Transaction ID</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Transaction details</returns>
-    /// <response code="200">Transaction retrieved successfully</response>
-    /// <response code="401">User not authenticated</response>
-    /// <response code="404">Transaction not found</response>
-    /// <response code="500">Internal server error</response>
+    /// <remarks>
+    /// Retrieves detailed information about a specific transaction. The transaction must belong
+    /// to the authenticated user - users cannot access transactions created by other users.
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **Security:**
+    /// - Users can only retrieve their own transactions
+    /// - Attempting to access another user's transaction will return 404 Not Found
+    /// - Transaction ownership is verified before returning data
+    ///
+    /// **Response Fields:**
+    /// - **Id**: Transaction unique identifier
+    /// - **TransactionType**: EXPENSE or INCOME
+    /// - **Amount**: Absolute amount (always positive)
+    /// - **SignedAmount**: Amount with sign (negative for expenses, positive for income)
+    /// - **Date**: Transaction date
+    /// - **Subject**: Brief description
+    /// - **Notes**: Optional detailed notes
+    /// - **PaymentMethod**: How the transaction was paid
+    /// - **CumulativeDelta**: Running balance at this transaction
+    /// - **CategoryId**: Associated category (if any)
+    /// - **TransactionGroupId**: Associated group (if any)
+    /// - **CreatedAt/UpdatedAt**: Timestamps
+    ///
+    /// **Use Cases:**
+    /// - Viewing full details of a specific transaction
+    /// - Retrieving transaction information before editing
+    /// - Displaying transaction details in the UI
+    ///
+    /// **Note:** ID must be a positive integer. Invalid IDs will return a 400 Bad Request error.
+    /// </remarks>
+    /// <param name="id">The unique identifier of the transaction to retrieve (must be positive integer)</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>Transaction details including all fields and related information</returns>
+    /// <response code="200">Transaction retrieved successfully - returns transaction object</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
+    /// <response code="404">Transaction not found or does not belong to authenticated user</response>
+    /// <response code="500">Internal server error - unexpected error occurred</response>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(TransactionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
@@ -171,13 +245,51 @@ public class TransactionController : ApiControllerBase
     /// <summary>
     /// Create a new transaction for the authenticated user.
     /// </summary>
-    /// <param name="request">Transaction creation request</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Created transaction</returns>
-    /// <response code="201">Transaction created successfully</response>
-    /// <response code="400">Invalid request data</response>
-    /// <response code="401">User not authenticated</response>
-    /// <response code="404">Referenced entity not found (user, category, etc.)</response>
+    /// <remarks>
+    /// Creates a new expense or income transaction. Transactions are the core entities for tracking
+    /// financial activity and can be categorized and grouped for better organization.
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **Required Fields:**
+    /// - **TransactionType**: EXPENSE or INCOME
+    /// - **Amount**: Positive decimal value (e.g., 50.00)
+    /// - **Date**: Transaction date in yyyy-MM-dd format
+    /// - **Subject**: Brief description (1-255 characters)
+    /// - **PaymentMethod**: CASH, DEBIT_CARD, CREDIT_CARD, BANK_TRANSFER, MOBILE_PAYMENT, PAYPAL, CRYPTO, or OTHER
+    ///
+    /// **Optional Fields:**
+    /// - **Notes**: Detailed description (max 2000 characters)
+    /// - **CategoryId**: ID of existing category (e.g., 1 for Food)
+    /// - **TransactionGroupId**: ID of existing transaction group
+    ///
+    /// **Transaction Types:**
+    /// - **EXPENSE**: Money going out (e.g., purchases, bills, payments)
+    /// - **INCOME**: Money coming in (e.g., salary, refunds, gifts)
+    ///
+    /// **Payment Methods:**
+    /// - CASH, DEBIT_CARD, CREDIT_CARD, BANK_TRANSFER, MOBILE_PAYMENT, PAYPAL, CRYPTO, OTHER
+    ///
+    /// **Response:**
+    /// Returns the created transaction with auto-generated ID, timestamps, and calculated fields
+    /// like SignedAmount and CumulativeDelta.
+    ///
+    /// **Use Cases:**
+    /// - Recording daily expenses
+    /// - Logging income transactions
+    /// - Tracking business expenses with categories
+    /// - Grouping related transactions (e.g., vacation expenses)
+    ///
+    /// **Note:** If CategoryId or TransactionGroupId is provided, they must reference existing entities
+    /// owned by the authenticated user.
+    /// </remarks>
+    /// <param name="request">Transaction creation request containing all required fields and optional category/group associations</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>Created transaction with ID, timestamps, and calculated fields</returns>
+    /// <response code="201">Transaction created successfully - returns created transaction</response>
+    /// <response code="400">Invalid request data or validation errors (e.g., invalid transaction type, negative amount, invalid date format)</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
+    /// <response code="404">Referenced entity not found (e.g., category or transaction group does not exist or does not belong to user)</response>
     [HttpPost]
     [ProducesResponseType(typeof(TransactionResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -229,14 +341,48 @@ public class TransactionController : ApiControllerBase
     /// <summary>
     /// Update an existing transaction.
     /// </summary>
-    /// <param name="id">Transaction ID to update</param>
-    /// <param name="request">Transaction update request</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Updated transaction</returns>
-    /// <response code="200">Transaction updated successfully</response>
-    /// <response code="400">Invalid request data</response>
-    /// <response code="401">User not authenticated</response>
-    /// <response code="404">Transaction not found or referenced entity not found</response>
+    /// <remarks>
+    /// Updates all fields of an existing transaction. Only the transaction owner can update the transaction.
+    /// This is a full update operation - all fields must be provided even if not changing.
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **Required Fields:**
+    /// - **TransactionType**: EXPENSE or INCOME
+    /// - **Amount**: Positive decimal value (e.g., 75.00)
+    /// - **Date**: Transaction date in yyyy-MM-dd format
+    /// - **Subject**: Brief description (1-255 characters)
+    /// - **PaymentMethod**: CASH, DEBIT_CARD, CREDIT_CARD, BANK_TRANSFER, MOBILE_PAYMENT, PAYPAL, CRYPTO, or OTHER
+    ///
+    /// **Optional Fields:**
+    /// - **Notes**: Detailed description (max 2000 characters, set to null to remove)
+    /// - **CategoryId**: ID of existing category (set to null to remove category)
+    /// - **TransactionGroupId**: ID of existing transaction group (set to null to remove from group)
+    ///
+    /// **Security:**
+    /// - Users can only update their own transactions
+    /// - Attempting to update another user's transaction will return 404 Not Found
+    /// - Transaction ownership is verified before applying changes
+    ///
+    /// **Use Cases:**
+    /// - Correcting transaction amount or date
+    /// - Updating transaction description
+    /// - Changing payment method
+    /// - Adding or removing category/group associations
+    /// - Fixing data entry errors
+    ///
+    /// **Note:** The transaction ID in the URL must match an existing transaction owned by the authenticated user.
+    /// ID must be a positive integer. If CategoryId or TransactionGroupId is provided, they must reference
+    /// existing entities owned by the user.
+    /// </remarks>
+    /// <param name="id">The unique identifier of the transaction to update (must be positive integer)</param>
+    /// <param name="request">Transaction update request containing all fields to be updated</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>Updated transaction with new values and updated timestamp</returns>
+    /// <response code="200">Transaction updated successfully - returns updated transaction object</response>
+    /// <response code="400">Invalid request data or validation errors (e.g., invalid transaction type, negative amount, invalid ID)</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
+    /// <response code="404">Transaction not found, does not belong to authenticated user, or referenced entity not found</response>
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(TransactionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -296,14 +442,43 @@ public class TransactionController : ApiControllerBase
     /// <summary>
     /// Delete a transaction.
     /// </summary>
-    /// <param name="id">Transaction ID to delete</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>No content on success</returns>
-    /// <response code="204">Transaction deleted successfully</response>
-    /// <response code="401">User not authenticated</response>
-    /// <response code="404">Transaction not found</response>
+    /// <remarks>
+    /// Permanently deletes a transaction. Only the transaction owner can delete the transaction.
+    /// This action cannot be undone.
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **Important:**
+    /// - Deleting a transaction is permanent and cannot be undone
+    /// - The transaction is completely removed from the system
+    /// - This affects cumulative balance calculations for subsequent transactions
+    /// - Category and group associations are removed
+    ///
+    /// **Security:**
+    /// - Users can only delete their own transactions
+    /// - Attempting to delete another user's transaction will return 404 Not Found
+    /// - Transaction ownership is verified before deletion
+    ///
+    /// **Use Cases:**
+    /// - Removing duplicate transactions
+    /// - Deleting test or incorrect entries
+    /// - Cleaning up old or irrelevant transactions
+    ///
+    /// **Response:**
+    /// Returns 204 No Content on successful deletion with no response body.
+    ///
+    /// **Note:** ID must be a positive integer. Invalid IDs will return a 400 Bad Request error.
+    /// </remarks>
+    /// <param name="id">The unique identifier of the transaction to delete (must be positive integer)</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>No content on successful deletion</returns>
+    /// <response code="204">Transaction deleted successfully - no response body</response>
+    /// <response code="400">Invalid TransactionId</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
+    /// <response code="404">Transaction not found or does not belong to authenticated user</response>
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteTransaction(int id, CancellationToken cancellationToken = default)

@@ -12,7 +12,6 @@ namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
 [ApiController]
 [Route("api/v{version:apiVersion}/categories")]
 [ApiVersion("1.0")]
-[Authorize]
 public class CategoryController : ApiControllerBase
 {
     private readonly ICategoryService _categoryService;
@@ -32,21 +31,34 @@ public class CategoryController : ApiControllerBase
     }
 
     /// <summary>
-    /// Get all categories.
+    /// Get all available categories for expense and income transactions.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>List of all categories</returns>
-    /// <response code="200">Categories retrieved successfully</response>
-    /// <response code="401">User not authenticated</response>
+    /// <remarks>
+    /// Retrieves all categories available in the system. Categories are used to classify transactions
+    /// for better organization and reporting. The system includes both predefined system categories
+    /// and custom categories that users can create.
+    ///
+    /// **Authentication:** Not required
+    ///
+    /// **Response Fields:**
+    /// - **Id**: Unique identifier for the category
+    /// - **Name**: Category name (e.g., "Food", "Transport", "Salary")
+    /// - **Description**: Optional detailed description of the category
+    /// - **Icon**: Icon identifier for UI representation
+    ///
+    /// **Use Cases:**
+    /// - Populating category dropdowns in transaction forms
+    /// - Displaying available categories for filtering
+    /// - Category-based transaction reporting
+    /// - Budget planning by category
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>List of all available categories with their details</returns>
+    /// <response code="200">Categories retrieved successfully - returns array of category objects</response>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<CategoryResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken = default)
     {
-        var unauthorizedResult = CheckUserContext();
-        if (unauthorizedResult != null) return unauthorizedResult;
-
         var result = await _categoryService.GetAllAsync(cancellationToken);
 
         if (result.IsError)

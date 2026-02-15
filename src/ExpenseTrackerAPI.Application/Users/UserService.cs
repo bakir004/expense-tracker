@@ -103,36 +103,45 @@ public class UserService : IUserService
 
             var user = userResult.Value;
 
+            // Verify current password
             if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
             {
                 return UserErrors.InvalidCredentials;
             }
 
-            if (!string.Equals(user.Email, request.Email.Trim(), StringComparison.OrdinalIgnoreCase))
+            // Only update email if provided
+            if (!string.IsNullOrWhiteSpace(request.Email))
             {
-                var existsResult = await _userRepository.ExistsByEmailAsync(request.Email, cancellationToken);
-                if (existsResult.IsError)
-                    return existsResult.Errors;
+                if (!string.Equals(user.Email, request.Email.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    var existsResult = await _userRepository.ExistsByEmailAsync(request.Email, cancellationToken);
+                    if (existsResult.IsError)
+                        return existsResult.Errors;
 
-                if (existsResult.Value)
-                    return UserErrors.DuplicateEmail;
+                    if (existsResult.Value)
+                        return UserErrors.DuplicateEmail;
+                }
             }
 
-            string newPasswordHash = user.PasswordHash;
+            // Only update password if provided
             if (!string.IsNullOrWhiteSpace(request.NewPassword))
             {
                 if (!HasValidPasswordComplexity(request.NewPassword))
                     return UserErrors.WeakPassword;
 
-                newPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword, BCrypt.Net.BCrypt.GenerateSalt());
+                var newPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword, BCrypt.Net.BCrypt.GenerateSalt());
+                user.UpdatePassword(newPasswordHash);
             }
 
-            user.UpdateProfile(request.Name, request.Email);
-            user.UpdateInitialBalance(request.InitialBalance);
+            // Only update name and email if provided
+            var nameToUpdate = request.Name ?? user.Name;
+            var emailToUpdate = request.Email ?? user.Email;
+            user.UpdateProfile(nameToUpdate, emailToUpdate);
 
-            if (newPasswordHash != user.PasswordHash)
+            // Only update initial balance if provided
+            if (request.InitialBalance.HasValue)
             {
-                user.UpdatePassword(newPasswordHash);
+                user.UpdateInitialBalance(request.InitialBalance.Value);
             }
 
             var updateResult = await _userRepository.UpdateAsync(user, cancellationToken);

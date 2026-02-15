@@ -190,7 +190,7 @@ public class UserRegistrationWorkflowTests : BaseE2ETest
     public async Task AuthHealthCheck_ShouldReturnHealthy()
     {
         // Act
-        var response = await Client.GetAsync(TestConstants.Routes.AuthHealth);
+        var response = await Client.GetAsync(TestConstants.Routes.Health);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);

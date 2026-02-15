@@ -16,7 +16,7 @@ public static class TestConstants
         // Auth endpoints
         public const string AuthRegister = $"{BaseUrl}/auth/register";
         public const string AuthLogin = $"{BaseUrl}/auth/login";
-        public const string AuthHealth = $"{BaseUrl}/auth/health";
+        public const string Health = $"{BaseUrl}/health";
 
         // Transaction endpoints
         public const string Transactions = $"{BaseUrl}/transactions";

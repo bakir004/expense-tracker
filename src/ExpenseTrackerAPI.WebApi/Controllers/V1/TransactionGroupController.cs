@@ -35,14 +35,39 @@ public class TransactionGroupController : ApiControllerBase
     /// <summary>
     /// Get all transaction groups for the authenticated user.
     /// </summary>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>List of transaction groups belonging to the user</returns>
-    /// <response code="200">Transaction groups retrieved successfully</response>
-    /// <response code="401">User not authenticated</response>
+    /// <remarks>
+    /// Retrieves all transaction groups created by the authenticated user. Transaction groups are
+    /// organizational containers that allow users to group related transactions together for better
+    /// tracking and reporting (e.g., "Monthly Expenses", "Vacation Budget", "Home Renovation").
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **What are Transaction Groups?**
+    /// Transaction groups help organize transactions into logical collections. Each group can contain
+    /// multiple transactions and provides a way to track related expenses or income together.
+    ///
+    /// **Response Fields:**
+    /// - **Id**: Unique identifier for the transaction group
+    /// - **Name**: Group name (e.g., "January Budget", "Trip to Paris")
+    /// - **Description**: Optional detailed description of the group's purpose
+    /// - **UserId**: ID of the user who owns this group
+    /// - **CreatedAt**: UTC timestamp when the group was created
+    ///
+    /// **Use Cases:**
+    /// - Budget tracking by project or time period
+    /// - Organizing expenses for specific events or trips
+    /// - Grouping business expenses by client or project
+    /// - Separating personal and business transactions
+    ///
+    /// **Note:** Only transaction groups belonging to the authenticated user are returned.
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>List of all transaction groups belonging to the authenticated user</returns>
+    /// <response code="200">Transaction groups retrieved successfully - returns array of group objects</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<TransactionGroupResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken = default)
     {
         var unauthorizedResult = CheckUserContext();
@@ -66,14 +91,34 @@ public class TransactionGroupController : ApiControllerBase
     /// <summary>
     /// Get a specific transaction group by ID.
     /// </summary>
-    /// <param name="id">Transaction group ID</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Transaction group details</returns>
-    /// <response code="200">Transaction group retrieved successfully</response>
-    /// <response code="401">User not authenticated</response>
-    /// <response code="404">Transaction group not found</response>
+    /// <remarks>
+    /// Retrieves detailed information about a specific transaction group. The group must belong
+    /// to the authenticated user - users cannot access groups created by other users.
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **Security:**
+    /// - Users can only retrieve their own transaction groups
+    /// - Attempting to access another user's group will return 404 Not Found
+    /// - Group ownership is verified before returning data
+    ///
+    /// **Use Cases:**
+    /// - Viewing details of a specific transaction group
+    /// - Retrieving group information before editing
+    /// - Displaying group details in the UI
+    ///
+    /// **Note:** ID must be a positive integer. Invalid IDs will return a 400 Bad Request error.
+    /// </remarks>
+    /// <param name="id">The unique identifier of the transaction group to retrieve (must be positive integer)</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>Transaction group details including name, description, owner, and creation date</returns>
+    /// <response code="200">Transaction group retrieved successfully - returns group object</response>
+    /// <response code="400">Invalid TransactionGroupId</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
+    /// <response code="404">Transaction group not found or does not belong to authenticated user</response>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(TransactionGroupResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken = default)
@@ -105,12 +150,32 @@ public class TransactionGroupController : ApiControllerBase
     /// <summary>
     /// Create a new transaction group for the authenticated user.
     /// </summary>
-    /// <param name="request">Transaction group creation request</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Created transaction group</returns>
-    /// <response code="201">Transaction group created successfully</response>
-    /// <response code="400">Invalid request data</response>
-    /// <response code="401">User not authenticated</response>
+    /// <remarks>
+    /// Creates a new transaction group for organizing related transactions. The group is automatically
+    /// associated with the authenticated user and can be used to categorize transactions.
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **Required Fields:**
+    /// - **Name**: Group name (cannot be empty)
+    ///
+    /// **Optional Fields:**
+    /// - **Description**: Detailed description of the group's purpose
+    ///
+    /// **Use Cases:**
+    /// - Creating a budget category for a specific project
+    /// - Setting up a group for vacation expenses
+    /// - Organizing business expenses by client
+    /// - Tracking monthly or yearly budgets
+    ///
+    /// **Note:** Group names do not need to be unique - multiple groups can have the same name.
+    /// </remarks>
+    /// <param name="request">Transaction group creation request containing name and optional description</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>Created transaction group with ID and timestamps</returns>
+    /// <response code="201">Transaction group created successfully - returns created group with Location header</response>
+    /// <response code="400">Invalid request data or validation errors (e.g., missing name)</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
     [HttpPost]
     [ProducesResponseType(typeof(TransactionGroupResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -147,14 +212,39 @@ public class TransactionGroupController : ApiControllerBase
     /// <summary>
     /// Update an existing transaction group.
     /// </summary>
-    /// <param name="id">Transaction group ID to update</param>
-    /// <param name="request">Transaction group update request</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Updated transaction group</returns>
-    /// <response code="200">Transaction group updated successfully</response>
-    /// <response code="400">Invalid request data</response>
-    /// <response code="401">User not authenticated</response>
-    /// <response code="404">Transaction group not found</response>
+    /// <remarks>
+    /// Updates the name and/or description of an existing transaction group. Only the group owner
+    /// can update the group. All transactions associated with the group remain unchanged.
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **Required Fields:**
+    /// - **Name**: Updated group name (cannot be empty)
+    ///
+    /// **Optional Fields:**
+    /// - **Description**: Updated description (can be null to remove description)
+    ///
+    /// **Security:**
+    /// - Users can only update their own transaction groups
+    /// - Attempting to update another user's group will return 404 Not Found
+    /// - Group ownership is verified before applying changes
+    ///
+    /// **Use Cases:**
+    /// - Renaming a group for clarity
+    /// - Updating group description with additional details
+    /// - Correcting typos in group information
+    ///
+    /// **Note:** The group ID in the URL must match an existing group owned by the authenticated user.
+    /// ID must be a positive integer.
+    /// </remarks>
+    /// <param name="id">The unique identifier of the transaction group to update (must be positive integer)</param>
+    /// <param name="request">Transaction group update request containing new name and optional description</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>Updated transaction group with new values and updated timestamp</returns>
+    /// <response code="200">Transaction group updated successfully - returns updated group object</response>
+    /// <response code="400">Invalid request data or validation errors (e.g., empty name, invalid ID)</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
+    /// <response code="404">Transaction group not found or does not belong to authenticated user</response>
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(TransactionGroupResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
@@ -197,12 +287,37 @@ public class TransactionGroupController : ApiControllerBase
     /// <summary>
     /// Delete a transaction group.
     /// </summary>
-    /// <param name="id">Transaction group ID to delete</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>No content on success</returns>
-    /// <response code="204">Transaction group deleted successfully</response>
-    /// <response code="401">User not authenticated</response>
-    /// <response code="404">Transaction group not found</response>
+    /// <remarks>
+    /// Permanently deletes a transaction group. Only the group owner can delete the group.
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **⚠️ Important:**
+    /// - Deleting a group does NOT delete the transactions within it
+    /// - Transactions will remain in the system but will no longer be associated with the group (set to null id)
+    /// - This action cannot be undone
+    ///
+    /// **Security:**
+    /// - Users can only delete their own transaction groups
+    /// - Attempting to delete another user's group will return 404 Not Found
+    /// - Group ownership is verified before deletion
+    ///
+    /// **Use Cases:**
+    /// - Removing obsolete or completed project groups
+    /// - Cleaning up old budget categories
+    /// - Removing accidentally created groups
+    ///
+    /// **Response:**
+    /// Returns 204 No Content on successful deletion with no response body.
+    ///
+    /// **Note:** ID must be a positive integer. Invalid IDs will return a 400 Bad Request error.
+    /// </remarks>
+    /// <param name="id">The unique identifier of the transaction group to delete (must be positive integer)</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>No content on successful deletion</returns>
+    /// <response code="204">Transaction group deleted successfully - no response body</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
+    /// <response code="404">Transaction group not found or does not belong to authenticated user</response>
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]

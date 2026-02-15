@@ -291,7 +291,7 @@ public class AuthApiTests : BaseE2ETest
     public async Task Health_ShouldReturnHealthyStatus()
     {
         // Act
-        var response = await Client.GetAsync(TestConstants.Routes.AuthHealth);
+        var response = await Client.GetAsync(TestConstants.Routes.Health);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -306,7 +306,7 @@ public class AuthApiTests : BaseE2ETest
         var unauthClient = Factory.CreateClient();
 
         // Act
-        var response = await unauthClient.GetAsync(TestConstants.Routes.AuthHealth);
+        var response = await unauthClient.GetAsync(TestConstants.Routes.Health);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);

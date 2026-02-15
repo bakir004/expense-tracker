@@ -548,7 +548,7 @@ public class CompleteUserJourneyTests : BaseE2ETest
     [Fact]
     public async Task HealthCheck_ShouldBeAccessible()
     {
-        var response = await Client.GetAsync(TestConstants.Routes.AuthHealth);
+        var response = await Client.GetAsync(TestConstants.Routes.Health);
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var content = await response.Content.ReadAsStringAsync();

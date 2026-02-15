@@ -5,6 +5,10 @@ namespace ExpenseTrackerAPI.Contracts.Users;
 /// <summary>
 /// Request contract for user registration.
 /// </summary>
+/// <param name="Name">User's full name (required, max 100 characters)</param>
+/// <param name="Email">User's email address - must be unique and in valid format (required, max 254 characters)</param>
+/// <param name="Password">User's password - must be 8-100 characters with at least one uppercase, one lowercase, one digit, and one special character (required)</param>
+/// <param name="InitialBalance">Optional starting account balance (defaults to 0.00 if not provided)</param>
 public record RegisterRequest(
     [Required(ErrorMessage = "Name is required")]
     [StringLength(100, ErrorMessage = "Name cannot exceed 100 characters")]
