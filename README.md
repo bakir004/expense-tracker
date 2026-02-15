@@ -40,9 +40,10 @@ If you see a version number, you have the .NET SDK installed. If not, please ins
 
 Once you have the .NET SDK installed, you can run the application locally by following these steps:
 1. Navigate to the project root directory in your terminal.
-2. Run the following command to restore dependencies and run the application:
+2. Run the following commands:
 
 ```bash
+dotnet build
 dotnet run --project src/ExpenseTracker.Api/ExpenseTracker.Api.csproj
 ```
 
@@ -65,6 +66,11 @@ In development mode, the API will attempt to connect to a PostgreSQL database at
 The database on startup needs to be empty. Running the API will automatically apply migrations and create tables in the database.
 Finally, it will seed it with some dummy data.
 
+You can run the test suite using the following command from the root directory:
+
+```bash
+dotnet test
+```
 
 #### Using `docker` in production
 To run the application in production using `docker`, you can use the `docker-compose.prod.yml` file,
