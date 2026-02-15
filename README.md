@@ -104,4 +104,4 @@ Verify that the API is running correctly and can connect to the database by hitt
 
 Keep in mind that the API has 10 attempts to reconnect to the database in case of connection failure, meaning the API wont respond to anything until the database is up.
 
-See the complete documentation at [ExpenseTracker API Documentation](/docs/API_DOCUMENTATION_SUMMARY.md) for detailed information on all endpoints, request/response formats, and usage examples.
+See the complete documentation at [ExpenseTracker API Documentation](docs/ARCHITECTURE.md) for detailed information on all endpoints, request/response formats, and usage examples.
