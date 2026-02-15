@@ -187,7 +187,7 @@ static string GetConnectionString(IConfiguration configuration, IWebHostEnvironm
     if (environment.IsProduction())
     {
         var host = Environment.GetEnvironmentVariable("DB_HOST") ?? "localhost";
-        var database = Environment.GetEnvironmentVariable("DB_NAME") ?? "expense_tracker_db";
+        var database = Environment.GetEnvironmentVariable("DB_NAME") ?? "expense-tracker-db";
         var username = Environment.GetEnvironmentVariable("DB_USER") ?? "postgres";
         var password = Environment.GetEnvironmentVariable("DB_PASSWORD") ?? throw new InvalidOperationException("DB_PASSWORD environment variable is required in production");
         var port = Environment.GetEnvironmentVariable("DB_PORT") ?? "5432";
@@ -253,10 +253,30 @@ static async Task InitializeDatabaseAsync(IServiceProvider services)
     {
         Log.Information("Checking database connectivity...");
 
-        var canConnect = await dbContext.Database.CanConnectAsync();
+        // Retry logic for Docker startup timing
+        const int maxRetries = 10;
+        const int delaySeconds = 3;
+        var canConnect = false;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            canConnect = await dbContext.Database.CanConnectAsync();
+            if (canConnect)
+            {
+                break;
+            }
+
+            if (attempt < maxRetries)
+            {
+                Log.Warning("Cannot connect to database (attempt {Attempt}/{MaxRetries}). Retrying in {Delay} seconds...",
+                    attempt, maxRetries, delaySeconds);
+                await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
+            }
+        }
+
         if (!canConnect)
         {
-            Log.Warning("Cannot connect to database");
+            Log.Warning("Cannot connect to database after {MaxRetries} attempts", maxRetries);
             return;
         }
 
