@@ -5,28 +5,28 @@
 ```
 📚 Documentation Structure
 │
-├── 📖 Main README.md ─────────────────────┐
-│                                          │
-├── 📋 docs/ARCHITECTURE.md (You are here) │
-│   └── Complete system overview           │
-│                                          │
-├── 🔌 API Layer Documentation             │
-│   └── src/WebApi/README.md              │
-│       └── All endpoints with examples    │
-│                                          │
-├── 📦 Core Layer Documentation            │
-│   ├── src/Domain/README.md              │
-│   │   └── Validation rules              │
-│   ├── src/Application/README.md         │
-│   │   └── Business logic                │
-│   ├── src/Infrastructure/README.md      │
-│   │   └── Cumulative delta system       │
-│   └── src/Contracts/README.md           │
-│       └── DTOs and mappings             │
-│                                          │
-└── 🧪 Test Documentation                  │
-    ├── tests/Domain.Tests/README.md      │
-    ├── tests/Application.Tests/README.md │
+├── 📖 Main README.md
+│                                          
+├── 📋 docs/ARCHITECTURE.md (You are here) 
+│   └── Complete system overview           
+│                                          
+├── 🔌 API Layer Documentation             
+│   └── src/WebApi/README.md              
+│       └── All endpoints with examples    
+│                                          
+├── 📦 Core Layer Documentation            
+│   ├── src/Domain/README.md              
+│   │   └── Validation rules              
+│   ├── src/Application/README.md         
+│   │   └── Business logic                
+│   ├── src/Infrastructure/README.md      
+│   │   └── Cumulative delta system       
+│   └── src/Contracts/README.md           
+│       └── DTOs and mappings             
+│                                          
+└── 🧪 Test Documentation                 
+    ├── tests/Domain.Tests/README.md      
+    ├── tests/Application.Tests/README.md 
     ├── tests/Infrastructure.Tests/README.md
     └── tests/WebApi.Tests/README.md      
 ```
@@ -35,7 +35,6 @@
 - 🚀 [Getting Started](../README.md#quickstart-guide)
 - 🔌 [API Endpoints](../src/ExpenseTrackerAPI.WebApi/README.md)
 - 💡 [Cumulative Delta Explained](../src/ExpenseTrackerAPI.Infrastructure/README.md#cumulative-delta-system)
-- 🐳 [Docker Setup](../docker/README.md)
 
 ---
 
@@ -163,12 +162,6 @@ The entry point of the application, handling HTTP requests and responses.
 - API versioning support
 
 ## Dependency Flow
-
-```
-WebApi → Application → Domain
-  ↓           ↓
-Contracts ← Infrastructure
-```
 
 - **WebApi** depends on Application, Contracts, Infrastructure
 - **Application** depends on Domain, Contracts
@@ -322,8 +315,6 @@ Comprehensive documentation is available for each layer of the application:
 
 ### 📚 Getting Started
 - **[Main README](../README.md)** - Quickstart guide and setup instructions
-- **[Docker Setup](../docker/README.md)** - Container configuration and deployment
-- **[Health Endpoints](../docker/HEALTH_ENDPOINTS.md)** - Health check documentation
 
 ### 🔌 API Documentation
 - **[WebApi Layer](../src/ExpenseTrackerAPI.WebApi/README.md)** - Complete API endpoint reference

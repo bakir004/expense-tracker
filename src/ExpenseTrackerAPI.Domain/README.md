@@ -918,13 +918,13 @@ var transaction = new Transaction(
 
 ### Related Documentation
 - **[Architecture Overview](../../docs/ARCHITECTURE.md)** - System design and layer responsibilities
-- **[Application Layer](../Application/README.md)** - Services using these entities
-- **[Infrastructure Layer](../Infrastructure/README.md)** - Repository implementations
-- **[Contracts Layer](../Contracts/README.md)** - Request/Response DTOs
-- **[WebApi Layer](../WebApi/README.md)** - API endpoints
+- **[Application Layer](../ExpenseTrackerAPI.Application/README.md)** - Services using these entities
+- **[Infrastructure Layer](../ExpenseTrackerAPI.Infrastructure/README.md)** - Repository implementations
+- **[Contracts Layer](../ExpenseTrackerAPI.Contracts/README.md)** - Request/Response DTOs
+- **[WebApi Layer](../ExpenseTrackerAPI.WebApi/README.md)** - API endpoints
 
 ### Testing
-- **[Domain Tests](../../tests/Domain.Tests/README.md)** - Tests for these validation rules
+- **[Domain Tests](../../tests/ExpenseTrackerAPI.Domain.Tests/README.md)** - Tests for these validation rules
 
 ---
 

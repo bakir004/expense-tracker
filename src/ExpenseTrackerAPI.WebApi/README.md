@@ -773,10 +773,10 @@ All errors follow the RFC 7807 Problem Details standard:
 
 ### Related Documentation
 - **[Architecture Overview](../../docs/ARCHITECTURE.md)** - System design and layer responsibilities
-- **[Domain Layer](../Domain/README.md)** - Business entities and validation rules
-- **[Application Layer](../Application/README.md)** - Services implementing business logic
-- **[Infrastructure Layer](../Infrastructure/README.md)** - Repository implementations and cumulative delta system
-- **[Contracts Layer](../Contracts/README.md)** - Request/Response DTOs used by these endpoints
+- **[Domain Layer](../ExpenseTrackerAPI.Domain/README.md)** - Business entities and validation rules
+- **[Application Layer](../ExpenseTrackerAPI.Application/README.md)** - Services implementing business logic
+- **[Infrastructure Layer](../ExpenseTrackerAPI.Infrastructure/README.md)** - Repository implementations and cumulative delta system
+- **[Contracts Layer](../ExpenseTrackerAPI.Contracts/README.md)** - Request/Response DTOs used by these endpoints
 
 ### Deployment & Configuration
 - **[Main README](../../README.md)** - Quickstart guide and setup instructions
@@ -784,7 +784,7 @@ All errors follow the RFC 7807 Problem Details standard:
 - **API Configuration**: `appsettings.json`
 
 ### Testing
-- **[WebApi Tests](../../tests/WebApi.Tests/README.md)** - E2E tests for these endpoints
+- **[WebApi Tests](../../tests/ExpenseTrackerAPI.WebApi.Tests/README.md)** - E2E tests for these endpoints
 
 ---
 

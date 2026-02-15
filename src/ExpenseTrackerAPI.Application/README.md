@@ -1025,13 +1025,13 @@ public async Task<ErrorOr<T>> OperationAsync(
 
 ### Related Documentation
 - **[Architecture Overview](../../docs/ARCHITECTURE.md)** - System design and layer responsibilities
-- **[Domain Layer](../Domain/README.md)** - Business entities and validation rules
-- **[Infrastructure Layer](../Infrastructure/README.md)** - Repository implementations
-- **[Contracts Layer](../Contracts/README.md)** - Request/Response DTOs
-- **[WebApi Layer](../WebApi/README.md)** - API endpoints
+- **[Domain Layer](../ExpenseTrackerAPI.Domain/README.md)** - Business entities and validation rules
+- **[Infrastructure Layer](../ExpenseTrackerAPI.Infrastructure/README.md)** - Repository implementations
+- **[Contracts Layer](../ExpenseTrackerAPI.Contracts/README.md)** - Request/Response DTOs
+- **[WebApi Layer](../ExpenseTrackerAPI.WebApi/README.md)** - API endpoints
 
 ### Testing
-- **[Application Tests](../../tests/Application.Tests/README.md)** - Tests for these services
+- **[Application Tests](../../tests/ExpenseTrackerAPI.Application.Tests/README.md)** - Tests for these services
 
 ---
 

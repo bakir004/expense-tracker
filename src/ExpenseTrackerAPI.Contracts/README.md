@@ -777,14 +777,14 @@ public record RegisterRequest(string Name, ...);
 
 ### Related Documentation
 - **[Architecture Overview](../../docs/ARCHITECTURE.md)** - System design and layer responsibilities
-- **[Domain Layer](../Domain/README.md)** - Business entities and validation rules
-- **[Application Layer](../Application/README.md)** - Services using these contracts
-- **[Infrastructure Layer](../Infrastructure/README.md)** - Repository implementations
-- **[WebApi Layer](../WebApi/README.md)** - Controllers using these contracts
+- **[Domain Layer](../ExpenseTrackerAPI.Domain/README.md)** - Business entities and validation rules
+- **[Application Layer](../ExpenseTrackerAPI.Application/README.md)** - Services using these contracts
+- **[Infrastructure Layer](../ExpenseTrackerAPI.Infrastructure/README.md)** - Repository implementations
+- **[WebApi Layer](../ExpenseTrackerAPI.WebApi/README.md)** - Controllers using these contracts
 
 ### Testing
-- **[Domain Tests](../../tests/Domain.Tests/README.md)** - Entity validation tests
-- **[WebApi Tests](../../tests/WebApi.Tests/README.md)** - E2E tests using these contracts
+- **[Domain Tests](../../tests/ExpenseTrackerAPI.Domain.Tests/README.md)** - Entity validation tests
+- **[WebApi Tests](../../tests/ExpenseTrackerAPI.WebApi.Tests/README.md)** - E2E tests using these contracts
 
 ---
 

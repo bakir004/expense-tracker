@@ -730,13 +730,13 @@ foreach (var tx in transactions.OrderBy(t => t.Date).ThenBy(t => t.CreatedAt))
 
 ### Related Documentation
 - **[Architecture Overview](../../docs/ARCHITECTURE.md)** - System design and layer responsibilities
-- **[Domain Layer](../Domain/README.md)** - Business entities and validation rules
-- **[Application Layer](../Application/README.md)** - Services using these repositories
-- **[Contracts Layer](../Contracts/README.md)** - Request/Response DTOs
-- **[WebApi Layer](../WebApi/README.md)** - API endpoints
+- **[Domain Layer](../ExpenseTrackerAPI.Domain/README.md)** - Business entities and validation rules
+- **[Application Layer](../ExpenseTrackerAPI.Application/README.md)** - Services using these repositories
+- **[Contracts Layer](../ExpenseTrackerAPI.Contracts/README.md)** - Request/Response DTOs
+- **[WebApi Layer](../ExpenseTrackerAPI.WebApi/README.md)** - API endpoints
 
 ### Testing
-- **[Infrastructure Tests](../../tests/Infrastructure.Tests/README.md)** - Tests for repositories and cumulative delta
+- **[Infrastructure Tests](../../tests/ExpenseTrackerAPI.Infrastructure.Tests/README.md)** - Tests for repositories and cumulative delta
 
 ---
 
