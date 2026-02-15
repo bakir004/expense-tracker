@@ -36,10 +36,9 @@ RUN mkdir -p /app/logs
 
 # Expose ports
 EXPOSE 5000
-EXPOSE 5001
 
 # Set environment variables
-ENV ASPNETCORE_URLS=http://+:5000;https://+:5001
+ENV ASPNETCORE_URLS=http://+:5000
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 # Health check

@@ -1,21 +1,21 @@
-version: "3.8"
-
 services:
     # PostgreSQL Database
     postgres:
         image: postgres:16-alpine
         container_name: expense-tracker-db
         restart: unless-stopped
+        env_file:
+            - ../.env
         environment:
-            POSTGRES_USER: postgres
-            POSTGRES_PASSWORD: postgres
-            POSTGRES_DB: expense_tracker_db
+            POSTGRES_USER: ${DB_USER}
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+            POSTGRES_DB: ${DB_NAME}
         ports:
-            - "5432:5432"
+            - "${DB_PORT:-5432}:5432"
         volumes:
             - postgres-data:/var/lib/postgresql/data
         healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
             interval: 10s
             timeout: 5s
             retries: 5
@@ -27,25 +27,13 @@ services:
         restart: unless-stopped
         ports:
             - "5000:5000"
-            - "5001:5001"
+        env_file:
+            - ../.env
         environment:
-            # Database Configuration
-            - DB_HOST=postgres
-            - DB_NAME=expense_tracker_db
-            - DB_USER=postgres
-            - DB_PASSWORD=postgres
-            - DB_PORT=5432
-            - DB_SSL_MODE=Disable
-
-            # JWT Configuration
-            - JWT_SECRET_KEY=your_production_jwt_secret_key_at_least_32_characters_long_change_me
-            - JWT_ISSUER=ExpenseTrackerAPI
-            - JWT_AUDIENCE=ExpenseTrackerAPI
-            - JWT_EXPIRY_HOURS=24
-
-            # Application Configuration
-            - ASPNETCORE_ENVIRONMENT=Production
-            - ASPNETCORE_URLS=http://+:5000
+            # Override DB_HOST for container networking - don't use localhost, use service name
+            DB_HOST: postgres
+            # Override ASPNETCORE_URLS to only use HTTP (no HTTPS cert in container)
+            ASPNETCORE_URLS: http://+:5000
         depends_on:
             postgres:
                 condition: service_healthy
