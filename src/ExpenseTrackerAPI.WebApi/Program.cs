@@ -4,6 +4,7 @@ using ExpenseTrackerAPI.Infrastructure.Persistence;
 using ExpenseTrackerAPI.Infrastructure.Shared;
 using ExpenseTrackerAPI.WebApi.Extensions;
 using ExpenseTrackerAPI.WebApi.Middleware;
+using ExpenseTrackerAPI.WebApi.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 ConfigureJwtSettings(builder.Services, builder.Configuration, builder.Environment);
+
+// Configure ApiSettings from appsettings.json and environment variables
+ConfigureApiSettings(builder.Configuration, builder.Environment);
+builder.Services.Configure<ApiSettings>(builder.Configuration.GetSection("ApiSettings"));
 
 builder.Services.AddControllers();
 
@@ -217,6 +222,25 @@ static void ConfigureJwtSettings(IServiceCollection services, IConfiguration con
     if (string.IsNullOrEmpty(secretKey))
     {
         throw new InvalidOperationException("JWT SecretKey is not configured");
+    }
+}
+
+static void ConfigureApiSettings(IConfiguration configuration, IWebHostEnvironment environment)
+{
+    if (environment.IsProduction())
+    {
+        var maxPageSize = Environment.GetEnvironmentVariable("API_MAX_PAGE_SIZE");
+        var defaultPageSize = Environment.GetEnvironmentVariable("API_DEFAULT_PAGE_SIZE");
+
+        if (!string.IsNullOrEmpty(maxPageSize))
+        {
+            configuration["ApiSettings:MaxPageSize"] = maxPageSize;
+        }
+
+        if (!string.IsNullOrEmpty(defaultPageSize))
+        {
+            configuration["ApiSettings:DefaultPageSize"] = defaultPageSize;
+        }
     }
 }
 

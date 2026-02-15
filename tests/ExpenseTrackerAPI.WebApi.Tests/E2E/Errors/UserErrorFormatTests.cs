@@ -18,15 +18,15 @@ public class UserErrorFormatTests : BaseE2ETest
     #region Update Profile Error Format Tests
 
     [Fact]
-    public async Task UpdateProfile_WithEmptyName_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
+    public async Task UpdateProfile_WithInvalidEmailOnly_ShouldReturnValidationProblemDetailsWithoutDotsInKeys()
     {
-        // Arrange
+        // Arrange - Since Name is now optional, test with invalid email instead
         var request = new UpdateUserRequest(
-            Name: "",
-            Email: TestConstants.TestUsers.SeededUser1Email,
+            Name: null,
+            Email: "invalid-email",
             NewPassword: null,
             CurrentPassword: TestConstants.TestUsers.SeededUserPassword,
-            InitialBalance: 0m);
+            InitialBalance: null);
 
         // Act
         var response = await Client.PutAsJsonAsync(TestConstants.Routes.UserProfile, request);
@@ -48,7 +48,7 @@ public class UserErrorFormatTests : BaseE2ETest
 
         problemDetails.Status.Should().Be(400);
         problemDetails.Errors.Should().NotBeNull();
-        problemDetails.Errors.Should().ContainKey("Name");
+        problemDetails.Errors.Should().ContainKey("Email");
     }
 
     [Fact]

@@ -102,7 +102,7 @@ public record TransactionFilterRequest
 
     /// <summary>
     /// Number of items per page.
-    /// Default: 20, Maximum: 100
+    /// Default: 20, Maximum: 50
     /// </summary>
     public int? PageSize { get; init; }
 }

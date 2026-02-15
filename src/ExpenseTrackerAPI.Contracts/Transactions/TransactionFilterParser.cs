@@ -17,10 +17,24 @@ public static class TransactionFilterParser
     /// <summary>
     /// Parses and validates a <see cref="TransactionFilterRequest"/> into a <see cref="TransactionFilter"/>.
     /// Returns validation errors if the request contains invalid values.
+    /// Uses default page size settings.
     /// </summary>
     /// <param name="request">The filter request to parse. Can be null for default filtering.</param>
     /// <returns>A validated <see cref="TransactionFilter"/> or validation errors.</returns>
     public static ErrorOr<TransactionFilter> Parse(TransactionFilterRequest? request)
+    {
+        return Parse(request, MaxPageSize, DefaultPageSize);
+    }
+
+    /// <summary>
+    /// Parses and validates a <see cref="TransactionFilterRequest"/> into a <see cref="TransactionFilter"/>.
+    /// Returns validation errors if the request contains invalid values.
+    /// </summary>
+    /// <param name="request">The filter request to parse. Can be null for default filtering.</param>
+    /// <param name="maxPageSize">Maximum allowed page size.</param>
+    /// <param name="defaultPageSize">Default page size when not specified.</param>
+    /// <returns>A validated <see cref="TransactionFilter"/> or validation errors.</returns>
+    public static ErrorOr<TransactionFilter> Parse(TransactionFilterRequest? request, int maxPageSize, int defaultPageSize)
     {
         if (request is null)
         {
@@ -168,7 +182,7 @@ public static class TransactionFilterParser
 
         // Validate pagination
         var page = request.Page ?? 1;
-        var pageSize = request.PageSize ?? DefaultPageSize;
+        var pageSize = request.PageSize ?? defaultPageSize;
 
         if (page < 1)
         {
@@ -179,9 +193,9 @@ public static class TransactionFilterParser
         {
             errors.Add(Error.Validation("PageSize", "Page size must be at least 1."));
         }
-        else if (pageSize > MaxPageSize)
+        else if (pageSize > maxPageSize)
         {
-            errors.Add(Error.Validation("PageSize", $"Page size cannot exceed {MaxPageSize}."));
+            errors.Add(Error.Validation("PageSize", $"Page size cannot exceed {maxPageSize}."));
         }
 
         // Return errors if any

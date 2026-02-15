@@ -4,6 +4,8 @@ using ExpenseTrackerAPI.Contracts.Transactions;
 using Microsoft.AspNetCore.Authorization;
 using Asp.Versioning;
 using ExpenseTrackerAPI.Domain.Errors;
+using Microsoft.Extensions.Options;
+using ExpenseTrackerAPI.WebApi.Configuration;
 
 namespace ExpenseTrackerAPI.WebApi.Controllers.V1;
 
@@ -18,18 +20,22 @@ public class TransactionController : ApiControllerBase
 {
     private readonly ITransactionService _transactionService;
     private readonly ILogger<TransactionController> _logger;
+    private readonly ApiSettings _apiSettings;
 
     /// <summary>
     /// Initializes a new instance of the TransactionController class.
     /// </summary>
     /// <param name="transactionService">Transaction service</param>
     /// <param name="logger">Logger instance</param>
+    /// <param name="apiSettings">API configuration settings</param>
     public TransactionController(
         ITransactionService transactionService,
-        ILogger<TransactionController> logger)
+        ILogger<TransactionController> logger,
+        IOptions<ApiSettings> apiSettings)
     {
         _transactionService = transactionService ?? throw new ArgumentNullException(nameof(transactionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _apiSettings = apiSettings?.Value ?? throw new ArgumentNullException(nameof(apiSettings));
     }
 
     /// <summary>
@@ -92,7 +98,7 @@ public class TransactionController : ApiControllerBase
     /// <param name="sortBy">Field to sort by: date, amount, subject, paymentMethod, createdAt, updatedAt (default: date)</param>
     /// <param name="sortDirection">Sort direction: asc for ascending, desc for descending (default: desc)</param>
     /// <param name="page">Page number starting from 1 (default: 1)</param>
-    /// <param name="pageSize">Number of items per page, maximum 100 (default: 20)</param>
+    /// <param name="pageSize">Number of items per page, maximum 50 (default: 20)</param>
     /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
     /// <returns>Paginated list of transactions matching the filter criteria with pagination metadata</returns>
     /// <response code="200">Transactions retrieved successfully - returns paginated transaction list</response>
@@ -147,8 +153,8 @@ public class TransactionController : ApiControllerBase
             PageSize = pageSize
         };
 
-        // Parse and validate the filter request
-        var parseResult = TransactionFilterParser.Parse(filterRequest);
+        // Parse and validate the filter request with configured page size settings
+        var parseResult = TransactionFilterParser.Parse(filterRequest, _apiSettings.MaxPageSize, _apiSettings.DefaultPageSize);
         if (parseResult.IsError)
         {
             _logger.LogWarning("Invalid filter parameters for user {UserId}: {Errors}",
