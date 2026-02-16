@@ -29,6 +29,18 @@ builder.Services.Configure<RouteOptions>(options =>
     options.LowercaseQueryStrings = true;
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:5173")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials(); // Required if you are sending cookies/JWTs
+        });
+});
+
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = (context) =>
@@ -54,6 +66,7 @@ builder.Services.AddProblemDetails(options =>
         }
     };
 });
+
 
 builder.Services.AddEndpointsApiExplorer();
 
@@ -103,6 +116,7 @@ builder.Services.AddJwtAuthentication(builder.Configuration);
 var app = builder.Build();
 
 app.UseSerilogRequestLogging();
+app.UseCors("AllowReactApp");
 
 // if (app.Environment.IsDevelopment())
 // {
