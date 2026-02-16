@@ -77,6 +77,8 @@ To run the application in production using `docker`, you can use the `docker-com
 which is configured to use the `.env` file for settings. `Program.cs` will try to pull environment variables
 to form the connection string, and in case it fails, it has default fallbacks (except DB_PASSWORD which is required).
 
+*Note: the `.env` file must be in the same location as the `docker-compose.prod.yml` file. If you like your `.env` file in the root of the project, then I suggest using symlinks to create a reference in the `/docker` directory that points to the root `.env`.*
+
 For this, the allocated .yml file is `docker-compose.prod.yml` which relies on the image of API being already built.
 Build the image with the following command (keep in mind that the `docker-compose.prod.yml` uses my Docker Hub username
 so if you wish to include your own changes, dont forget to change the official image name):
