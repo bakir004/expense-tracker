@@ -33,7 +33,7 @@ public interface ITransactionRepository
     /// <param name="filter">Filter, sort, and pagination options</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>List of matching transactions</returns>
-    Task<ErrorOr<List<Transaction>>> GetByUserIdWithFilterAsync(
+    Task<ErrorOr<(List<Transaction> Transactions, int TotalCount)>> GetByUserIdWithFilterAsync(
         int userId,
         TransactionFilter filter,
         CancellationToken cancellationToken);

@@ -144,11 +144,15 @@ public class TransactionService : ITransactionService
             return result.Errors;
         }
 
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
 
         return new TransactionFilterResponse
         {
-            Transactions = transactions.Select(t => t.ToResponse()).ToList()
+            Transactions = transactions.Select(t => t.ToResponse()).ToList(),
+            CurrentPage = filter.Page,
+            PageSize = filter.PageSize,
+            TotalCount = totalCount,
+            TotalPages = (int)Math.Ceiling((double)totalCount / filter.PageSize)
         };
     }
 }

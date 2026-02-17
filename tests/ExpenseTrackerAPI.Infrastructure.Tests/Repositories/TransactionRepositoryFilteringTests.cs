@@ -177,7 +177,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Equal(TransactionType.EXPENSE, t.TransactionType));
     }
@@ -197,7 +197,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Equal(TransactionType.INCOME, t.TransactionType));
     }
@@ -216,7 +216,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
     }
 
@@ -239,7 +239,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.True(t.Amount >= 50m));
     }
@@ -259,7 +259,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.True(t.Amount <= 50m));
     }
@@ -281,7 +281,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         Assert.All(transactions, t => Assert.True(t.Amount >= 50m && t.Amount <= 100m));
     }
@@ -301,7 +301,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Equal(50m, t.Amount));
     }
@@ -325,7 +325,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.True(t.Date >= new DateOnly(2024, 1, 5)));
     }
@@ -345,7 +345,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.True(t.Date <= new DateOnly(2024, 1, 5)));
     }
@@ -370,7 +370,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         Assert.All(transactions, t => Assert.True(
             t.Date >= new DateOnly(2024, 1, 5) && t.Date <= new DateOnly(2024, 1, 10)));
@@ -393,7 +393,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Equal(targetDate, t.Date));
     }
@@ -417,7 +417,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Contains("shopping", t.Subject, StringComparison.OrdinalIgnoreCase));
     }
@@ -437,7 +437,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
     }
 
@@ -456,7 +456,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Contains("payment", t.Notes ?? "", StringComparison.OrdinalIgnoreCase));
     }
@@ -475,7 +475,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Single(transactions);
         Assert.NotNull(transactions[0].Notes);
     }
@@ -495,7 +495,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Single(transactions);
         Assert.Contains("coffee", transactions[0].Subject, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("urgent", transactions[0].Notes ?? "", StringComparison.OrdinalIgnoreCase);
@@ -520,7 +520,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Equal(PaymentMethod.CASH, t.PaymentMethod));
     }
@@ -543,7 +543,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         Assert.All(transactions, t => Assert.Contains(t.PaymentMethod,
             new[] { PaymentMethod.CASH, PaymentMethod.DEBIT_CARD, PaymentMethod.CREDIT_CARD }));
@@ -563,7 +563,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
     }
 
@@ -586,7 +586,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Equal(_testCategory1.Id, t.CategoryId));
     }
@@ -606,7 +606,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.True(
             t.CategoryId == _testCategory1.Id || t.CategoryId == _testCategory2.Id));
@@ -627,7 +627,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Null(t.CategoryId));
     }
@@ -646,7 +646,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
     }
 
@@ -669,7 +669,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Equal(_testGroup1.Id, t.TransactionGroupId));
     }
@@ -689,7 +689,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.True(
             t.TransactionGroupId == _testGroup1.Id || t.TransactionGroupId == _testGroup2.Id));
@@ -710,7 +710,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.All(transactions, t => Assert.Null(t.TransactionGroupId));
     }
@@ -729,7 +729,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
     }
 
@@ -752,7 +752,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         Assert.Equal(new DateOnly(2024, 1, 1), transactions[0].Date);
         Assert.Equal(new DateOnly(2024, 1, 5), transactions[1].Date);
@@ -774,7 +774,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         Assert.Equal(new DateOnly(2024, 1, 10), transactions[0].Date);
         Assert.Equal(new DateOnly(2024, 1, 5), transactions[1].Date);
@@ -796,7 +796,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         Assert.Equal(25m, transactions[0].Amount);
         Assert.Equal(50m, transactions[1].Amount);
@@ -818,7 +818,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         Assert.Equal(100m, transactions[0].Amount);
         Assert.Equal(50m, transactions[1].Amount);
@@ -840,7 +840,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         Assert.Equal("Apple", transactions[0].Subject);
         Assert.Equal("Mango", transactions[1].Subject);
@@ -863,7 +863,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         Assert.Equal("First", transactions[0].Subject);
         Assert.Equal("Second", transactions[1].Subject);
@@ -891,7 +891,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         Assert.Equal("Newest update", transactions[0].Subject);
     }
@@ -913,7 +913,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         // All same date, so should be sorted by CreatedAt ascending
         Assert.Equal("First", transactions[0].Subject);
@@ -941,7 +941,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.Equal("Transaction 1", transactions[0].Subject);
         Assert.Equal("Transaction 2", transactions[1].Subject);
@@ -963,7 +963,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count);
         Assert.Equal("Transaction 3", transactions[0].Subject);
         Assert.Equal("Transaction 4", transactions[1].Subject);
@@ -985,7 +985,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Single(transactions);
         Assert.Equal("Transaction 5", transactions[0].Subject);
     }
@@ -1006,7 +1006,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Empty(transactions);
     }
 
@@ -1026,7 +1026,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(10, transactions.Count);
     }
 
@@ -1053,7 +1053,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Single(transactions);
         Assert.Equal(TransactionType.EXPENSE, transactions[0].TransactionType);
         Assert.True(transactions[0].Amount >= 50m);
@@ -1079,7 +1079,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Single(transactions);
         Assert.Equal("In range cash", transactions[0].Subject);
     }
@@ -1105,7 +1105,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Single(transactions);
         Assert.Equal("Cat1 Group1", transactions[0].Subject);
     }
@@ -1128,7 +1128,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Single(transactions);
         Assert.Equal("Coffee shop", transactions[0].Subject);
     }
@@ -1164,7 +1164,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(2, transactions.Count); // Should return first two transactions
         Assert.All(transactions, t =>
         {
@@ -1218,7 +1218,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Single(transactions);
         Assert.Equal(_testUser.Id, transactions[0].UserId);
         Assert.Equal("Test user transaction", transactions[0].Subject);
@@ -1239,7 +1239,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Empty(transactions);
     }
 
@@ -1256,7 +1256,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Empty(transactions);
     }
 
@@ -1275,7 +1275,7 @@ public class TransactionRepositoryFilteringTests : IAsyncLifetime
 
         // Assert
         Assert.False(result.IsError);
-        var transactions = result.Value;
+        var (transactions, totalCount) = result.Value;
         Assert.Equal(3, transactions.Count);
         // Default sort is by Date descending
         Assert.Equal("Newest", transactions[0].Subject);

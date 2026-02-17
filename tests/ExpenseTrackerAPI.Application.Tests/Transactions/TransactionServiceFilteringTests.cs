@@ -93,7 +93,7 @@ public class TransactionServiceFilteringTests
 
         _transactionRepositoryMock
             .Setup(x => x.GetByUserIdWithFilterAsync(userId, filter, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(transactions);
+            .ReturnsAsync((transactions, transactions.Count));
 
         // Act
         var result = await _sut.GetByUserIdWithFilterAsync(userId, filter, CancellationToken.None);
@@ -182,7 +182,7 @@ public class TransactionServiceFilteringTests
 
         _transactionRepositoryMock
             .Setup(x => x.GetByUserIdWithFilterAsync(userId, filter, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Transaction>());
+            .ReturnsAsync((new List<Transaction>(), 0));
 
         // Act
         var result = await _sut.GetByUserIdWithFilterAsync(userId, filter, CancellationToken.None);
@@ -226,7 +226,7 @@ public class TransactionServiceFilteringTests
 
         _transactionRepositoryMock
             .Setup(x => x.GetByUserIdWithFilterAsync(userId, filter, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(transactions);
+            .ReturnsAsync((transactions, transactions.Count));
 
         // Act
         var result = await _sut.GetByUserIdWithFilterAsync(userId, filter, CancellationToken.None);
@@ -281,7 +281,7 @@ public class TransactionServiceFilteringTests
 
         _transactionRepositoryMock
             .Setup(x => x.GetByUserIdWithFilterAsync(userId, filter, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Transaction> { transaction });
+            .ReturnsAsync((new List<Transaction> { transaction }, 1));
 
         // Act
         var result = await _sut.GetByUserIdWithFilterAsync(userId, filter, CancellationToken.None);

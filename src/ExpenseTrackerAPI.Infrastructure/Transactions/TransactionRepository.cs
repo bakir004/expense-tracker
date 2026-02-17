@@ -329,7 +329,7 @@ public class TransactionRepository : ITransactionRepository
         }
     }
 
-    public async Task<ErrorOr<List<Transaction>>> GetByUserIdWithFilterAsync(
+    public async Task<ErrorOr<(List<Transaction> Transactions, int TotalCount)>> GetByUserIdWithFilterAsync(
         int userId,
         TransactionFilter filter,
         CancellationToken cancellationToken)
@@ -340,19 +340,18 @@ public class TransactionRepository : ITransactionRepository
                 .AsNoTracking()
                 .Where(t => t.UserId == userId);
 
-            // Apply filters
             query = ApplyFilters(query, filter);
 
-            // Apply sorting
+            var totalCount = await query.CountAsync(cancellationToken);
+
             query = ApplySorting(query, filter);
 
-            // Apply pagination
             var transactions = await query
                 .Skip(filter.Skip)
                 .Take(filter.PageSize)
                 .ToListAsync(cancellationToken);
 
-            return transactions;
+            return (transactions, totalCount);
         }
         catch (Exception ex)
         {

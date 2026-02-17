@@ -121,6 +121,86 @@ public static class DatabaseSeeder
             t11.UpdateCumulativeDelta(3700m);
             transactions.Add(t11);
 
+                        var t12 = new Transaction(UserId(0), TransactionType.EXPENSE, 85m, today.AddDays(-20), "Restaurant dinner", PaymentMethod.CREDIT_CARD, "Date night at Italian bistro", Cat(5), null);
+            t12.UpdateCumulativeDelta(3255m); // 3340 - 85
+            transactions.Add(t12);
+
+            var t13 = new Transaction(UserId(0), TransactionType.EXPENSE, 45m, today.AddDays(-19), "Streaming subscriptions", PaymentMethod.CREDIT_CARD, "Netflix, Spotify bundle", Cat(6), null);
+            t13.UpdateCumulativeDelta(3210m); // 3255 - 45
+            transactions.Add(t13);
+
+            var t14 = new Transaction(UserId(0), TransactionType.EXPENSE, 120m, today.AddDays(-18), "Electricity bill", PaymentMethod.BANK_TRANSFER, null, Cat(7), null);
+            t14.UpdateCumulativeDelta(3090m); // 3210 - 120
+            transactions.Add(t14);
+
+            var t15 = new Transaction(UserId(0), TransactionType.EXPENSE, 75m, today.AddDays(-17), "Grocery shopping", PaymentMethod.DEBIT_CARD, "Weekly groceries at Whole Foods", Cat(0), null);
+            t15.UpdateCumulativeDelta(3015m); // 3090 - 75
+            transactions.Add(t15);
+
+            var t16 = new Transaction(UserId(0), TransactionType.EXPENSE, 200m, today.AddDays(-16), "Gym annual membership", PaymentMethod.CREDIT_CARD, null, Cat(3), null);
+            t16.UpdateCumulativeDelta(2815m); // 3015 - 200
+            transactions.Add(t16);
+
+            var t17 = new Transaction(UserId(0), TransactionType.INCOME, 250m, today.AddDays(-15), "Online course sale", PaymentMethod.PAYPAL, null, Cat(10), null);
+            t17.UpdateCumulativeDelta(3065m); // 2815 + 250
+            transactions.Add(t17);
+
+            var t18 = new Transaction(UserId(0), TransactionType.EXPENSE, 30m, today.AddDays(-14), "Coffee shop work session", PaymentMethod.DEBIT_CARD, "Weekly remote work at café", Cat(5), null);
+            t18.UpdateCumulativeDelta(3035m); // 3065 - 30
+            transactions.Add(t18);
+
+            var t19 = new Transaction(UserId(0), TransactionType.EXPENSE, 95m, today.AddDays(-13), "Pharmacy prescriptions", PaymentMethod.DEBIT_CARD, null, Cat(4), null);
+            t19.UpdateCumulativeDelta(2940m); // 3035 - 95
+            transactions.Add(t19);
+
+            var t20 = new Transaction(UserId(0), TransactionType.EXPENSE, 400m, today.AddDays(-12), "Hotel booking", PaymentMethod.CREDIT_CARD, "2 nights Paris hotel", Cat(1), GroupId(0));
+            t20.UpdateCumulativeDelta(2540m); // 2940 - 400
+            transactions.Add(t20);
+
+            var t21 = new Transaction(UserId(0), TransactionType.EXPENSE, 60m, today.AddDays(-11), "Grocery shopping", PaymentMethod.DEBIT_CARD, "Midweek top-up at Trader Joe's", Cat(0), null);
+            t21.UpdateCumulativeDelta(2480m); // 2540 - 60
+            transactions.Add(t21);
+
+            var t22 = new Transaction(UserId(0), TransactionType.INCOME, 180m, today.AddDays(-10), "Cashback reward redemption", PaymentMethod.BANK_TRANSFER, null, Cat(9), null);
+            t22.UpdateCumulativeDelta(2660m); // 2480 + 180
+            transactions.Add(t22);
+
+            var t23 = new Transaction(UserId(0), TransactionType.EXPENSE, 55m, today.AddDays(-9), "Internet bill", PaymentMethod.BANK_TRANSFER, null, Cat(7), null);
+            t23.UpdateCumulativeDelta(2605m); // 2660 - 55
+            transactions.Add(t23);
+
+            var t24 = new Transaction(UserId(0), TransactionType.EXPENSE, 140m, today.AddDays(-8), "New shoes", PaymentMethod.CREDIT_CARD, "Running shoes from Nike outlet", Cat(3), null);
+            t24.UpdateCumulativeDelta(2465m); // 2605 - 140
+            transactions.Add(t24);
+
+            var t25 = new Transaction(UserId(0), TransactionType.EXPENSE, 70m, today.AddDays(-7), "Grocery shopping", PaymentMethod.DEBIT_CARD, "Weekly groceries at Whole Foods", Cat(0), null);
+            t25.UpdateCumulativeDelta(2395m); // 2465 - 70
+            transactions.Add(t25);
+
+            var t26 = new Transaction(UserId(0), TransactionType.INCOME, 600m, today.AddDays(-6), "Freelance project", PaymentMethod.PAYPAL, "UI design for startup client", Cat(10), null);
+            t26.UpdateCumulativeDelta(2995m); // 2395 + 600
+            transactions.Add(t26);
+
+            var t27 = new Transaction(UserId(0), TransactionType.EXPENSE, 25m, today.AddDays(-5), "Parking fees", PaymentMethod.DEBIT_CARD, null, Cat(1), null);
+            t27.UpdateCumulativeDelta(2970m); // 2995 - 25
+            transactions.Add(t27);
+
+            var t28 = new Transaction(UserId(0), TransactionType.EXPENSE, 90m, today.AddDays(-4), "Dinner with friends", PaymentMethod.CREDIT_CARD, "Birthday celebration at steakhouse", Cat(5), null);
+            t28.UpdateCumulativeDelta(2880m); // 2970 - 90
+            transactions.Add(t28);
+
+            var t29 = new Transaction(UserId(0), TransactionType.EXPENSE, 110m, today.AddDays(-3), "Phone bill", PaymentMethod.BANK_TRANSFER, null, Cat(7), null);
+            t29.UpdateCumulativeDelta(2770m); // 2880 - 110
+            transactions.Add(t29);
+
+            var t30 = new Transaction(UserId(0), TransactionType.EXPENSE, 65m, today.AddDays(-2), "Grocery shopping", PaymentMethod.DEBIT_CARD, "Weekend grocery run", Cat(0), null);
+            t30.UpdateCumulativeDelta(2705m); // 2770 - 65
+            transactions.Add(t30);
+
+            var t31 = new Transaction(UserId(0), TransactionType.INCOME, 3500m, today.AddDays(-1), "Monthly salary", PaymentMethod.BANK_TRANSFER, null, Cat(8), null);
+            t31.UpdateCumulativeDelta(6205m); // 2705 + 3500
+            transactions.Add(t31);
+
             context.Transactions.AddRange(transactions);
             await context.SaveChangesAsync(cancellationToken);
         }
@@ -191,6 +271,86 @@ public static class DatabaseSeeder
 
             var t11 = new Transaction(UserId(1), TransactionType.EXPENSE, 500m, today.AddDays(-21), "Wedding venue deposit", PaymentMethod.BANK_TRANSFER, "Initial deposit for the reception venue", Cat(3), GroupId(2));
             t11.UpdateCumulativeDelta(3700m); transactions.Add(t11);
+
+            var t12 = new Transaction(UserId(0), TransactionType.EXPENSE, 85m, today.AddDays(-20), "Restaurant dinner", PaymentMethod.CREDIT_CARD, "Date night at Italian bistro", Cat(5), null);
+            t12.UpdateCumulativeDelta(3255m); // 3340 - 85
+            transactions.Add(t12);
+
+            var t13 = new Transaction(UserId(0), TransactionType.EXPENSE, 45m, today.AddDays(-19), "Streaming subscriptions", PaymentMethod.CREDIT_CARD, "Netflix, Spotify bundle", Cat(6), null);
+            t13.UpdateCumulativeDelta(3210m); // 3255 - 45
+            transactions.Add(t13);
+
+            var t14 = new Transaction(UserId(0), TransactionType.EXPENSE, 120m, today.AddDays(-18), "Electricity bill", PaymentMethod.BANK_TRANSFER, null, Cat(7), null);
+            t14.UpdateCumulativeDelta(3090m); // 3210 - 120
+            transactions.Add(t14);
+
+            var t15 = new Transaction(UserId(0), TransactionType.EXPENSE, 75m, today.AddDays(-17), "Grocery shopping", PaymentMethod.DEBIT_CARD, "Weekly groceries at Whole Foods", Cat(0), null);
+            t15.UpdateCumulativeDelta(3015m); // 3090 - 75
+            transactions.Add(t15);
+
+            var t16 = new Transaction(UserId(0), TransactionType.EXPENSE, 200m, today.AddDays(-16), "Gym annual membership", PaymentMethod.CREDIT_CARD, null, Cat(3), null);
+            t16.UpdateCumulativeDelta(2815m); // 3015 - 200
+            transactions.Add(t16);
+
+            var t17 = new Transaction(UserId(0), TransactionType.INCOME, 250m, today.AddDays(-15), "Online course sale", PaymentMethod.PAYPAL, null, Cat(10), null);
+            t17.UpdateCumulativeDelta(3065m); // 2815 + 250
+            transactions.Add(t17);
+
+            var t18 = new Transaction(UserId(0), TransactionType.EXPENSE, 30m, today.AddDays(-14), "Coffee shop work session", PaymentMethod.DEBIT_CARD, "Weekly remote work at café", Cat(5), null);
+            t18.UpdateCumulativeDelta(3035m); // 3065 - 30
+            transactions.Add(t18);
+
+            var t19 = new Transaction(UserId(0), TransactionType.EXPENSE, 95m, today.AddDays(-13), "Pharmacy prescriptions", PaymentMethod.DEBIT_CARD, null, Cat(4), null);
+            t19.UpdateCumulativeDelta(2940m); // 3035 - 95
+            transactions.Add(t19);
+
+            var t20 = new Transaction(UserId(0), TransactionType.EXPENSE, 400m, today.AddDays(-12), "Hotel booking", PaymentMethod.CREDIT_CARD, "2 nights Paris hotel", Cat(1), GroupId(0));
+            t20.UpdateCumulativeDelta(2540m); // 2940 - 400
+            transactions.Add(t20);
+
+            var t21 = new Transaction(UserId(0), TransactionType.EXPENSE, 60m, today.AddDays(-11), "Grocery shopping", PaymentMethod.DEBIT_CARD, "Midweek top-up at Trader Joe's", Cat(0), null);
+            t21.UpdateCumulativeDelta(2480m); // 2540 - 60
+            transactions.Add(t21);
+
+            var t22 = new Transaction(UserId(0), TransactionType.INCOME, 180m, today.AddDays(-10), "Cashback reward redemption", PaymentMethod.BANK_TRANSFER, null, Cat(9), null);
+            t22.UpdateCumulativeDelta(2660m); // 2480 + 180
+            transactions.Add(t22);
+
+            var t23 = new Transaction(UserId(0), TransactionType.EXPENSE, 55m, today.AddDays(-9), "Internet bill", PaymentMethod.BANK_TRANSFER, null, Cat(7), null);
+            t23.UpdateCumulativeDelta(2605m); // 2660 - 55
+            transactions.Add(t23);
+
+            var t24 = new Transaction(UserId(0), TransactionType.EXPENSE, 140m, today.AddDays(-8), "New shoes", PaymentMethod.CREDIT_CARD, "Running shoes from Nike outlet", Cat(3), null);
+            t24.UpdateCumulativeDelta(2465m); // 2605 - 140
+            transactions.Add(t24);
+
+            var t25 = new Transaction(UserId(0), TransactionType.EXPENSE, 70m, today.AddDays(-7), "Grocery shopping", PaymentMethod.DEBIT_CARD, "Weekly groceries at Whole Foods", Cat(0), null);
+            t25.UpdateCumulativeDelta(2395m); // 2465 - 70
+            transactions.Add(t25);
+
+            var t26 = new Transaction(UserId(0), TransactionType.INCOME, 600m, today.AddDays(-6), "Freelance project", PaymentMethod.PAYPAL, "UI design for startup client", Cat(10), null);
+            t26.UpdateCumulativeDelta(2995m); // 2395 + 600
+            transactions.Add(t26);
+
+            var t27 = new Transaction(UserId(0), TransactionType.EXPENSE, 25m, today.AddDays(-5), "Parking fees", PaymentMethod.DEBIT_CARD, null, Cat(1), null);
+            t27.UpdateCumulativeDelta(2970m); // 2995 - 25
+            transactions.Add(t27);
+
+            var t28 = new Transaction(UserId(0), TransactionType.EXPENSE, 90m, today.AddDays(-4), "Dinner with friends", PaymentMethod.CREDIT_CARD, "Birthday celebration at steakhouse", Cat(5), null);
+            t28.UpdateCumulativeDelta(2880m); // 2970 - 90
+            transactions.Add(t28);
+
+            var t29 = new Transaction(UserId(0), TransactionType.EXPENSE, 110m, today.AddDays(-3), "Phone bill", PaymentMethod.BANK_TRANSFER, null, Cat(7), null);
+            t29.UpdateCumulativeDelta(2770m); // 2880 - 110
+            transactions.Add(t29);
+
+            var t30 = new Transaction(UserId(0), TransactionType.EXPENSE, 65m, today.AddDays(-2), "Grocery shopping", PaymentMethod.DEBIT_CARD, "Weekend grocery run", Cat(0), null);
+            t30.UpdateCumulativeDelta(2705m); // 2770 - 65
+            transactions.Add(t30);
+
+            var t31 = new Transaction(UserId(0), TransactionType.INCOME, 3500m, today.AddDays(-1), "Monthly salary", PaymentMethod.BANK_TRANSFER, null, Cat(8), null);
+            t31.UpdateCumulativeDelta(6205m); // 2705 + 3500
+            transactions.Add(t31);
 
             context.Transactions.AddRange(transactions);
             await context.SaveChangesAsync(cancellationToken);
