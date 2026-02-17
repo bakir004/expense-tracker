@@ -78,7 +78,8 @@ expense-tracker/
 ├── tests/
 │   ├── ExpenseTrackerAPI.Application.Tests/
 │   ├── ExpenseTrackerAPI.Infrastructure.Tests/
-│   └── ExpenseTrackerAPI.WebApi.Tests/
+│   ├── ExpenseTrackerAPI.WebApi.Tests/
+│   └── ExpenseTrackerAPI.Domain.Tests/
 ├── docker/
 │   ├── Dockerfile
 │   ├── docker-compose.yml                  # Development
