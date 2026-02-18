@@ -130,7 +130,6 @@ public class TransactionService : ITransactionService
         TransactionFilter filter,
         CancellationToken cancellationToken)
     {
-        // Verify user exists
         var userResult = await _userRepository.GetByIdAsync(userId, cancellationToken);
         if (userResult.IsError)
         {

@@ -7,7 +7,6 @@ using ExpenseTrackerAPI.Domain.Errors;
 using ExpenseTrackerAPI.Application.Transactions.Interfaces.Infrastructure;
 using ExpenseTrackerAPI.Infrastructure.Persistence;
 using ExpenseTrackerAPI.Contracts.Transactions;
-using System.Linq.Expressions;
 
 namespace ExpenseTrackerAPI.Infrastructure.Transactions;
 
@@ -452,6 +451,14 @@ public class TransactionRepository : ITransactionRepository
             TransactionSortField.PaymentMethod => filter.SortDescending
                 ? query.OrderByDescending(t => t.PaymentMethod)
                 : query.OrderBy(t => t.PaymentMethod),
+
+            TransactionSortField.CategoryId => filter.SortDescending
+                ? query.OrderByDescending(t => t.CategoryId)
+                : query.OrderBy(t => t.CategoryId),
+
+            TransactionSortField.TransactionGroupId => filter.SortDescending
+                ? query.OrderByDescending(t => t.TransactionGroupId)
+                : query.OrderBy(t => t.TransactionGroupId),
 
             TransactionSortField.CreatedAt => filter.SortDescending
                 ? query.OrderByDescending(t => t.CreatedAt)

@@ -133,6 +133,12 @@ public enum TransactionSortField
     /// <summary>Sort by subject alphabetically.</summary>
     Subject,
 
+    /// <summary>Sort (Group) by category.</summary>
+    CategoryId,
+
+    /// <summary>Sort (Group) by transaction group.</summary>
+    TransactionGroupId,
+
     /// <summary>Sort by payment method.</summary>
     PaymentMethod,
 

@@ -1,7 +1,6 @@
 using ExpenseTrackerAPI.Domain.Entities;
 using ExpenseTrackerAPI.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using BCrypt.Net;
 
 namespace ExpenseTrackerAPI.Infrastructure.Shared;
 

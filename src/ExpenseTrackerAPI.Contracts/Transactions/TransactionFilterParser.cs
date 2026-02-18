@@ -288,6 +288,8 @@ public static class TransactionFilterParser
             "amount" => TransactionSortField.Amount,
             "subject" => TransactionSortField.Subject,
             "paymentmethod" or "payment_method" => TransactionSortField.PaymentMethod,
+            "categoryid" or "category_id" => TransactionSortField.CategoryId,
+            "transactiongroupid" or "transaction_group_id" => TransactionSortField.TransactionGroupId,
             "createdat" or "created_at" => TransactionSortField.CreatedAt,
             "updatedat" or "updated_at" => TransactionSortField.UpdatedAt,
             _ => Error.Validation("SortBy", $"Invalid sort field: '{value}'. Valid values are: date, amount, subject, paymentMethod, createdAt, updatedAt.")

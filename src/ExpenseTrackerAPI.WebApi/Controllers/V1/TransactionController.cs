@@ -29,9 +29,9 @@ public class TransactionController : ApiControllerBase
     /// <param name="logger">Logger instance</param>
     /// <param name="apiSettings">API configuration settings</param>
     public TransactionController(
-        ITransactionService transactionService,
-        ILogger<TransactionController> logger,
-        IOptions<ApiSettings> apiSettings)
+            ITransactionService transactionService,
+            ILogger<TransactionController> logger,
+            IOptions<ApiSettings> apiSettings)
     {
         _transactionService = transactionService ?? throw new ArgumentNullException(nameof(transactionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -60,7 +60,7 @@ public class TransactionController : ApiControllerBase
     /// - **ungrouped**: Set to true to get only transactions without groups
     ///
     /// **Sorting:**
-    /// - **sortBy**: date, amount, subject, paymentMethod, createdAt, updatedAt (default: date)
+    /// - **sortBy**: date, amount, subject, categoryId, transactionGroupId, paymentMethod, createdAt, updatedAt (default: date)
     /// - **sortDirection**: asc or desc (default: desc)
     ///
     /// **Pagination:**
@@ -95,7 +95,7 @@ public class TransactionController : ApiControllerBase
     /// <param name="uncategorized">Set to true to filter for transactions without a category</param>
     /// <param name="transactionGroupIds">Filter by transaction group IDs as comma-separated values (e.g., 1,2,3)</param>
     /// <param name="ungrouped">Set to true to filter for transactions without a transaction group</param>
-    /// <param name="sortBy">Field to sort by: date, amount, subject, paymentMethod, createdAt, updatedAt (default: date)</param>
+    /// <param name="sortBy">Field to sort by: date, amount, subject, categoryId, transactionGroupid, paymentMethod, createdAt, updatedAt (default: date)</param>
     /// <param name="sortDirection">Sort direction: asc for ascending, desc for descending (default: desc)</param>
     /// <param name="page">Page number starting from 1 (default: 1)</param>
     /// <param name="pageSize">Number of items per page, maximum 50 (default: 20)</param>
@@ -109,30 +109,29 @@ public class TransactionController : ApiControllerBase
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetTransactions(
-        [FromQuery] string? transactionType = null,
-        [FromQuery] decimal? minAmount = null,
-        [FromQuery] decimal? maxAmount = null,
-        [FromQuery] string? dateFrom = null,
-        [FromQuery] string? dateTo = null,
-        [FromQuery] string? subjectContains = null,
-        [FromQuery] string? notesContains = null,
-        [FromQuery] string? paymentMethods = null,
-        [FromQuery] string? categoryIds = null,
-        [FromQuery] bool? uncategorized = null,
-        [FromQuery] string? transactionGroupIds = null,
-        [FromQuery] bool? ungrouped = null,
-        [FromQuery] string? sortBy = null,
-        [FromQuery] string? sortDirection = null,
-        [FromQuery] int? page = null,
-        [FromQuery] int? pageSize = null,
-        CancellationToken cancellationToken = default)
+            [FromQuery] string? transactionType = null,
+            [FromQuery] decimal? minAmount = null,
+            [FromQuery] decimal? maxAmount = null,
+            [FromQuery] string? dateFrom = null,
+            [FromQuery] string? dateTo = null,
+            [FromQuery] string? subjectContains = null,
+            [FromQuery] string? notesContains = null,
+            [FromQuery] string? paymentMethods = null,
+            [FromQuery] string? categoryIds = null,
+            [FromQuery] bool? uncategorized = null,
+            [FromQuery] string? transactionGroupIds = null,
+            [FromQuery] bool? ungrouped = null,
+            [FromQuery] string? sortBy = null,
+            [FromQuery] string? sortDirection = null,
+            [FromQuery] int? page = null,
+            [FromQuery] int? pageSize = null,
+            CancellationToken cancellationToken = default)
     {
         var unauthorizedResult = CheckUserContext();
         if (unauthorizedResult != null) return unauthorizedResult;
 
         var userId = GetRequiredUserId();
 
-        // Build filter request from query parameters
         var filterRequest = new TransactionFilterRequest
         {
             TransactionType = transactionType,
@@ -153,12 +152,11 @@ public class TransactionController : ApiControllerBase
             PageSize = pageSize
         };
 
-        // Parse and validate the filter request with configured page size settings
         var parseResult = TransactionFilterParser.Parse(filterRequest, _apiSettings.MaxPageSize, _apiSettings.DefaultPageSize);
         if (parseResult.IsError)
         {
             _logger.LogWarning("Invalid filter parameters for user {UserId}: {Errors}",
-                userId, string.Join(", ", parseResult.Errors.Select(e => e.Description)));
+                    userId, string.Join(", ", parseResult.Errors.Select(e => e.Description)));
             return Problem(parseResult.Errors);
         }
 
@@ -169,7 +167,7 @@ public class TransactionController : ApiControllerBase
         if (result.IsError)
         {
             _logger.LogWarning("Failed to get transactions for user {UserId}: {Errors}",
-                userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+                    userId, string.Join(", ", result.Errors.Select(e => e.Description)));
             return Problem(result.Errors);
         }
 
@@ -240,7 +238,7 @@ public class TransactionController : ApiControllerBase
         if (result.IsError)
         {
             _logger.LogWarning("Failed to get transaction {TransactionId} for user {UserId}: {Errors}",
-                id, userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+                    id, userId, string.Join(", ", result.Errors.Select(e => e.Description)));
             return Problem(result.Errors);
         }
 
@@ -302,41 +300,40 @@ public class TransactionController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CreateTransaction(
-        [FromBody] CreateTransactionRequest request,
-        CancellationToken cancellationToken = default)
+            [FromBody] CreateTransactionRequest request,
+            CancellationToken cancellationToken = default)
     {
         var unauthorizedResult = CheckUserContext();
         if (unauthorizedResult != null) return unauthorizedResult;
 
         var userId = GetRequiredUserId();
 
-        // Parse and validate string values to enums
         var parseResult = TransactionRequestParser.ParseCreateRequest(request);
         if (parseResult.IsError)
         {
             _logger.LogWarning("Invalid transaction request for user {UserId}: {Errors}",
-                userId, string.Join(", ", parseResult.Errors.Select(e => e.Description)));
+                    userId, string.Join(", ", parseResult.Errors.Select(e => e.Description)));
             return Problem(parseResult.Errors);
         }
 
         var (transactionType, paymentMethod) = parseResult.Value;
 
         var result = await _transactionService.CreateAsync(
-            userId: userId,
-            transactionType: transactionType,
-            amount: request.Amount,
-            date: request.Date,
-            subject: request.Subject,
-            notes: request.Notes,
-            paymentMethod: paymentMethod,
-            categoryId: request.CategoryId,
-            transactionGroupId: request.TransactionGroupId,
-            cancellationToken: cancellationToken);
+                userId: userId,
+                transactionType: transactionType,
+                amount: request.Amount,
+                date: request.Date,
+                subject: request.Subject,
+                notes: request.Notes,
+                paymentMethod: paymentMethod,
+                categoryId: request.CategoryId,
+                transactionGroupId: request.TransactionGroupId,
+                cancellationToken: cancellationToken);
 
         if (result.IsError)
         {
             _logger.LogWarning("Failed to create transaction for user {UserId}: {Errors}",
-                userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+                    userId, string.Join(", ", result.Errors.Select(e => e.Description)));
             return Problem(result.Errors);
         }
 
@@ -395,9 +392,9 @@ public class TransactionController : ApiControllerBase
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateTransaction(
-        int id,
-        [FromBody] UpdateTransactionRequest request,
-        CancellationToken cancellationToken = default)
+            int id,
+            [FromBody] UpdateTransactionRequest request,
+            CancellationToken cancellationToken = default)
     {
         if (id <= 0)
         {
@@ -415,29 +412,29 @@ public class TransactionController : ApiControllerBase
         if (parseResult.IsError)
         {
             _logger.LogWarning("Invalid transaction update request for user {UserId}: {Errors}",
-                userId, string.Join(", ", parseResult.Errors.Select(e => e.Description)));
+                    userId, string.Join(", ", parseResult.Errors.Select(e => e.Description)));
             return Problem(parseResult.Errors);
         }
 
         var (transactionType, paymentMethod) = parseResult.Value;
 
         var result = await _transactionService.UpdateAsync(
-            id: id,
-            userId: userId,
-            transactionType: transactionType,
-            amount: request.Amount,
-            date: request.Date,
-            subject: request.Subject,
-            notes: request.Notes,
-            paymentMethod: paymentMethod,
-            categoryId: request.CategoryId,
-            transactionGroupId: request.TransactionGroupId,
-            cancellationToken: cancellationToken);
+                id: id,
+                userId: userId,
+                transactionType: transactionType,
+                amount: request.Amount,
+                date: request.Date,
+                subject: request.Subject,
+                notes: request.Notes,
+                paymentMethod: paymentMethod,
+                categoryId: request.CategoryId,
+                transactionGroupId: request.TransactionGroupId,
+                cancellationToken: cancellationToken);
 
         if (result.IsError)
         {
             _logger.LogWarning("Failed to update transaction {TransactionId} for user {UserId}: {Errors}",
-                id, userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+                    id, userId, string.Join(", ", result.Errors.Select(e => e.Description)));
             return Problem(result.Errors);
         }
 
@@ -505,7 +502,7 @@ public class TransactionController : ApiControllerBase
         if (result.IsError)
         {
             _logger.LogWarning("Failed to delete transaction {TransactionId} for user {UserId}: {Errors}",
-                id, userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+                    id, userId, string.Join(", ", result.Errors.Select(e => e.Description)));
             return Problem(result.Errors);
         }
 
