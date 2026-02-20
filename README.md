@@ -112,4 +112,13 @@ Verify that the API is running correctly and can connect to the database by hitt
 
 Keep in mind that the API has 10 attempts to reconnect to the database in case of connection failure, meaning the API wont respond to anything until the database is up.
 
+#### Seeded users
+Since most endpoints are protected and require authentication, the API seeds the database with some dummy users on startup.
+Here are the credentials for the seeded users:
+| Email | Password  |
+|----------|-----------|
+| john.doe@email.com | Password123! |
+| jane.smith@email.com | Password123! | 
+| mike.wilson@email.com| Password123! |
+
 See the complete documentation at [ExpenseTracker API Documentation](docs/ARCHITECTURE.md) for detailed information on all endpoints, request/response formats, and usage examples.
