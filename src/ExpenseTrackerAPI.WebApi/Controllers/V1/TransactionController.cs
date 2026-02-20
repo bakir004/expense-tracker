@@ -510,6 +510,56 @@ public class TransactionController : ApiControllerBase
     }
 
     /// <summary>
+    /// Batch delete transactions.
+    /// </summary>
+    /// <remarks>
+    /// Permanently deletes a list of transactions. Only transactions owned by the authenticated user will be deleted.
+    /// This action is atomic; if the service fails, no transactions are deleted.
+    ///
+    /// **Security:**
+    /// - Ownership is verified for all provided IDs.
+    /// - If any transaction does not belong to the user, the operation will fail or skip based on service logic.
+    /// </remarks>
+    /// <param name="ids">A list of unique identifiers for the transactions to delete</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <response code="204">Transactions deleted successfully</response>
+    /// <response code="400">Invalid ID list or empty request</response>
+    /// <response code="401">User not authenticated</response>
+    /// <response code="404">One or more transactions not found</response>
+    [HttpDelete("batch")] // Changed from {id:int} to a static "batch" route
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> BatchDeleteTransactions(
+        [FromBody] List<int> ids, 
+        CancellationToken cancellationToken = default)
+    {
+        if (ids == null || !ids.Any() || ids.Any(id => id <= 0))
+        {
+            _logger.LogWarning("Invalid batch delete request: IDs are empty or contain non-positive values. User: {UserId}", GetUserId());
+            return Problem(TransactionErrors.InvalidTransactionId);
+        }
+
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
+
+        var userId = GetRequiredUserId();
+
+        var result = await _transactionService.DeleteBatchAsync(ids, userId, cancellationToken);
+
+        if (result.IsError)
+        {
+            _logger.LogWarning("Failed to batch delete {Count} transactions for user {UserId}: {Errors}",
+                ids.Count, userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+            
+            return Problem(result.Errors);
+        }
+
+        return NoContent();
+    }
+
+    /// <summary>
     /// Parses a comma-separated string into a string array.
     /// </summary>
     private static string[]? ParseCommaSeparatedArray(string? value)

@@ -125,6 +125,29 @@ public class TransactionService : ITransactionService
         return await _transactionRepository.DeleteAsync(id, cancellationToken);
     }
 
+    public async Task<ErrorOr<int>> DeleteBatchAsync(List<int> ids, int userId, CancellationToken cancellationToken)
+    {
+        int deletedCount = 0;
+        foreach (var transactionId in ids)
+        {
+            var existingTransaction = await _transactionRepository.GetByIdAsync(transactionId, userId, cancellationToken);
+
+            if (existingTransaction.IsError)
+                continue; // Skip not found transactions
+
+            var transactionOwnerId = existingTransaction.Value.UserId;
+
+            if (transactionOwnerId != userId)
+                continue; // Skip transactions that don't belong to the user
+
+            var result = await _transactionRepository.DeleteAsync(transactionId, cancellationToken);
+            if (result.IsError)
+                continue; // Skip transactions that failed to delete
+            deletedCount++;
+        }
+        return deletedCount;
+    }
+
     public async Task<ErrorOr<TransactionFilterResponse>> GetByUserIdWithFilterAsync(
         int userId,
         TransactionFilter filter,

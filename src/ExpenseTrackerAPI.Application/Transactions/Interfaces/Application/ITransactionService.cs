@@ -47,6 +47,11 @@ public interface ITransactionService
     Task<ErrorOr<Deleted>> DeleteAsync(int id, int userId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Batch delete transactions
+    /// </summary>
+    Task<ErrorOr<int>> DeleteBatchAsync(List<int> ids, int userId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Get transactions for a user with optional filters, sorting, and pagination.
     /// </summary>
     /// <param name="userId">The user ID to filter transactions by</param>
