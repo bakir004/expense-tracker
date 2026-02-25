@@ -1,5 +1,3 @@
-using ExpenseTrackerAPI.Domain.Errors;
-
 namespace ExpenseTrackerAPI.Domain.Entities;
 
 /// <summary>
