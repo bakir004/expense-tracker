@@ -37,4 +37,14 @@ public interface ITransactionRepository
         int userId,
         TransactionFilter filter,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Get aggregated data for transaction net chart (income vs expenses) for a user.
+    /// </summary>
+    Task<ErrorOr<TransactionNetChartDataResponse>> GetTransactionNetChartDataAsync(int userId, GetTransactionNetChartDataRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Get aggregated data for transactions by category chart for a user.
+    /// </summary>
+    Task<ErrorOr<TransactionByCategoryChartDataResponse>> GetTransactionByCategoryChartDataAsync(int userId, CancellationToken cancellationToken);
 }

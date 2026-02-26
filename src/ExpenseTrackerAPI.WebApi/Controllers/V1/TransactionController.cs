@@ -560,6 +560,87 @@ public class TransactionController : ApiControllerBase
     }
 
     /// <summary>
+    /// Get aggregated transaction data for time-series charting.
+    /// </summary>
+    /// <remarks>
+    /// Groups transactions by date and calculates daily totals for income, expenses, and net balance.
+    /// Useful for building bar, line, or area charts showing financial trends.
+    /// 
+    /// **Logic:**
+    /// - **NetIncome**: Sum of all positive amounts for that day.
+    /// - **NetExpenses**: Sum of all negative amounts for that day.
+    /// - **NetAmount**: The final balance for the day (Income + Expenses).
+    /// - **Transactions**: The full list of individual transaction details that occurred on that date.
+    ///
+    /// **Authentication:** Required (Bearer Token).
+    /// </remarks>
+    /// <param name="request">The date range for the chart data (yyyy-MM-dd).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns the aggregated chart data points sorted by date ascending.</response>
+    /// <response code="400">If the date range is invalid (e.g., dateFrom is after dateTo).</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    [HttpPost("net-chart-data")] 
+    [ProducesResponseType(typeof(TransactionNetChartDataResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetTransactionNetChartData(
+        [FromBody] GetTransactionNetChartDataRequest request, 
+        CancellationToken cancellationToken = default)
+    {
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
+
+        var userId = GetRequiredUserId();
+
+        var result = await _transactionService.GetTransactionNetChartDataAsync(userId, request, cancellationToken);
+
+        if (result.IsError)
+        {
+            _logger.LogWarning("Failed to get transaction net chart data for user {UserId}: {Errors}",
+                    userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return Problem(result.Errors);
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Get aggregated transaction data by category.
+    /// </summary>
+    /// <remarks>
+    /// Groups transactions by CategoryId and calculates total spending per category.
+    /// Useful for pie charts or horizontal bar charts showing spending distribution.
+    /// 
+    /// **Authentication:** Required (Bearer Token).
+    /// </remarks>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <response code="200">Returns the aggregated category data.</response>
+    /// <response code="401">If the user is not authenticated.</response>
+    [HttpGet("category-chart-data")] // Changed to GET
+    [ProducesResponseType(typeof(TransactionByCategoryChartDataResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetTransactionByCategoryChartData(
+        CancellationToken cancellationToken = default)
+    {
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
+
+        var userId = GetRequiredUserId();
+
+        // Calling the new Service method we just wrote
+        var result = await _transactionService.GetTransactionByCategoryChartDataAsync(userId, cancellationToken);
+
+        if (result.IsError)
+        {
+            _logger.LogWarning("Failed to get category chart data for user {UserId}: {Errors}",
+                    userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return Problem(result.Errors);
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     /// Parses a comma-separated string into a string array.
     /// </summary>
     private static string[]? ParseCommaSeparatedArray(string? value)
@@ -591,4 +672,6 @@ public class TransactionController : ApiControllerBase
 
         return result.Count > 0 ? result.ToArray() : null;
     }
+
+
 }

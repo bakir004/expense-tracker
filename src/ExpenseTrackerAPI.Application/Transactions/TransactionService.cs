@@ -177,4 +177,67 @@ public class TransactionService : ITransactionService
             TotalPages = (int)Math.Ceiling((double)totalCount / filter.PageSize)
         };
     }
+
+    public async Task<ErrorOr<TransactionNetChartDataResponse>> GetTransactionNetChartDataAsync(
+        int userId,
+        GetTransactionNetChartDataRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userResult = await _userRepository.GetByIdAsync(userId, cancellationToken);
+        if (userResult.IsError)
+        {
+            return UserErrors.NotFound;
+        }
+
+        var result = await _transactionRepository.GetTransactionNetChartDataAsync(userId, request, cancellationToken);
+
+        if (result.IsError)
+        {
+            return result.Errors;
+        }
+
+        var chartData = result.Value.ChartData.Select(d => new TransactionNetChartData
+        {
+            Date = d.Date,
+            NetAmount = d.NetAmount,
+            NetExpenses = d.NetExpenses,
+            NetIncome = d.NetIncome,
+            Transactions = d.Transactions
+        }).ToList();
+
+        return new TransactionNetChartDataResponse
+        {
+            ChartData = chartData
+        };
+    }
+
+    public async Task<ErrorOr<TransactionByCategoryChartDataResponse>> GetTransactionByCategoryChartDataAsync(
+            int userId,
+            CancellationToken cancellationToken)
+    {
+        var userResult = await _userRepository.GetByIdAsync(userId, cancellationToken);
+        if (userResult.IsError)
+        {
+            return UserErrors.NotFound;
+        }
+
+        var result = await _transactionRepository.GetTransactionByCategoryChartDataAsync(userId, cancellationToken);
+
+        if (result.IsError)
+        {
+            return result.Errors;
+        }
+
+        var chartData = result.Value.ChartData.Select(d => new TransactionByCategoryChartData
+                {
+                CategoryId = d.CategoryId,
+                NetExpenses = d.NetExpenses,
+                Transactions = d.Transactions
+                }).ToList();
+
+        return new TransactionByCategoryChartDataResponse
+        {
+            ChartData = chartData
+        };
+    }
 }
