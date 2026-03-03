@@ -51,6 +51,7 @@ public static class DependencyInjectionExtensions
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<ITransactionCSVService, TransactionCSVService>();
         services.AddScoped<ITransactionGroupRepository, TransactionGroupRepository>();
 
         return services;

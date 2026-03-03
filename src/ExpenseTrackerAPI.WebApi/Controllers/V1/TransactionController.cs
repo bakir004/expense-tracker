@@ -616,7 +616,7 @@ public class TransactionController : ApiControllerBase
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <response code="200">Returns the aggregated category data.</response>
     /// <response code="401">If the user is not authenticated.</response>
-    [HttpGet("category-chart-data")] // Changed to GET
+    [HttpGet("category-chart-data")]
     [ProducesResponseType(typeof(TransactionByCategoryChartDataResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetTransactionByCategoryChartData(
@@ -627,12 +627,136 @@ public class TransactionController : ApiControllerBase
 
         var userId = GetRequiredUserId();
 
-        // Calling the new Service method we just wrote
         var result = await _transactionService.GetTransactionByCategoryChartDataAsync(userId, cancellationToken);
 
         if (result.IsError)
         {
             _logger.LogWarning("Failed to get category chart data for user {UserId}: {Errors}",
+                    userId, string.Join(", ", result.Errors.Select(e => e.Description)));
+            return Problem(result.Errors);
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Get csv export of transactions based on filters.
+    /// </summary>
+    /// <remarks>
+    /// Retrieves transactions with powerful filtering, sorting, and pagination capabilities. Use this endpoint
+    /// to query expenses and income with various criteria for reporting, budgeting, and analysis.
+    ///
+    /// **Authentication:** Required - must include valid JWT token in Authorization header
+    ///
+    /// **Filtering Options:**
+    /// - **transactionType**: Filter by EXPENSE or INCOME
+    /// - **minAmount/maxAmount**: Filter by amount range (inclusive)
+    /// - **dateFrom/dateTo**: Filter by date range in yyyy-MM-dd format (inclusive)
+    /// - **subjectContains**: Search in transaction subjects (case-insensitive)
+    /// - **notesContains**: Search in transaction notes (case-insensitive)
+    /// - **paymentMethods**: Comma-separated list (CASH, DEBIT_CARD, CREDIT_CARD, BANK_TRANSFER, MOBILE_PAYMENT, PAYPAL, CRYPTO, OTHER)
+    /// - **categoryIds**: Comma-separated category IDs
+    /// - **uncategorized**: Set to true to get only transactions without categories
+    /// - **transactionGroupIds**: Comma-separated transaction group IDs
+    /// - **ungrouped**: Set to true to get only transactions without groups
+    ///
+    /// **Sorting:**
+    /// - **sortBy**: date, amount, subject, categoryId, transactionGroupId, paymentMethod, createdAt, updatedAt (default: date)
+    /// - **sortDirection**: asc or desc (default: desc)
+    ///
+    /// **Response Fields:**
+    /// - **transactions**: Array of transaction objects
+    /// - **totalCount**: Total number of transactions matching filters
+    /// - **page**: Current page number
+    /// - **pageSize**: Items per page
+    /// - **totalPages**: Total number of pages
+    ///
+    /// **Use Cases:**
+    /// - Viewing all expenses for a specific month
+    /// - Filtering transactions by category for budget analysis
+    /// - Searching for specific transactions by subject
+    /// - Generating reports for specific date ranges
+    /// - Tracking cash flow by payment method
+    ///
+    /// **Note:** Only transactions belonging to the authenticated user are returned.
+    /// </remarks>
+    /// <param name="transactionType">Filter by transaction type: EXPENSE or INCOME</param>
+    /// <param name="minAmount">Filter by minimum amount (inclusive, e.g., 10.00)</param>
+    /// <param name="maxAmount">Filter by maximum amount (inclusive, e.g., 1000.00)</param>
+    /// <param name="dateFrom">Filter by start date in yyyy-MM-dd format (inclusive, e.g., 2024-01-01)</param>
+    /// <param name="dateTo">Filter by end date in yyyy-MM-dd format (inclusive, e.g., 2024-12-31)</param>
+    /// <param name="subjectContains">Filter by subject containing this text (case-insensitive)</param>
+    /// <param name="notesContains">Filter by notes containing this text (case-insensitive)</param>
+    /// <param name="paymentMethods">Filter by payment methods as comma-separated values (e.g., CASH,DEBIT_CARD,CREDIT_CARD)</param>
+    /// <param name="categoryIds">Filter by category IDs as comma-separated values (e.g., 1,2,3)</param>
+    /// <param name="uncategorized">Set to true to filter for transactions without a category</param>
+    /// <param name="transactionGroupIds">Filter by transaction group IDs as comma-separated values (e.g., 1,2,3)</param>
+    /// <param name="ungrouped">Set to true to filter for transactions without a transaction group</param>
+    /// <param name="sortBy">Field to sort by: date, amount, subject, categoryId, transactionGroupid, paymentMethod, createdAt, updatedAt (default: date)</param>
+    /// <param name="sortDirection">Sort direction: asc for ascending, desc for descending (default: desc)</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the operation</param>
+    /// <returns>Paginated list of transactions matching the filter criteria with pagination metadata</returns>
+    /// <response code="200">Transactions retrieved successfully - returns paginated transaction list</response>
+    /// <response code="400">Invalid filter parameters (e.g., invalid date format, invalid enum values)</response>
+    /// <response code="401">User not authenticated - valid JWT token required</response>
+    [HttpGet("export")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ExportTransactionsToCsv(
+        [FromQuery] string? transactionType = null,
+        [FromQuery] decimal? minAmount = null,
+        [FromQuery] decimal? maxAmount = null,
+        [FromQuery] string? dateFrom = null,
+        [FromQuery] string? dateTo = null,
+        [FromQuery] string? subjectContains = null,
+        [FromQuery] string? notesContains = null,
+        [FromQuery] string? paymentMethods = null,
+        [FromQuery] string? categoryIds = null,
+        [FromQuery] bool? uncategorized = null,
+        [FromQuery] string? transactionGroupIds = null,
+        [FromQuery] bool? ungrouped = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDirection = null,
+        CancellationToken cancellationToken = default) {
+        var unauthorizedResult = CheckUserContext();
+        if (unauthorizedResult != null) return unauthorizedResult;
+
+        var userId = GetRequiredUserId();
+
+        var filterRequest = new TransactionFilterRequest
+        {
+            TransactionType = transactionType,
+            MinAmount = minAmount,
+            MaxAmount = maxAmount,
+            DateFrom = dateFrom,
+            DateTo = dateTo,
+            SubjectContains = subjectContains,
+            NotesContains = notesContains,
+            PaymentMethods = ParseCommaSeparatedArray(paymentMethods),
+            CategoryIds = ParseCommaSeparatedIntArray(categoryIds),
+            Uncategorized = uncategorized,
+            TransactionGroupIds = ParseCommaSeparatedIntArray(transactionGroupIds),
+            Ungrouped = ungrouped,
+            SortBy = sortBy,
+            SortDirection = sortDirection,
+        };
+
+        var parseResult = TransactionFilterParser.Parse(filterRequest, _apiSettings.MaxPageSize, _apiSettings.DefaultPageSize);
+        if (parseResult.IsError)
+        {
+            _logger.LogWarning("Invalid filter parameters for user {UserId}: {Errors}",
+                    userId, string.Join(", ", parseResult.Errors.Select(e => e.Description)));
+            return Problem(parseResult.Errors);
+        }
+
+        var filter = parseResult.Value;
+
+        var result = await _transactionService.ExportTransactionsToCSVAsync(userId, filter, cancellationToken);
+
+        if (result.IsError)
+        {
+            _logger.LogWarning("Failed to get transactions for user {UserId}: {Errors}",
                     userId, string.Join(", ", result.Errors.Select(e => e.Description)));
             return Problem(result.Errors);
         }

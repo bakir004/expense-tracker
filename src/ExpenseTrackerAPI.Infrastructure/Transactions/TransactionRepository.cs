@@ -525,7 +525,7 @@ public class TransactionRepository : ITransactionRepository
                 .Select(g => new 
                         {
                         CategoryId = g.Key,
-                        TotalAmount = g.Sum(t => t.SignedAmount),
+                        TotalAmount = g.Where(t => t.SignedAmount < 0).Sum(t => t.SignedAmount),
                         RawTransactions = g.OrderByDescending(x => x.Date).Take(10).ToList() 
                         })
             .ToListAsync(cancellationToken);
@@ -533,7 +533,7 @@ public class TransactionRepository : ITransactionRepository
             var finalResult = rawData.Select(d => new TransactionByCategoryChartData
                     {
                     CategoryId = d.CategoryId,
-                    NetExpenses = Math.Abs(d.TotalAmount), 
+                    NetExpenses = d.TotalAmount,
                     Transactions = d.RawTransactions.Select(t => new TransactionResponse(
                                 t.Id, t.UserId, t.TransactionType.ToString(),
                                 t.Amount, t.SignedAmount, t.Date, t.Subject, t.Notes,

@@ -16,13 +16,17 @@ public class TransactionService : ITransactionService
 {
     private readonly ITransactionRepository _transactionRepository;
     private readonly IUserRepository _userRepository;
+    private readonly ITransactionCSVService _transactionCSVService;
 
     public TransactionService(
         ITransactionRepository transactionRepository,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        ITransactionCSVService transactionCSVService
+        )
     {
         _transactionRepository = transactionRepository ?? throw new ArgumentNullException(nameof(transactionRepository));
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+        _transactionCSVService = transactionCSVService ?? throw new ArgumentNullException(nameof(transactionCSVService));
     }
 
     public async Task<ErrorOr<Transaction>> GetByIdAsync(int id, int userId, CancellationToken cancellationToken)
@@ -239,5 +243,18 @@ public class TransactionService : ITransactionService
         {
             ChartData = chartData
         };
+    }
+
+    public async Task<ErrorOr<Stream>> ExportTransactionsToCSVAsync(int userId, TransactionFilter filters, CancellationToken cancellationToken)
+    {
+        var userResult = await _userRepository.GetByIdAsync(userId, cancellationToken);
+        if (userResult.IsError) return userResult.Errors;
+
+        var transactionsResult = await _transactionRepository.GetByUserIdWithFilterAsync(userId, filters, cancellationToken);
+        
+        if (transactionsResult.IsError) return transactionsResult.Errors;
+
+        var transactions = transactionsResult.Value.Transactions;
+        return await _transactionCSVService.ExportTransactionsToCSVAsync(transactions, cancellationToken);
     }
 }

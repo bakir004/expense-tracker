@@ -20,13 +20,15 @@ public class TransactionServiceFilteringTests
 {
     private readonly Mock<ITransactionRepository> _transactionRepositoryMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
+    private readonly Mock<ITransactionCSVService> _transactionCSVServiceMock = new();
     private readonly TransactionService _sut;
 
     public TransactionServiceFilteringTests()
     {
         _transactionRepositoryMock = new Mock<ITransactionRepository>();
         _userRepositoryMock = new Mock<IUserRepository>();
-        _sut = new TransactionService(_transactionRepositoryMock.Object, _userRepositoryMock.Object);
+        _transactionCSVServiceMock = new Mock<ITransactionCSVService>();
+        _sut = new TransactionService(_transactionRepositoryMock.Object, _userRepositoryMock.Object, _transactionCSVServiceMock.Object);
     }
 
     #region Helper Methods

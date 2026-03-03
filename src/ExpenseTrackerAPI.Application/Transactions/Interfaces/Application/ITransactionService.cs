@@ -72,4 +72,9 @@ public interface ITransactionService
     /// Get aggregated data for transactions by category chart for a user.
     /// </summary>
     Task<ErrorOr<TransactionByCategoryChartDataResponse>> GetTransactionByCategoryChartDataAsync(int userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Export transactions to CSV format for a user based on optional filters.
+    /// </summary>
+    Task<ErrorOr<Stream>> ExportTransactionsToCSVAsync(int userId, TransactionFilter filters, CancellationToken cancellationToken);
 }
