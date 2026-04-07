@@ -1,5 +1,7 @@
 # Expense Tracker API
 
+> Part of [bakir004/expense-tracker-ui](https://github.com/bakir004/expense-tracker-ui) — a full-stack expense tracking suite.
+
 This repository contains the source code for the Expense Tracker API, a RESTful web service built with ASP.NET Core. 
 The API allows users to manage their expenses, including creating, reading, updating, and deleting expense records.
 
